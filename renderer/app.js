@@ -1,6 +1,7 @@
 const btnOpen = document.getElementById("btnOpen");
 const btnSave = document.getElementById("btnSave");
 const btnGrayscale = document.getElementById("btnGrayscale");
+const toolButtons = document.querySelectorAll(".tool-button");
 // const canvas = document.getElementById("mainCanvas");
 
 // Assumindo que openFile devolve um caminho (ou base64) - depende da interface que você fizer
@@ -34,4 +35,13 @@ btnSave.addEventListener("click", async () => {
 
 btnGrayscale.addEventListener("click", () => {
   applyFilter(window.Filters.grayscale);
+});
+
+toolButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    toolButtons.forEach((b) => b.removeAttribute("active"));
+    btn.setAttribute("active", "true");
+    console.log(`Ferramenta selecionada: ${btn.id}`);
+    // Aqui você pode definir a ferramenta ativa no seu app
+  });
 });

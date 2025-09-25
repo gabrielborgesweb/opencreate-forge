@@ -4,17 +4,53 @@
     <meta charset="UTF-8" />
     <title>OpenCreate Forge</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="components.js"></script>
+    <meta
+      rel="viewport"
+      content="width=device-width, initial-scale=1.0 min-scale=1.0 max-scale=1.0"
+    />
   </head>
   <body>
-    <div id="toolbar">
-      <button id="btnOpen">Open Image...</button>
-      <button id="btnSave">Save Image...</button>
-      <button id="btnGrayscale">Filter: Grayscale</button>
-      <!-- mais botões de filtro / ferramenta -->
-    </div>
-    <div id="canvas-container">
-      <canvas id="mainCanvas"></canvas>
-    </div>
+    <main id="app" class="flex flex-column">
+      <div id="menubar" class="flex flex-row">
+        <button id="btnOpen">Open Image...</button>
+        <button id="btnSave">Save Image...</button>
+        <button id="btnGrayscale">Filter: Grayscale</button>
+
+        <!-- mais botões de filtro / ferramenta -->
+      </div>
+      <div id="editor" class="flex flex-row">
+        <div id="toolbar">
+          <button
+            class="tool-button"
+            id="moveTool"
+            title="Move Tool (V)"
+            active
+          >
+            <svg-src src="assets/svg/Cursor.svg"></svg-src>
+          </button>
+          <button class="tool-button" id="selectTool" title="Select Tool (M)">
+            <svg-src src="assets/svg/RectDashed.svg"></svg-src>
+          </button>
+        </div>
+        <div id="canvas-container">
+          <canvas id="mainCanvas"></canvas>
+        </div>
+        <div id="sidebar" class="flex flex-column">
+          <div id="layersPanel" class="panel">
+            <h3>Layers</h3>
+            <div id="layersList" class="list"></div>
+            <button id="btnAddLayer">Add Layer</button>
+          </div>
+          <div id="propertiesPanel" class="panel">
+            <h3>Properties</h3>
+            <div id="propertiesContent">
+              Select a layer to see its properties.
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
 
     <script src="filters/filters.js"></script>
     <script src="imageEngine.js"></script>

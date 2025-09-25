@@ -13,6 +13,25 @@ btnOpen.addEventListener("click", async () => {
   }
 });
 
+btnSave.addEventListener("click", async () => {
+  console.log("Botão Salvar clicado");
+
+  // Obter imagem do canvas como dataURL (PNG por exemplo)
+  const canvas = document.getElementById("mainCanvas");
+  const dataURL = canvas.toDataURL("image/png");
+
+  // Opcional: definir nome padrão
+  const defaultName = "opencreate_image.png";
+
+  const result = await window.electronAPI.saveFile({ dataURL, defaultName });
+  console.log("Resultado do saveFile:", result);
+  if (result.success) {
+    alert("Imagem salva em: " + result.filePath);
+  } else {
+    console.warn("Falha ao salvar:", result.error);
+  }
+});
+
 btnGrayscale.addEventListener("click", () => {
   applyFilter(window.Filters.grayscale);
 });

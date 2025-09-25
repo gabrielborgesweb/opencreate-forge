@@ -1,0 +1,23 @@
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+#toolbar {
+  height: 50px;
+  background: #ddd;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+}
+#canvas-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #888;
+}
+canvas {
+  background: white;
+}

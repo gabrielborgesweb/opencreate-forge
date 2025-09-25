@@ -1,39 +1,83 @@
 const canvas = document.getElementById("mainCanvas");
 const ctx = canvas.getContext("2d");
 
-let currentImageData = null;
+canvas.width = canvas.parentElement.clientWidth;
+canvas.height = canvas.parentElement.clientHeight;
 
+let scale = 1;
+let originX = 0;
+let originY = 0;
+let isPanning = false;
+let startX, startY;
+let currentImage = null;
+
+// --------- DRAW ---------
+function draw() {
+  ctx.save();
+  ctx.setTransform(scale, 0, 0, scale, originX, originY);
+  ctx.clearRect(
+    -originX / scale,
+    -originY / scale,
+    canvas.width / scale,
+    canvas.height / scale
+  );
+  if (currentImage) ctx.drawImage(currentImage, 0, 0);
+  ctx.restore();
+}
+
+// --------- LOAD IMAGE ---------
 function loadImage(filePath) {
   const img = new Image();
   img.onload = () => {
-    canvas.width = img.width;
-    canvas.height = img.height;
-    ctx.drawImage(img, 0, 0);
-    currentImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    currentImage = img;
+    scale = 1;
+    originX = 0;
+    originY = 0;
+    draw();
   };
   img.src = filePath;
 }
 
-// função para aplicar filtro genérico
-function applyFilter(filterFunc) {
-  if (!currentImageData) return;
-  const newData = ctx.createImageData(
-    currentImageData.width,
-    currentImageData.height
-  );
-  const src = currentImageData.data;
-  const dst = newData.data;
-  for (let i = 0; i < src.length; i += 4) {
-    const r = src[i],
-      g = src[i + 1],
-      b = src[i + 2],
-      a = src[i + 3];
-    const [nr, ng, nb, na] = filterFunc(r, g, b, a);
-    dst[i] = nr;
-    dst[i + 1] = ng;
-    dst[i + 2] = nb;
-    dst[i + 3] = na;
+// --------- ZOOM & PAN (touchpad + mouse) ---------
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+
+  // Trackpad pinch (ctrlKey=true) OU mouse + Ctrl/Cmd pressionado
+  if (e.ctrlKey || e.metaKey) {
+    const mouseX = e.offsetX;
+    const mouseY = e.offsetY;
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    const newScale = Math.min(Math.max(scale * zoomFactor, 0.1), 10);
+
+    originX = mouseX - (mouseX - originX) * (newScale / scale);
+    originY = mouseY - (mouseY - originY) * (newScale / scale);
+
+    scale = newScale;
+    draw();
+  } else {
+    // Dois dedos no trackpad → PAN
+    originX -= e.deltaX;
+    originY -= e.deltaY;
+    draw();
   }
-  ctx.putImageData(newData, 0, 0);
-  currentImageData = newData;
-}
+});
+
+// --------- PAN (mouse botão do meio) ---------
+canvas.addEventListener("mousedown", (e) => {
+  // Botão do meio (e.button === 1)
+  if (e.button === 1) {
+    isPanning = true;
+    startX = e.clientX - originX;
+    startY = e.clientY - originY;
+  }
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  if (!isPanning) return;
+  originX = e.clientX - startX;
+  originY = e.clientY - startY;
+  draw();
+});
+
+canvas.addEventListener("mouseup", () => (isPanning = false));
+canvas.addEventListener("mouseleave", () => (isPanning = false));

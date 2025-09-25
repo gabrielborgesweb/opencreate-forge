@@ -1,3 +1,5 @@
+// renderer/app.js
+
 const btnOpen = document.getElementById("btnOpen");
 const btnSave = document.getElementById("btnSave");
 const btnGrayscale = document.getElementById("btnGrayscale");

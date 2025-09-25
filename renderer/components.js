@@ -1,3 +1,5 @@
+// renderer/components.js
+
 // Definição do Web Component
 class SvgSrc extends HTMLElement {
   static get observedAttributes() {

@@ -51,11 +51,41 @@ button {
 #editor {
   flex: 1;
 }
-#canvas-container {
+/* checkerboard background for canvas container */
+#canvasContainer {
+  position: relative;
   flex: 1;
   display: flex;
-  background: #888;
+  flex-direction: column;
+  background-color: #222;
+  background-image: linear-gradient(45deg, #333 25%, transparent 25%),
+    linear-gradient(-45deg, #333 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #333 75%),
+    linear-gradient(-45deg, transparent 75%, #333 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
 }
+
+#zoomScale {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: sans-serif;
+}
+
+/* Ensure canvas itself is transparent so checkerboard shows through */
+#mainCanvas {
+  background: transparent;
+  display: block;
+  /* Optional: add a subtle border around viewport */
+  /* border: 1px solid rgba(0,0,0,0.12); */
+}
+
 canvas {
   background: #252525;
 }

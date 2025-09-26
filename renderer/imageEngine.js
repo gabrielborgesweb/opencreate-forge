@@ -1,64 +1,141 @@
 // renderer/imageEngine.js
+const ZOOM_SENSITIVITY = 0.05; // 0.1 = 10% por scroll (aumente ou diminua)
 
 const canvas = document.getElementById("mainCanvas");
+const container = canvas.parentElement;
 const ctx = canvas.getContext("2d");
 
-canvas.width = canvas.parentElement.clientWidth;
-canvas.height = canvas.parentElement.clientHeight;
-
-// Transformações globais
+// --- Transform / view ---
 let scale = 1;
-let originX = 0;
+let originX = 0; // screen translation for project origin: screenX = projectX*scale + originX
 let originY = 0;
 let isPanning = false;
-let startX, startY;
+let startX = 0,
+  startY = 0;
 
-// Gestão de camadas
-let layers = [];
+// --- Project (separate from viewport) ---
+let projectWidth = 1080;
+let projectHeight = 1080;
+
+// --- Layers ---
+let layers = []; // { id, name, image (HTMLImageElement), x, y, visible }
 let activeLayer = null;
 
-// --------- DRAW TODAS AS CAMADAS ---------
+// ajusta canvas para ocupar o viewport (em CSS pixels)
+function resizeViewport() {
+  const oldW = canvas.width || 0;
+  const oldH = canvas.height || 0;
+
+  canvas.width = container.clientWidth;
+  canvas.height =
+    container.clientHeight -
+    document.getElementById("projectsTabs").clientHeight;
+  canvas.style.width = container.clientWidth + "px";
+  canvas.style.height =
+    container.clientHeight -
+    document.getElementById("projectsTabs").clientHeight +
+    "px";
+
+  // manter a mesma posição visual do centro do projeto ao redimensionar
+  originX += (canvas.width - oldW) / 2;
+  originY += (canvas.height - oldH) / 2;
+
+  draw();
+}
+window.addEventListener("resize", resizeViewport);
+resizeViewport(); // inicializa
+
+// helpers
+function uid() {
+  return Date.now() + "-" + Math.floor(Math.random() * 10000);
+}
+
+// --------- DRAW: desenha o viewport, mostrando apenas a área do projeto desenhada nas coordenadas certas ---------
 function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!projectWidth || !projectHeight) return;
+
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, originX, originY);
-  ctx.clearRect(
-    -originX / scale,
-    -originY / scale,
-    canvas.width / scale,
-    canvas.height / scale
-  );
 
   for (let layer of layers) {
     if (!layer.visible) continue;
     ctx.drawImage(layer.image, layer.x, layer.y);
+  }
 
-    if (layer === activeLayer) {
-      ctx.strokeStyle = "rgba(0, 120, 255, 0.8)";
-      ctx.lineWidth = 2 / scale;
-      ctx.strokeRect(layer.x, layer.y, layer.image.width, layer.image.height);
-    }
+  ctx.strokeStyle = "rgba(0,0,0,0.4)";
+  ctx.lineWidth = 2 / Math.max(scale, 1);
+  ctx.strokeRect(0, 0, projectWidth, projectHeight);
+
+  if (activeLayer) {
+    ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
+    ctx.lineWidth = 2 / Math.max(scale, 1);
+    ctx.strokeRect(
+      activeLayer.x,
+      activeLayer.y,
+      activeLayer.image.width,
+      activeLayer.image.height
+    );
   }
 
   ctx.restore();
+
+  // atualizar zoom overlay
+  const zoomEl = document.getElementById("zoomScale");
+  if (zoomEl) {
+    zoomEl.textContent = Math.round(scale * 100) + "%";
+  }
 }
 
-// --------- ADICIONAR CAMADA ---------
+// --------- UTIL: converte coordenadas de evento -> coords do projeto ---------
+function screenToProject(screenX, screenY) {
+  // screenX/screenY: coordenadas em pixels relativos ao canvas (mouse offsetX/offsetY)
+  const px = (screenX - originX) / scale;
+  const py = (screenY - originY) / scale;
+  return { x: px, y: py };
+}
+
+// --------- CREATE NEW PROJECT ---------
+function createNewProject(w, h) {
+  projectWidth = Math.max(1, Math.floor(w));
+  projectHeight = Math.max(1, Math.floor(h));
+
+  // limpar camadas
+  layers = [];
+  activeLayer = null;
+  updateLayersPanel();
+  fitToScreen();
+
+  // centralizar projeto na viewport
+  // scale = 1;
+  // originX = Math.round((canvas.width - projectWidth * scale) / 2);
+  // originY = Math.round((canvas.height - projectHeight * scale) / 2);
+
+  draw();
+  console.log(`Novo projeto: ${projectWidth}x${projectHeight}`);
+}
+
+// --------- ADD LAYER (from image) ---------
 function addLayer(img, name = "Layer") {
+  // posicionar no centro do projeto por padrão
+  const lx = Math.round((projectWidth - img.width) / 2);
+  const ly = Math.round((projectHeight - img.height) / 2);
   const newLayer = {
-    id: Date.now(),
+    id: uid(),
     name,
     image: img,
-    x: 0,
-    y: 0,
+    x: lx,
+    y: ly,
     visible: true,
   };
   layers.push(newLayer);
-  setActiveLayer(newLayer);
+  setActiveLayer(newLayer.id);
   updateLayersPanel();
   draw();
 }
 
-// --------- LOAD IMAGE EM UMA CAMADA ---------
+// --------- LOAD IMAGE (filePath from main) -> cria uma camada ---------
 function loadImage(filePath) {
   const img = new Image();
   img.onload = () => {
@@ -68,63 +145,203 @@ function loadImage(filePath) {
   img.src = filePath;
 }
 
-// --------- DEFINIR CAMADA ATIVA ---------
-function setActiveLayer(layer) {
-  activeLayer = layer;
+// --------- Set active layer by id ---------
+function setActiveLayer(id) {
+  const layer = layers.find((l) => l.id === id);
+  activeLayer = layer || null;
   updateLayersPanel();
   draw();
 }
 
-// --------- ATUALIZAR PAINEL DE CAMADAS ---------
+// --------- update layers panel (DOM) ---------
 function updateLayersPanel() {
   const list = document.getElementById("layersList");
   if (!list) return;
   list.innerHTML = "";
-  layers.forEach((layer) => {
+  // mostrar em ordem (última = topo)
+  for (let i = layers.length - 1; i >= 0; i--) {
+    const layer = layers[i];
     const div = document.createElement("div");
     div.className = "layer-item";
     div.textContent = layer.name;
-    if (layer === activeLayer) div.style.background = "#555";
-    div.onclick = () => setActiveLayer(layer);
+    div.style.padding = "6px";
+    div.style.cursor = "pointer";
+    div.style.userSelect = "none";
+    if (layer === activeLayer) {
+      div.style.background = "#555";
+    } else {
+      div.style.background = "transparent";
+    }
+    div.onclick = () => setActiveLayer(layer.id);
     list.appendChild(div);
-  });
+  }
 }
 
-// --------- MOVER CAMADA COM MOVE TOOL ---------
-let isDraggingLayer = false;
-let dragOffsetX, dragOffsetY;
+// --------- EXPORT (render all layers to an offscreen canvas sized to project) ---------
+function exportImage() {
+  if (!projectWidth || !projectHeight) {
+    // fallback: export viewport (not recommended)
+    return canvas.toDataURL("image/png");
+  }
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = projectWidth;
+  exportCanvas.height = projectHeight;
+  const ectx = exportCanvas.getContext("2d");
 
+  // limpar (transparente)
+  ectx.clearRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+  // desenhar cada layer (em ordem)
+  for (let layer of layers) {
+    if (!layer.visible) continue;
+    ectx.drawImage(layer.image, layer.x, layer.y);
+  }
+
+  return exportCanvas.toDataURL("image/png");
+}
+
+// --------- ZOOM & PAN (wheel + middle mouse pan + trackpad heuristics) ---------
+
+// wheel: ctrl/meta (pinch or cmd/ctrl + scroll) => zoom; otherwise delta => pan (trackpad two-finger)
+canvas.addEventListener(
+  "wheel",
+  (e) => {
+    e.preventDefault();
+    // if ctrl/meta pressed => zoom
+    if (e.ctrlKey || e.metaKey) {
+      // focal point (screen)
+      const mx = e.offsetX;
+      const my = e.offsetY;
+      const zoomFactor =
+        e.deltaY < 0 ? 1 + ZOOM_SENSITIVITY : 1 - ZOOM_SENSITIVITY;
+      const newScale = Math.min(Math.max(scale * zoomFactor, 0.05), 50);
+
+      // keep mouse point stable
+      originX = mx - (mx - originX) * (newScale / scale);
+      originY = my - (my - originY) * (newScale / scale);
+
+      scale = newScale;
+      draw();
+    } else {
+      // pan (trackpad two-finger) — deltaX, deltaY in screen pixels
+      originX -= e.deltaX;
+      originY -= e.deltaY;
+      draw();
+    }
+  },
+  { passive: false }
+);
+
+// middle-button drag = pan view
 canvas.addEventListener("mousedown", (e) => {
+  // botão do meio = 1
+  if (e.button === 1) {
+    isPanning = true;
+    startX = e.clientX - originX;
+    startY = e.clientY - originY;
+    // prevenir comportamento default (p.ex. autoscroll)
+    e.preventDefault();
+    return;
+  }
+
+  // Se move tool está ativa, lidar com inicio de arraste de camada
   const moveToolActive = document
     .getElementById("moveTool")
     .hasAttribute("active");
-
-  if (moveToolActive && activeLayer) {
-    const mx = (e.offsetX - originX) / scale;
-    const my = (e.offsetY - originY) / scale;
-
+  if (moveToolActive && activeLayer && e.button === 0) {
+    const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
+    // se clicou dentro da bbox da camada, inicia arrastar camada
     if (
-      mx >= activeLayer.x &&
-      mx <= activeLayer.x + activeLayer.image.width &&
-      my >= activeLayer.y &&
-      my <= activeLayer.y + activeLayer.image.height
+      px >= activeLayer.x &&
+      px <= activeLayer.x + activeLayer.image.width &&
+      py >= activeLayer.y &&
+      py <= activeLayer.y + activeLayer.image.height
     ) {
-      isDraggingLayer = true;
-      dragOffsetX = mx - activeLayer.x;
-      dragOffsetY = my - activeLayer.y;
+      // iniciar arraste de camada
+      draggingLayerState.isDragging = true;
+      draggingLayerState.offsetX = px - activeLayer.x;
+      draggingLayerState.offsetY = py - activeLayer.y;
     }
   }
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  if (!isDraggingLayer || !activeLayer) return;
-  const mx = (e.offsetX - originX) / scale;
-  const my = (e.offsetY - originY) / scale;
+  // pan com middle button
+  if (isPanning) {
+    originX = e.clientX - startX;
+    originY = e.clientY - startY;
+    draw();
+    return;
+  }
 
-  activeLayer.x = mx - dragOffsetX;
-  activeLayer.y = my - dragOffsetY;
-  draw();
+  // arrastar camada
+  if (draggingLayerState.isDragging && activeLayer) {
+    const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
+    activeLayer.x = px - draggingLayerState.offsetX;
+    activeLayer.y = py - draggingLayerState.offsetY;
+    draw();
+    return;
+  }
 });
 
-canvas.addEventListener("mouseup", () => (isDraggingLayer = false));
-canvas.addEventListener("mouseleave", () => (isDraggingLayer = false));
+canvas.addEventListener("mouseup", (e) => {
+  if (e.button === 1) {
+    isPanning = false;
+  }
+  // finalizar drag de layer independente do botão
+  draggingLayerState.isDragging = false;
+});
+
+canvas.addEventListener("mouseleave", () => {
+  isPanning = false;
+  draggingLayerState.isDragging = false;
+});
+
+// state for layer dragging
+const draggingLayerState = {
+  isDragging: false,
+  offsetX: 0,
+  offsetY: 0,
+};
+
+// expose API to global (app.js will call these)
+window.ImageEngine = {
+  loadImage,
+  addLayer,
+  createNewProject,
+  setActiveLayer,
+  exportImage,
+  draw,
+  getState: () => ({
+    projectWidth,
+    projectHeight,
+    layers,
+    activeLayer,
+    scale,
+    originX,
+    originY,
+  }),
+};
+
+function fitToScreen() {
+  if (!projectWidth || !projectHeight) return;
+
+  const viewW = canvas.width;
+  const viewH = canvas.height;
+
+  // fator de escala mínimo para caber em width/height
+  const scaleX = viewW / projectWidth;
+  const scaleY = viewH / projectHeight;
+  scale = Math.min(scaleX, scaleY) * 0.9; // 90% para dar uma margem
+
+  // centralizar
+  originX = (viewW - projectWidth * scale) / 2;
+  originY = (viewH - projectHeight * scale) / 2;
+
+  draw();
+}
+fitToScreen();
+
+// ensure canvas is transparent so checkerboard of container shows through
+canvas.style.background = "transparent";
+draw();

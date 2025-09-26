@@ -38,11 +38,16 @@
         </div>
         <div id="canvasContainer">
           <div id="projectsTabs">
-            <button disabled="disabled">Home</button>
+            <button id="homeTab" class="active">
+              <svg-src
+                src="assets/svg/Home.svg"
+                style="fill: #c5c5c5"
+              ></svg-src>
+            </button>
             <!-- abas de projetos -->
           </div>
           <canvas id="mainCanvas"></canvas>
-          <div id="zoomScale"></div>
+          <div id="zoomScale" style="display: none"></div>
         </div>
         <div id="sidebar" class="flex flex-column">
           <div id="layersPanel" class="panel">
@@ -59,25 +64,6 @@
         </div>
       </div>
     </main>
-
-    <dialog id="newProjectDialog">
-      <form method="dialog" id="newProjectForm">
-        <h2>New Project</h2>
-        <label>
-          Width:
-          <input type="number" id="projWidth" value="800" min="1" />
-        </label>
-        <br />
-        <label>
-          Height:
-          <input type="number" id="projHeight" value="600" min="1" />
-        </label>
-        <menu>
-          <button id="cancelNew" value="cancel">Cancel</button>
-          <button id="createNew" value="default">Create</button>
-        </menu>
-      </form>
-    </dialog>
 
     <script src="imageEngine.js"></script>
     <script src="filters/filters.js"></script>

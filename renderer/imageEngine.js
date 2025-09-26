@@ -14,12 +14,38 @@ let startX = 0,
   startY = 0;
 
 // --- Project (separate from viewport) ---
-let projectWidth = 1080;
-let projectHeight = 1080;
+let projectWidth = undefined; // undefined = no project yet
+let projectHeight = undefined;
 
 // --- Layers ---
 let layers = []; // { id, name, image (HTMLImageElement), x, y, visible }
 let activeLayer = null;
+
+// helpers
+function uid() {
+  return Date.now() + "-" + Math.floor(Math.random() * 10000);
+}
+
+let checkerPattern = null;
+function getCheckerPattern() {
+  if (!checkerPattern) {
+    const size = 10;
+    const patternCanvas = document.createElement("canvas");
+    patternCanvas.width = size * 2;
+    patternCanvas.height = size * 2;
+    const pctx = patternCanvas.getContext("2d");
+
+    pctx.fillStyle = "#333";
+    pctx.fillRect(0, 0, patternCanvas.width, patternCanvas.height);
+
+    pctx.fillStyle = "#444";
+    pctx.fillRect(0, 0, size, size);
+    pctx.fillRect(size, size, size, size);
+
+    checkerPattern = ctx.createPattern(patternCanvas, "repeat");
+  }
+  return checkerPattern;
+}
 
 // ajusta canvas para ocupar o viewport (em CSS pixels)
 function resizeViewport() {
@@ -45,17 +71,33 @@ function resizeViewport() {
 window.addEventListener("resize", resizeViewport);
 resizeViewport(); // inicializa
 
-// helpers
-function uid() {
-  return Date.now() + "-" + Math.floor(Math.random() * 10000);
-}
-
 // --------- DRAW: desenha o viewport, mostrando apenas a área do projeto desenhada nas coordenadas certas ---------
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   if (!projectWidth || !projectHeight) return;
 
+  // --- desenhar checkerboard em coords de tela (não escala) ---
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
+
+  // calcular área do projeto em coords de tela
+  const projectXOnScreen = originX;
+  const projectYOnScreen = originY;
+  const projectWOnScreen = projectWidth * scale;
+  const projectHOnScreen = projectHeight * scale;
+
+  ctx.fillStyle = getCheckerPattern();
+  ctx.fillRect(
+    projectXOnScreen,
+    projectYOnScreen,
+    projectWOnScreen,
+    projectHOnScreen
+  );
+
+  ctx.restore();
+
+  // --- desenhar camadas e bordas em coords do projeto ---
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, originX, originY);
 
@@ -64,7 +106,15 @@ function draw() {
     ctx.drawImage(layer.image, layer.x, layer.y);
   }
 
-  ctx.strokeStyle = "rgba(0,0,0,0.4)";
+  // sombra (box shadow)
+  // ctx.shadowColor = "rgba(0,0,0,1)"; // cor da sombra
+  // ctx.shadowBlur = 4; // intensidade do blur
+  // ctx.shadowSpread = 8; // espalhamento
+  // ctx.shadowOffsetX = 0; // deslocamento horizontal
+  // ctx.shadowOffsetY = 4; // deslocamento vertical
+
+  // stroke
+  ctx.strokeStyle = "rgba(0,0,0,0.5)";
   ctx.lineWidth = 2 / Math.max(scale, 1);
   ctx.strokeRect(0, 0, projectWidth, projectHeight);
 
@@ -79,9 +129,22 @@ function draw() {
     );
   }
 
+  const currentTab = projectsTabs.querySelectorAll("button.active")[0];
+  // atualiza o layers do projects (para o caso de mudanças fora do draw)
+  if (typeof projects !== "undefined" && typeof currentTab !== "undefined") {
+    const project = projects.find((p) => p.name === currentTab.textContent);
+    // console.log("Projects array:", projects);
+    // console.log("Active tab:", currentTab.textContent);
+    // console.log("Updating project layers:", project);
+    // console.log("Current layers:", layers);
+    if (project) {
+      project.layers = layers;
+    }
+  }
+
   ctx.restore();
 
-  // atualizar zoom overlay
+  // zoom overlay
   const zoomEl = document.getElementById("zoomScale");
   if (zoomEl) {
     zoomEl.textContent = Math.round(scale * 100) + "%";
@@ -304,25 +367,6 @@ const draggingLayerState = {
   offsetY: 0,
 };
 
-// expose API to global (app.js will call these)
-window.ImageEngine = {
-  loadImage,
-  addLayer,
-  createNewProject,
-  setActiveLayer,
-  exportImage,
-  draw,
-  getState: () => ({
-    projectWidth,
-    projectHeight,
-    layers,
-    activeLayer,
-    scale,
-    originX,
-    originY,
-  }),
-};
-
 function fitToScreen() {
   if (!projectWidth || !projectHeight) return;
 
@@ -345,3 +389,56 @@ fitToScreen();
 // ensure canvas is transparent so checkerboard of container shows through
 canvas.style.background = "transparent";
 draw();
+
+// -------- RESETAR VIEWPORT PARA HOMEPAGE-TAB ---------
+
+function resetViewport() {
+  projectWidth = undefined;
+  projectHeight = undefined;
+  layers = [];
+  activeLayer = null;
+  scale = 1;
+  originX = canvas.width / 2;
+  originY = canvas.height / 2;
+  updateLayersPanel();
+  draw();
+}
+
+// --------- AO TROCAR PARA A ABA DO PROJETO ---------
+
+function setProject(w, h, projLayers) {
+  projectWidth = w;
+  projectHeight = h;
+  layers = projLayers.map((l) => ({
+    ...l,
+    image: (() => {
+      const img = new Image();
+      img.src = l.image.src; // assume que l.image é um HTMLImageElement ou similar
+      return img;
+    })(),
+  }));
+  activeLayer = layers.length > 0 ? layers[0] : null;
+  updateLayersPanel();
+  fitToScreen();
+}
+
+// expose API to global (app.js will call these)
+window.ImageEngine = {
+  loadImage,
+  addLayer,
+  createNewProject,
+  setActiveLayer,
+  exportImage,
+  draw,
+  resetViewport,
+  setProject,
+  getState: () => ({
+    projectWidth,
+    projectHeight,
+    layers,
+    activeLayer,
+    scale,
+    originX,
+    originY,
+  }),
+};

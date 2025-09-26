@@ -6,6 +6,29 @@ const btnSave = document.getElementById("btnSave");
 const btnGrayscale = document.getElementById("btnGrayscale");
 const toolButtons = document.querySelectorAll(".tool-button");
 
+const projects = [
+  // { id, name, width, height, layers: [...] }
+];
+const projectsTabs = document.getElementById("projectsTabs");
+const homeTab = document.getElementById("homeTab");
+
+// set initial state
+homeTab.classList.add("active");
+
+// ao clicar em Home, resetar viewport
+homeTab.addEventListener("click", () => {
+  if (typeof window.ImageEngine === "undefined") {
+    alert("ImageEngine não está disponível");
+    return;
+  }
+  window.ImageEngine.resetViewport();
+  projectsTabs.querySelectorAll("button").forEach((b) => {
+    b.classList.remove("active");
+  });
+  homeTab.classList.add("active");
+  document.getElementById("zoomScale").style.display = "none";
+});
+
 // show modal for new project (programmatic simple modal)
 function showNewProjectModal() {
   // evitar duplicar
@@ -26,12 +49,15 @@ function showNewProjectModal() {
 
   modal.innerHTML = `
     <div style="background:#222;color:#fff;padding:18px;border-radius:8px;min-width:260px;">
-      <h3 style="margin:0 0 8px 0">New Project</h3>
+      <h3 style="margin:0 0 8px 0">Create New Project</h3>
       <label style="display:block;margin-bottom:6px">
-        Width: <input id="ocf-proj-width" type="number" value="800" min="1" style="width:100px;margin-left:6px" />
+        Name: <input id="ocf-proj-name" type="text" value="Untitled" min="1" style="width:100px;margin-left:6px" />
+      </label>
+      <label style="display:block;margin-bottom:6px">
+        Width: <input id="ocf-proj-width" type="number" value="1080" min="1" style="width:100px;margin-left:6px" />
       </label>
       <label style="display:block;margin-bottom:12px">
-        Height: <input id="ocf-proj-height" type="number" value="600" min="1" style="width:100px;margin-left:6px" />
+        Height: <input id="ocf-proj-height" type="number" value="1080" min="1" style="width:100px;margin-left:6px" />
       </label>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button id="ocf-cancel" style="padding:6px 10px">Cancel</button>
@@ -55,6 +81,39 @@ function showNewProjectModal() {
     }
     // chama a engine para criar o novo projeto
     window.ImageEngine.createNewProject(w, h);
+
+    // registrar aba
+    const tab = document.createElement("button");
+    tab.textContent =
+      document.getElementById("ocf-proj-name").value || "Untitled";
+    tab.classList.add("active");
+    homeTab.classList.remove("active");
+
+    // ao clicar na aba, trocar para o projeto
+    tab.addEventListener("click", () => {
+      const proj = projects.find((p) => p.name === tab.textContent);
+      if (proj) {
+        window.ImageEngine.setProject(proj.width, proj.height, proj.layers);
+        projectsTabs.querySelectorAll("button").forEach((b) => {
+          b.classList.remove("active");
+        });
+        tab.classList.add("active");
+        document.getElementById("zoomScale").style.display = "block";
+      }
+    });
+
+    projectsTabs.appendChild(tab);
+
+    projects.push({
+      id: Date.now(),
+      name: tab.textContent,
+      width: w,
+      height: h,
+      layers: [],
+    });
+
+    document.getElementById("zoomScale").style.display = "block";
+
     modal.remove();
   });
 }
@@ -66,6 +125,15 @@ btnNew.addEventListener("click", () => {
 
 // Open file (usa API exposta via preload)
 btnOpen.addEventListener("click", async () => {
+  if (typeof window.ImageEngine === "undefined") {
+    alert("ImageEngine não está disponível");
+    return;
+  }
+  if (projects.length === 0) {
+    alert("Crie um novo projeto antes de abrir uma imagem");
+    return;
+  }
+  // abre dialog e retorna caminho do arquivo
   const result = await window.electronAPI.openFile();
   if (result) {
     // window.ImageEngine.loadImage adiciona como nova camada

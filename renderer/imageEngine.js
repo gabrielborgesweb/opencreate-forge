@@ -129,18 +129,18 @@ function draw() {
     );
   }
 
-  const currentTab = projectsTabs.querySelectorAll("button.active")[0];
-  // atualiza o layers do projects (para o caso de mudanças fora do draw)
-  if (typeof projects !== "undefined" && typeof currentTab !== "undefined") {
-    const project = projects.find((p) => p.name === currentTab.textContent);
-    // console.log("Projects array:", projects);
-    // console.log("Active tab:", currentTab.textContent);
-    // console.log("Updating project layers:", project);
-    // console.log("Current layers:", layers);
-    if (project) {
-      project.layers = layers;
-    }
-  }
+  // const currentTab = projectsTabs.querySelectorAll("button.active")[0];
+  // // atualiza o layers do projects (para o caso de mudanças fora do draw)
+  // if (typeof projects !== "undefined" && typeof currentTab !== "undefined") {
+  //   const project = projects.find((p) => p.id === currentTab.id);
+  //   console.log("Projects array:", projects);
+  //   console.log("Active tab:", currentTab);
+  //   console.log("Updating project layers:", project);
+  //   console.log("Current layers:", layers);
+  //   if (project) {
+  //     project.layers = layers;
+  //   }
+  // }
 
   ctx.restore();
 

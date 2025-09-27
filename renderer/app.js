@@ -12,6 +12,13 @@ const projects = [
 const projectsTabs = document.getElementById("projectsTabs");
 const homeTab = document.getElementById("homeTab");
 
+function getActiveProject() {
+  const activeTab = projectsTabs.querySelector("button.active:not(#homeTab)");
+  if (!activeTab) return null;
+  // O ID do projeto é armazenado como o ID do botão
+  return projects.find((p) => p.id == activeTab.id);
+}
+
 // set initial state
 homeTab.classList.add("active");
 
@@ -21,6 +28,22 @@ homeTab.addEventListener("click", () => {
     alert("ImageEngine não está disponível");
     return;
   }
+  // --- NOVO: Salvar estado do projeto anterior ---
+  const currentProject = getActiveProject();
+  if (currentProject) {
+    // Pega o estado atual da ImageEngine
+    const state = window.ImageEngine.getState();
+    // Salva as layers no objeto do projeto
+    currentProject.layers = state.layers;
+    console.log(
+      "Salvando layers do projeto '",
+      currentProject.name,
+      "' antes de ir para Home:",
+      state.layers
+    );
+  }
+  // ---------------------------------------------
+
   window.ImageEngine.resetViewport();
   projectsTabs.querySelectorAll("button").forEach((b) => {
     b.classList.remove("active");
@@ -84,14 +107,33 @@ function showNewProjectModal() {
 
     // registrar aba
     const tab = document.createElement("button");
+    // this.tab = tab;
     tab.textContent =
       document.getElementById("ocf-proj-name").value || "Untitled";
+    tab.id = Date.now();
+    projectsTabs.querySelectorAll("button").forEach((b) => {
+      b.classList.remove("active");
+    });
     tab.classList.add("active");
-    homeTab.classList.remove("active");
 
     // ao clicar na aba, trocar para o projeto
     tab.addEventListener("click", () => {
-      const proj = projects.find((p) => p.name === tab.textContent);
+      // --- NOVO: Salvar estado do projeto anterior ---
+      const currentProject = getActiveProject();
+      if (currentProject) {
+        const state = window.ImageEngine.getState();
+        currentProject.layers = state.layers;
+        console.log(
+          "Salvando layers do projeto '",
+          currentProject.name,
+          "' antes de trocar:",
+          state.layers
+        );
+      }
+      // ---------------------------------------------
+
+      const proj = projects.find((p) => p.id == tab.id);
+      console.log("Switching to project:", proj); // Log agora é único e correto
       if (proj) {
         window.ImageEngine.setProject(proj.width, proj.height, proj.layers);
         projectsTabs.querySelectorAll("button").forEach((b) => {

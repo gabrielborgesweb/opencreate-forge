@@ -384,7 +384,7 @@ function fitToScreen() {
 
   draw();
 }
-fitToScreen();
+// fitToScreen();
 
 // ensure canvas is transparent so checkerboard of container shows through
 canvas.style.background = "transparent";
@@ -406,7 +406,8 @@ function resetViewport() {
 
 // --------- AO TROCAR PARA A ABA DO PROJETO ---------
 
-function setProject(w, h, projLayers) {
+// Mudar a assinatura para aceitar o estado do viewport salvo
+function setProject(w, h, projLayers, viewportState = {}) {
   projectWidth = w;
   projectHeight = h;
   layers = projLayers.map((l) => ({
@@ -419,7 +420,19 @@ function setProject(w, h, projLayers) {
   }));
   activeLayer = layers.length > 0 ? layers[0] : null;
   updateLayersPanel();
-  fitToScreen();
+
+  // --- NOVO: Aplicar estado do viewport ou re-ajustar ---
+  if (viewportState.scale) {
+    scale = viewportState.scale;
+    originX = viewportState.originX;
+    originY = viewportState.originY;
+  } else {
+    // Se não há estado salvo, ajusta a tela como era antes (e.g., primeira vez)
+    fitToScreen();
+  }
+  // ----------------------------------------------------
+
+  draw();
 }
 
 // expose API to global (app.js will call these)

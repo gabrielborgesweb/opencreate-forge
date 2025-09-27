@@ -28,18 +28,23 @@ homeTab.addEventListener("click", () => {
     alert("ImageEngine não está disponível");
     return;
   }
-  // --- NOVO: Salvar estado do projeto anterior ---
+
+  // --- SALVAR ESTADO ANTES DE TROCAR PARA HOME ---
   const currentProject = getActiveProject();
   if (currentProject) {
     // Pega o estado atual da ImageEngine
     const state = window.ImageEngine.getState();
     // Salva as layers no objeto do projeto
     currentProject.layers = state.layers;
+    // Salvar estado do viewport
+    currentProject.scale = state.scale;
+    currentProject.originX = state.originX;
+    currentProject.originY = state.originY;
     console.log(
-      "Salvando layers do projeto '",
+      "Salvando layers e viewport do projeto '",
       currentProject.name,
       "' antes de ir para Home:",
-      state.layers
+      state
     );
   }
   // ---------------------------------------------
@@ -107,7 +112,7 @@ function showNewProjectModal() {
 
     // registrar aba
     const tab = document.createElement("button");
-    // this.tab = tab;
+    this.tab = tab;
     tab.textContent =
       document.getElementById("ocf-proj-name").value || "Untitled";
     tab.id = Date.now();
@@ -118,24 +123,40 @@ function showNewProjectModal() {
 
     // ao clicar na aba, trocar para o projeto
     tab.addEventListener("click", () => {
-      // --- NOVO: Salvar estado do projeto anterior ---
+      // --- SALVAR ESTADO ANTES DE TROCAR ---
       const currentProject = getActiveProject();
       if (currentProject) {
         const state = window.ImageEngine.getState();
         currentProject.layers = state.layers;
+        // Salvar estado do viewport
+        currentProject.scale = state.scale;
+        currentProject.originX = state.originX;
+        currentProject.originY = state.originY;
         console.log(
-          "Salvando layers do projeto '",
+          "Salvando layers e viewport do projeto '",
           currentProject.name,
           "' antes de trocar:",
-          state.layers
+          state
         );
       }
-      // ---------------------------------------------
+      // ------------------------------------
 
       const proj = projects.find((p) => p.id == tab.id);
-      console.log("Switching to project:", proj); // Log agora é único e correto
+      console.log("Switching to project:", proj);
       if (proj) {
-        window.ImageEngine.setProject(proj.width, proj.height, proj.layers);
+        // --- CARREGAR ESTADO DO VIEWPORT ---
+        const viewportState = {
+          scale: proj.scale,
+          originX: proj.originX,
+          originY: proj.originY,
+        };
+        window.ImageEngine.setProject(
+          proj.width,
+          proj.height,
+          proj.layers,
+          viewportState
+        );
+        // ------------------------------------
         projectsTabs.querySelectorAll("button").forEach((b) => {
           b.classList.remove("active");
         });
@@ -146,13 +167,22 @@ function showNewProjectModal() {
 
     projectsTabs.appendChild(tab);
 
+    // --- INICIALIZAR PROJETO COM O ESTADO ATUAL DO VIEWPORT ---
+    // Pega o estado atual após o createNewProject (que chama fitToScreen)
+    const initialState = window.ImageEngine.getState();
+
     projects.push({
       id: Date.now(),
       name: tab.textContent,
       width: w,
       height: h,
       layers: [],
+      // Adicionar estado inicial do viewport
+      scale: initialState.scale,
+      originX: initialState.originX,
+      originY: initialState.originY,
     });
+    // --------------------------------------------------------
 
     document.getElementById("zoomScale").style.display = "block";
 
@@ -196,13 +226,13 @@ btnSave.addEventListener("click", async () => {
 });
 
 // Filter grayscale (usa a função global applyFilter se existir)
-btnGrayscale.addEventListener("click", () => {
-  if (typeof applyFilter === "function") {
-    applyFilter(window.Filters.grayscale);
-  } else {
-    alert("Filtro não implementado (applyFilter ausente)");
-  }
-});
+// btnGrayscale.addEventListener("click", () => {
+//   if (typeof applyFilter === "function") {
+//     applyFilter(window.Filters.grayscale);
+//   } else {
+//     alert("Filtro não implementado (applyFilter ausente)");
+//   }
+// });
 
 // tool buttons: toggle active attr
 toolButtons.forEach((btn) => {

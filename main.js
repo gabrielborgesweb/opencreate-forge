@@ -8,13 +8,28 @@ function createWindow() {
     height: 900,
     minWidth: 800,
     minHeight: 600,
+    backgroundColor: "#000",
+    center: true,
+    darkTheme: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      additionalArguments: [
+        "--ignore-gpu-blacklist",
+        "--enable-hardware-overlays=single-fullscreen",
+        "--disable-pinch",
+        "--forced-compositing-mode",
+        "--disable-raf-throttling",
+        "--in-process-gpu",
+        // "--disable-frame-rate-limit",
+        "--enable-logging",
+      ],
     },
   });
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
+  win.maximize();
+  win.setMenu(null);
 }
 
 app.whenReady().then(() => {
@@ -67,5 +82,5 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  app.quit();
 });

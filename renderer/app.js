@@ -107,15 +107,33 @@ function showNewProjectModal() {
       alert("Width/Height inválidos");
       return;
     }
-    // chama a engine para criar o novo projeto
-    window.ImageEngine.createNewProject(w, h);
+
+    // caso estar focado em outro projeto, salvar estado antes de criar novo
+    const currentProject = getActiveProject();
+    if (currentProject) {
+      const state = window.ImageEngine.getState();
+      currentProject.layers = state.layers;
+      // Salvar estado do viewport
+      currentProject.scale = state.scale;
+      currentProject.originX = state.originX;
+      currentProject.originY = state.originY;
+      console.log(
+        "Salvando layers e viewport do projeto '",
+        currentProject.name,
+        "' antes de criar novo:",
+        state
+      );
+    }
+    // ------------------------------------
+
+    // usar um id único consistente para a aba e o projeto
+    const projectId = Date.now();
 
     // registrar aba
     const tab = document.createElement("button");
-    this.tab = tab;
     tab.textContent =
       document.getElementById("ocf-proj-name").value || "Untitled";
-    tab.id = Date.now();
+    tab.id = projectId;
     projectsTabs.querySelectorAll("button").forEach((b) => {
       b.classList.remove("active");
     });
@@ -172,7 +190,7 @@ function showNewProjectModal() {
     const initialState = window.ImageEngine.getState();
 
     projects.push({
-      id: Date.now(),
+      id: projectId,
       name: tab.textContent,
       width: w,
       height: h,
@@ -183,6 +201,9 @@ function showNewProjectModal() {
       originY: initialState.originY,
     });
     // --------------------------------------------------------
+
+    // chama a engine para criar o novo projeto
+    window.ImageEngine.createNewProject(w, h);
 
     document.getElementById("zoomScale").style.display = "block";
 

@@ -6,6 +6,9 @@ const btnSave = document.getElementById("btnSave");
 const btnGrayscale = document.getElementById("btnGrayscale");
 const toolButtons = document.querySelectorAll(".tool-button");
 
+const btnAddEmptyLayer = document.getElementById("btnAddEmptyLayer");
+const selectedToolDiv = document.getElementById("selectedtool");
+
 const projects = [
   // { id, name, width, height, layers: [...] }
 ];
@@ -255,18 +258,72 @@ btnSave.addEventListener("click", async () => {
 //   }
 // });
 
-// tool buttons: toggle active attr
+function updateSelectedToolUI() {
+  const activeTool = document.querySelector(".tool-button[active]");
+  if (!activeTool) return;
+
+  let toolName = activeTool.getAttribute("title").split(" (")[0];
+
+  selectedToolDiv.innerHTML = `
+    <span style="margin-left: 10px">${toolName}</span>
+    ${
+      toolName === "Brush Tool"
+        ? `
+      <input type="color" id="brushColor" value="${brushColor}" style="margin-left: 10px">
+      <input type="range" id="brushSize" min="1" max="50" value="${brushSize}" style="margin-left: 10px">
+      <span id="brushSizeValue">${brushSize}px</span>
+    `
+        : ""
+    }
+  `;
+
+  if (toolName === "Brush Tool") {
+    document.getElementById("brushColor").addEventListener("input", (e) => {
+      window.ImageEngine.setBrushColor(e.target.value);
+    });
+    document.getElementById("brushSize").addEventListener("input", (e) => {
+      const size = parseInt(e.target.value);
+      window.ImageEngine.setBrushSize(size);
+      document.getElementById("brushSizeValue").textContent = size + "px";
+    });
+  }
+}
+
+// Modify the tool buttons click handler
 toolButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
     toolButtons.forEach((b) => b.removeAttribute("active"));
     btn.setAttribute("active", "true");
+    updateSelectedToolUI();
   });
 });
 
-// Add keyboard shortcuts
+// Add empty layer button handler
+btnAddEmptyLayer.addEventListener("click", () => {
+  if (!projectWidth || !projectHeight) {
+    alert("Create a project first");
+    return;
+  }
+  window.ImageEngine.createEmptyLayer(projectWidth, projectHeight);
+});
+
+// Add to keyboard shortcuts
 document.addEventListener("keydown", (e) => {
-  // Don't trigger shortcuts when typing in input fields
   if (e.target.tagName === "INPUT") return;
+
+  if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+    switch (e.key.toLowerCase()) {
+      case "v":
+        document.getElementById("moveTool").click();
+        break;
+      case "m":
+        document.getElementById("selectTool").click();
+        break;
+      case "b":
+        document.getElementById("brushTool").click();
+        break;
+    }
+  }
 
   // Common shortcuts
   if (e.ctrlKey || e.metaKey) {
@@ -293,16 +350,7 @@ document.addEventListener("keydown", (e) => {
         break;
     }
   }
-
-  // Tool shortcuts (without modifiers)
-  if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-    switch (e.key.toLowerCase()) {
-      case "v":
-        document.getElementById("moveTool").click();
-        break;
-      case "m":
-        document.getElementById("selectTool").click();
-        break;
-    }
-  }
 });
+
+// Initialize UI
+updateSelectedToolUI();

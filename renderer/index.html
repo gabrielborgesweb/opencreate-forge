@@ -9,7 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+      content="default-src 'self'; script-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
     />
   </head>
   <body>
@@ -22,6 +22,7 @@
 
         <!-- mais botões de filtro / ferramenta -->
       </div>
+      <div id="selectedtool"></div>
       <div id="editor" class="flex flex-row">
         <div id="toolbar">
           <button
@@ -34,6 +35,9 @@
           </button>
           <button class="tool-button" id="selectTool" title="Select Tool (M)">
             <svg-src src="assets/svg/RectDashed.svg"></svg-src>
+          </button>
+          <button class="tool-button" id="brushTool" title="Brush Tool (B)">
+            <svg-src src="assets/svg/Brush.svg"></svg-src>
           </button>
         </div>
         <div id="canvasContainer">
@@ -53,7 +57,10 @@
           <div id="layersPanel" class="panel">
             <h3>Layers</h3>
             <div id="layersList" class="list"></div>
-            <button id="btnAddLayer">Add Layer</button>
+            <div style="display: flex; gap: 8px">
+              <button id="btnAddEmptyLayer">Empty Layer</button>
+              <button id="btnAddLayer">Add Image Layer</button>
+            </div>
           </div>
           <div id="propertiesPanel" class="panel">
             <h3>Properties</h3>

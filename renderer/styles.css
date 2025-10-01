@@ -59,6 +59,15 @@ button {
   padding: 1rem;
   color: #fff;
 }
+#selectedtool {
+  height: 30px;
+  min-height: 30px;
+  background: #474747;
+  color: #fff;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
 #editor {
   flex: 1;
 }
@@ -157,8 +166,15 @@ canvas {
   }
 }
 
+#layersList {
+  min-height: 150px;
+  height: 300px;
+  overflow: auto;
+  resize: vertical;
+}
+
 .layer-item {
-  transition: background 0.2s;
+  cursor: pointer;
 }
 
 .layer-item button {

@@ -129,6 +129,16 @@ function draw() {
     );
   }
 
+  for (let layer of layers) {
+    if (!layer.visible) continue;
+    // Draw either temp canvas during stroke or regular image
+    if (layer === activeLayer && layer.tempCanvas) {
+      ctx.drawImage(layer.tempCanvas, layer.x, layer.y);
+    } else {
+      ctx.drawImage(layer.image, layer.x, layer.y);
+    }
+  }
+
   // const currentTab = projectsTabs.querySelectorAll("button.active")[0];
   // // atualiza o layers do projects (para o caso de mudanças fora do draw)
   // if (typeof projects !== "undefined" && typeof currentTab !== "undefined") {
@@ -198,6 +208,23 @@ function addLayer(img, name = "Layer") {
   updateLayersPanel();
   saveState();
   draw();
+}
+
+// --------- CREATE EMPTY LAYER ---------
+function createEmptyLayer(w, h, name = "Empty Layer") {
+  const canvas = document.createElement("canvas");
+  canvas.width = projectWidth; // Use project dimensions instead of passed w,h
+  canvas.height = projectHeight;
+
+  // Initialize with transparent background
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const img = new Image();
+  img.onload = () => {
+    addLayer(img, name);
+  };
+  img.src = canvas.toDataURL();
 }
 
 // --------- LOAD IMAGE (filePath from main) -> cria uma camada ---------
@@ -382,25 +409,35 @@ canvas.addEventListener("mousedown", (e) => {
     isPanning = true;
     startX = e.clientX - originX;
     startY = e.clientY - originY;
-    // prevenir comportamento default (p.ex. autoscroll)
     e.preventDefault();
     return;
   }
 
-  // Se move tool está ativa, lidar com inicio de arraste de camada
-  const moveToolActive = document
-    .getElementById("moveTool")
-    .hasAttribute("active");
-  if (moveToolActive && activeLayer && e.button === 0) {
-    const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
-    // se clicou dentro da bbox da camada, inicia arrastar camada
+  const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
+
+  // Handle brush tool
+  if (
+    document.getElementById("brushTool").hasAttribute("active") &&
+    activeLayer &&
+    e.button === 0
+  ) {
+    isDrawing = true;
+    drawBrushStroke(px, py);
+    return;
+  }
+
+  // Handle move tool
+  if (
+    document.getElementById("moveTool").hasAttribute("active") &&
+    activeLayer &&
+    e.button === 0
+  ) {
     if (
       px >= activeLayer.x &&
       px <= activeLayer.x + activeLayer.image.width &&
       py >= activeLayer.y &&
       py <= activeLayer.y + activeLayer.image.height
     ) {
-      // iniciar arraste de camada
       draggingLayerState.isDragging = true;
       draggingLayerState.offsetX = px - activeLayer.x;
       draggingLayerState.offsetY = py - activeLayer.y;
@@ -415,8 +452,10 @@ canvas.addEventListener("mousemove", (e) => {
     originY = e.clientY - startY;
     draw();
     return;
+  } else if (isDrawing && activeLayer) {
+    const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
+    drawBrushStroke(px, py);
   }
-
   // arrastar camada
   if (draggingLayerState.isDragging && activeLayer) {
     const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
@@ -431,6 +470,24 @@ canvas.addEventListener("mouseup", (e) => {
   if (e.button === 1) {
     isPanning = false;
   }
+  if (isDrawing && activeLayer) {
+    isDrawing = false;
+
+    if (strokeCanvas) {
+      const img = new Image();
+      img.onload = () => {
+        activeLayer.image = img;
+        activeLayer.tempCanvas = null;
+        strokeCanvas = null;
+        strokeStartBounds = null;
+        saveState();
+        draw();
+      };
+      img.src = strokeCanvas.toDataURL();
+    }
+
+    // saveState(); // Save for undo/redo after stroke
+  }
   // Save state if we were dragging a layer
   if (draggingLayerState.isDragging) {
     saveState(); // Save for undo/redo after moving layer
@@ -441,6 +498,14 @@ canvas.addEventListener("mouseup", (e) => {
 canvas.addEventListener("mouseleave", () => {
   isPanning = false;
   draggingLayerState.isDragging = false;
+
+  if (isDrawing) {
+    isDrawing = false;
+    strokeCanvas = null;
+    strokeStartBounds = null;
+    activeLayer.tempCanvas = null;
+    draw();
+  }
 });
 
 // state for layer dragging
@@ -518,6 +583,93 @@ function setProject(w, h, projLayers, viewportState = {}) {
   draw();
 }
 
+// --------- BRUSH TOOL ---------
+let isDrawing = false;
+let brushColor = "#000000";
+let brushSize = 5;
+let strokeCanvas = null;
+let strokeStartBounds = null;
+
+function drawBrushStroke(x, y) {
+  if (
+    !activeLayer ||
+    !document.getElementById("brushTool").hasAttribute("active")
+  ) {
+    return;
+  }
+
+  const localX = x - activeLayer.x;
+  const localY = y - activeLayer.y;
+
+  if (isDrawing) {
+    // Start new stroke - initialize bounds tracking
+    strokeStartBounds = {
+      minX: activeLayer.x,
+      minY: activeLayer.y,
+      maxX: activeLayer.x + activeLayer.image.width,
+      maxY: activeLayer.y + activeLayer.image.height,
+    };
+  }
+
+  // Track expanded bounds including current stroke
+  const strokeRadius = brushSize / 2;
+  strokeStartBounds.minX = Math.min(strokeStartBounds.minX, x - strokeRadius);
+  strokeStartBounds.minY = Math.min(strokeStartBounds.minY, y - strokeRadius);
+  strokeStartBounds.maxX = Math.max(strokeStartBounds.maxX, x + strokeRadius);
+  strokeStartBounds.maxY = Math.max(strokeStartBounds.maxY, y + strokeRadius);
+
+  // Calculate new dimensions and offset
+  const newWidth = Math.ceil(strokeStartBounds.maxX - strokeStartBounds.minX);
+  const newHeight = Math.ceil(strokeStartBounds.maxY - strokeStartBounds.minY);
+  const offsetX = activeLayer.x - strokeStartBounds.minX;
+  const offsetY = activeLayer.y - strokeStartBounds.minY;
+
+  // Create or resize stroke canvas
+  if (!strokeCanvas) {
+    strokeCanvas = document.createElement("canvas");
+    const ctx = strokeCanvas.getContext("2d");
+
+    // Set new dimensions
+    strokeCanvas.width = newWidth;
+    strokeCanvas.height = newHeight;
+
+    // Copy existing layer content to new position
+    ctx.drawImage(activeLayer.image, offsetX, offsetY);
+  }
+
+  // Ensure stroke canvas is large enough
+  if (strokeCanvas.width < newWidth || strokeCanvas.height < newHeight) {
+    const oldCanvas = strokeCanvas;
+    strokeCanvas = document.createElement("canvas");
+    strokeCanvas.width = newWidth;
+    strokeCanvas.height = newHeight;
+
+    // Copy existing content
+    const ctx = strokeCanvas.getContext("2d");
+    ctx.drawImage(oldCanvas, 0, 0);
+  }
+
+  // Draw new stroke
+  const ctx = strokeCanvas.getContext("2d");
+  ctx.fillStyle = brushColor;
+  ctx.beginPath();
+  ctx.arc(
+    x - strokeStartBounds.minX,
+    y - strokeStartBounds.minY,
+    strokeRadius,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  // Update layer position and temporary canvas
+  activeLayer.x = strokeStartBounds.minX;
+  activeLayer.y = strokeStartBounds.minY;
+  activeLayer.tempCanvas = strokeCanvas;
+
+  draw();
+}
+
 // expose API to global (app.js will call these)
 window.ImageEngine = {
   loadImage,
@@ -539,4 +691,11 @@ window.ImageEngine = {
   }),
   undo,
   redo,
+  createEmptyLayer,
+  setBrushColor: (color) => {
+    brushColor = color;
+  },
+  setBrushSize: (size) => {
+    brushSize = Math.max(1, size);
+  },
 };

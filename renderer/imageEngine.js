@@ -176,6 +176,7 @@ function createNewProject(w, h) {
   // originY = Math.round((canvas.height - projectHeight * scale) / 2);
 
   draw();
+  saveState();
   console.log(`Novo projeto: ${projectWidth}x${projectHeight}`);
 }
 
@@ -195,6 +196,7 @@ function addLayer(img, name = "Layer") {
   layers.push(newLayer);
   setActiveLayer(newLayer.id);
   updateLayersPanel();
+  saveState();
   draw();
 }
 
@@ -216,25 +218,103 @@ function setActiveLayer(id) {
   draw();
 }
 
-// --------- update layers panel (DOM) ---------
+// Undo/redo stacks
+const undoStack = [];
+const redoStack = [];
+const MAX_HISTORY = 50;
+
+function saveState() {
+  const state = {
+    layers: layers.map((l) => ({ ...l, image: l.image.src })),
+    activeLayer: activeLayer ? activeLayer.id : null,
+  };
+  console.log("Saving state for undo:", state);
+
+  undoStack.push(state);
+  if (undoStack.length > MAX_HISTORY) undoStack.shift();
+  redoStack.length = 0; // Clear redo stack when new action is performed
+}
+
+function undo() {
+  if (undoStack.length <= 1) return;
+  const prevState = undoStack.pop();
+  redoStack.push(prevState);
+  const newState = undoStack[undoStack.length - 1];
+  restoreState(newState);
+  draw();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  const nextState = redoStack.pop();
+  undoStack.push(nextState);
+  restoreState(nextState);
+  draw();
+}
+
+function restoreState(state) {
+  layers = state.layers.map((l) => ({
+    ...l,
+    image: (() => {
+      const img = new Image();
+      img.src = l.image;
+      return img;
+    })(),
+  }));
+  activeLayer = state.activeLayer
+    ? layers.find((l) => l.id === state.activeLayer)
+    : null;
+  updateLayersPanel();
+  draw();
+}
+
+// Enhance layer panel
 function updateLayersPanel() {
   const list = document.getElementById("layersList");
   if (!list) return;
   list.innerHTML = "";
-  // mostrar em ordem (última = topo)
+
   for (let i = layers.length - 1; i >= 0; i--) {
     const layer = layers[i];
     const div = document.createElement("div");
     div.className = "layer-item";
-    div.textContent = layer.name;
+    div.style.display = "flex";
+    div.style.alignItems = "center";
     div.style.padding = "6px";
-    div.style.cursor = "pointer";
-    div.style.userSelect = "none";
-    if (layer === activeLayer) {
-      div.style.background = "#555";
-    } else {
-      div.style.background = "transparent";
-    }
+    div.style.background = layer === activeLayer ? "#555" : "transparent";
+
+    // Visibility toggle
+    const visibilityBtn = document.createElement("button");
+    visibilityBtn.innerHTML = layer.visible ? "👁" : "👁‍🗨";
+    visibilityBtn.style.marginRight = "8px";
+    visibilityBtn.onclick = (e) => {
+      e.stopPropagation();
+      layer.visible = !layer.visible;
+      saveState();
+      updateLayersPanel();
+      draw();
+    };
+
+    // Layer name
+    const name = document.createElement("span");
+    name.textContent = layer.name;
+    name.style.flex = "1";
+
+    // Delete button
+    const deleteBtn = document.createElement("button");
+    deleteBtn.innerHTML = "🗑";
+    deleteBtn.onclick = (e) => {
+      e.stopPropagation();
+      layers = layers.filter((l) => l.id !== layer.id);
+      if (activeLayer === layer) {
+        activeLayer = layers[layers.length - 1] || null;
+      }
+      saveState();
+      updateLayersPanel();
+      draw();
+    };
+
+    div.append(visibilityBtn, name, deleteBtn);
     div.onclick = () => setActiveLayer(layer.id);
     list.appendChild(div);
   }
@@ -351,8 +431,11 @@ canvas.addEventListener("mouseup", (e) => {
   if (e.button === 1) {
     isPanning = false;
   }
-  // finalizar drag de layer independente do botão
-  draggingLayerState.isDragging = false;
+  // Save state if we were dragging a layer
+  if (draggingLayerState.isDragging) {
+    saveState(); // Save for undo/redo after moving layer
+    draggingLayerState.isDragging = false;
+  }
 });
 
 canvas.addEventListener("mouseleave", () => {
@@ -454,4 +537,6 @@ window.ImageEngine = {
     originX,
     originY,
   }),
+  undo,
+  redo,
 };

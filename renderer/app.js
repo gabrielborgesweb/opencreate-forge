@@ -262,3 +262,47 @@ toolButtons.forEach((btn) => {
     btn.setAttribute("active", "true");
   });
 });
+
+// Add keyboard shortcuts
+document.addEventListener("keydown", (e) => {
+  // Don't trigger shortcuts when typing in input fields
+  if (e.target.tagName === "INPUT") return;
+
+  // Common shortcuts
+  if (e.ctrlKey || e.metaKey) {
+    switch (e.key.toLowerCase()) {
+      case "n":
+        e.preventDefault();
+        showNewProjectModal();
+        break;
+      case "o":
+        e.preventDefault();
+        btnOpen.click();
+        break;
+      case "s":
+        e.preventDefault();
+        btnSave.click();
+        break;
+      case "z":
+        e.preventDefault();
+        if (e.shiftKey) {
+          window.ImageEngine.redo();
+        } else {
+          window.ImageEngine.undo();
+        }
+        break;
+    }
+  }
+
+  // Tool shortcuts (without modifiers)
+  if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+    switch (e.key.toLowerCase()) {
+      case "v":
+        document.getElementById("moveTool").click();
+        break;
+      case "m":
+        document.getElementById("selectTool").click();
+        break;
+    }
+  }
+});

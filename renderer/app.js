@@ -239,8 +239,21 @@ btnOpen.addEventListener("click", async () => {
 
 // Save -> export via ImageEngine (exportImage) que retorna dataURL
 btnSave.addEventListener("click", async () => {
+  if (typeof window.ImageEngine === "undefined") {
+    alert("ImageEngine não está disponível");
+    return;
+  }
+  if (projects.length === 0) {
+    alert("Crie um novo projeto antes de salvar uma imagem");
+    return;
+  }
   const dataURL = window.ImageEngine.exportImage();
-  const defaultName = "opencreate_export.png";
+  // const defaultName = `{}.png`;
+  // get default name from project name
+  const currentProject = getActiveProject();
+  const defaultName = currentProject
+    ? `${currentProject.name || "project"}.png`
+    : "opencreate_export.png";
   const result = await window.electronAPI.saveFile({ dataURL, defaultName });
   if (result && result.success) {
     alert("Imagem salva em: " + result.filePath);

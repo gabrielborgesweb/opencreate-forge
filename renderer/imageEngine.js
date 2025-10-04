@@ -1,5 +1,8 @@
 // renderer/imageEngine.js
-const ZOOM_SENSITIVITY = 0.02; // 0.1 = 10% por scroll (aumente ou diminua)
+const ZOOM_SENSITIVITY = 0.01; // 0.01 = 1% por scroll (aumente ou diminua)
+let currentScale = 1;
+let targetScale = 1;
+const ZOOM_SMOOTHING = 0.15; // Controls how smooth the zoom animation is
 
 const canvas = document.getElementById("mainCanvas");
 const container = canvas.parentElement;
@@ -153,6 +156,49 @@ function draw() {
   // }
 
   ctx.restore();
+
+  if (scale > 1.0) {
+    ctx.imageSmoothingEnabled = false;
+  } else {
+    ctx.imageSmoothingEnabled = true;
+  }
+
+  // desenhar grid se zoom >= 500%
+  function shouldShowGrid() {
+    return scale >= 5; // 500%
+  }
+
+  // desenha grid 1px x 1px
+  function drawGrid() {
+    const gridSize = 1; // 1px grid
+
+    ctx.save();
+    ctx.setTransform(scale, 0, 0, scale, originX, originY);
+
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(128,128,128,0.2)";
+    ctx.lineWidth = 1 / scale;
+
+    // Vertical lines
+    for (let x = 0; x <= projectWidth; x += gridSize) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, projectHeight);
+    }
+
+    // Horizontal lines
+    for (let y = 0; y <= projectHeight; y += gridSize) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(projectWidth, y);
+    }
+
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // In the draw() function, after drawing layers but before restore:
+  if (shouldShowGrid()) {
+    drawGrid();
+  }
 
   // zoom overlay
   const zoomEl = document.getElementById("zoomScale");
@@ -377,23 +423,50 @@ canvas.addEventListener(
   "wheel",
   (e) => {
     e.preventDefault();
-    // if ctrl/meta pressed => zoom
+
     if (e.ctrlKey || e.metaKey) {
-      // focal point (screen)
+      // Focal point (screen coords)
       const mx = e.offsetX;
       const my = e.offsetY;
-      const zoomFactor =
-        e.deltaY < 0 ? 1 + ZOOM_SENSITIVITY : 1 - ZOOM_SENSITIVITY;
-      const newScale = Math.min(Math.max(scale * zoomFactor, 0.05), 50);
 
-      // keep mouse point stable
+      // Normalize wheel delta
+      const wheelDelta = -e.deltaY;
+      const normalizedDelta =
+        Math.sign(wheelDelta) *
+        Math.min(Math.abs(wheelDelta * ZOOM_SENSITIVITY), 0.5);
+
+      // Calculate target scale with momentum
+      const zoomFactor = Math.exp(normalizedDelta);
+      targetScale = Math.min(Math.max(scale * zoomFactor, 0.05), 50);
+
+      // Smoothly animate to target scale
+      const scaleChange = (targetScale - scale) * ZOOM_SMOOTHING;
+      const newScale = scale + scaleChange;
+
+      // Update origin to keep mouse point stable
       originX = mx - (mx - originX) * (newScale / scale);
       originY = my - (my - originY) * (newScale / scale);
 
       scale = newScale;
+
+      // Disable image smoothing at high zoom levels
+      ctx.imageSmoothingEnabled = scale <= 1.0;
+
       draw();
+
+      // Request another frame if still animating
+      if (Math.abs(targetScale - scale) > 0.001) {
+        requestAnimationFrame(() => {
+          const evt = new WheelEvent("wheel", {
+            deltaY: 0,
+            ctrlKey: true,
+            metaKey: true,
+          });
+          canvas.dispatchEvent(evt);
+        });
+      }
     } else {
-      // pan (trackpad two-finger) — deltaX, deltaY in screen pixels
+      // Pan behavior remains the same
       originX -= e.deltaX;
       originY -= e.deltaY;
       draw();

@@ -271,6 +271,7 @@ btnSave.addEventListener("click", async () => {
 //   }
 // });
 
+// Modificar a função updateSelectedToolUI()
 function updateSelectedToolUI() {
   const activeTool = document.querySelector(".tool-button[active]");
   if (!activeTool) return;
@@ -283,8 +284,10 @@ function updateSelectedToolUI() {
       toolName === "Brush Tool"
         ? `
       <input type="color" id="brushColor" value="${brushColor}" style="margin-left: 10px">
-      <input type="range" id="brushSize" min="1" max="50" value="${brushSize}" style="margin-left: 10px">
+      <input type="range" id="brushSize" min="1" max="2000" value="${brushSize}" style="margin-left: 10px">
       <span id="brushSizeValue">${brushSize}px</span>
+      <input type="range" id="brushHardness" min="0" max="100" value="100" style="margin-left: 10px">
+      <span id="brushHardnessValue">100%</span>
     `
         : ""
     }
@@ -294,10 +297,18 @@ function updateSelectedToolUI() {
     document.getElementById("brushColor").addEventListener("input", (e) => {
       window.ImageEngine.setBrushColor(e.target.value);
     });
+
     document.getElementById("brushSize").addEventListener("input", (e) => {
       const size = parseInt(e.target.value);
       window.ImageEngine.setBrushSize(size);
       document.getElementById("brushSizeValue").textContent = size + "px";
+    });
+
+    document.getElementById("brushHardness").addEventListener("input", (e) => {
+      const hardness = parseInt(e.target.value) / 100;
+      window.ImageEngine.setBrushHardness(hardness);
+      document.getElementById("brushHardnessValue").textContent =
+        e.target.value + "%";
     });
   }
 }

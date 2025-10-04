@@ -453,6 +453,7 @@ canvas.addEventListener(
       ctx.imageSmoothingEnabled = scale <= 1.0;
 
       draw();
+      brushPreview.style.display = "none";
 
       // Request another frame if still animating
       if (Math.abs(targetScale - scale) > 0.001) {
@@ -665,13 +666,15 @@ function setProject(w, h, projLayers, viewportState = {}) {
 // --------- BRUSH TOOL ---------
 let isDrawing = false;
 let brushColor = "#000000";
-let brushSize = 5;
+let brushSize = 50;
+let brushHardness = 1; // 0-1, onde 1 é sólido e 0 é totalmente borrado
 let strokeCanvas = null;
 let strokeStartBounds = null;
 
 // Add these variables near other brush-related variables
 let lastX = null;
 let lastY = null;
+let brushPreview = null;
 
 function drawBrushStroke(x, y) {
   if (
@@ -748,31 +751,97 @@ function drawBrushStroke(x, y) {
     ctx.drawImage(oldCanvas, 0, 0);
   }
 
-  // Draw line between points
   const ctx = strokeCanvas.getContext("2d");
-  ctx.strokeStyle = brushColor;
-  ctx.lineWidth = brushSize;
+  // Convert hex color to rgba
+  const color = brushColor;
+  const r = parseInt(color.substr(1, 2), 16);
+  const g = parseInt(color.substr(3, 2), 16);
+  const b = parseInt(color.substr(5, 2), 16);
+
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  ctx.beginPath();
-  ctx.moveTo(lastX - strokeStartBounds.minX, lastY - strokeStartBounds.minY);
-  ctx.lineTo(x - strokeStartBounds.minX, y - strokeStartBounds.minY);
-  ctx.stroke();
+  const hardness = Math.max(0, Math.min(1, brushHardness / 100));
 
-  // Update layer position and temporary canvas
+  const outerR = brushSize / 2;
+  // Defina uma “faixa de transição” — quanto menor hardness, mais lenta a transição
+  // Por exemplo: falloffWidth = outerR * (1 - hardness)
+  const falloffWidth = outerR * (1 - hardness);
+  const innerR = outerR - falloffWidth;
+
+  // Função para desenhar um “stamp” no ponto (px, py)
+  function stamp(px, py) {
+    const grad = ctx.createRadialGradient(px, py, innerR, px, py, outerR);
+    grad.addColorStop(0, `rgba(${r},${g},${b},1)`);
+    // Ajuste do stop intermediário para controlar suavidade
+    const inter = innerR / outerR;
+    grad.addColorStop(inter, `rgba(${r},${g},${b},1)`);
+    grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(px, py, outerR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Interpole ao longo da linha entre lastX,lastY e x,y
+  const dx = x - lastX;
+  const dy = y - lastY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const steps = Math.max(Math.floor(dist), 1);
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const px = lastX + dx * t - strokeStartBounds.minX;
+    const py = lastY + dy * t - strokeStartBounds.minY;
+    stamp(px, py);
+  }
+
+  // Atualiza camada etc.
   activeLayer.x = strokeStartBounds.minX;
   activeLayer.y = strokeStartBounds.minY;
   activeLayer.tempCanvas = strokeCanvas;
 
-  // Update last point
   lastX = x;
   lastY = y;
 
   draw();
 }
 
-// expose API to global (app.js will call these)
+// Adicionar após as funções de eventos do mouse
+function updateBrushPreview(e) {
+  if (!document.getElementById("brushTool").hasAttribute("active")) {
+    if (brushPreview) {
+      brushPreview.style.display = "none";
+    }
+    return;
+  }
+
+  if (!brushPreview) {
+    brushPreview = document.createElement("div");
+    brushPreview.style.position = "fixed";
+    brushPreview.style.pointerEvents = "none";
+    brushPreview.style.zIndex = "10000";
+    brushPreview.style.border = "1px solid white";
+    brushPreview.style.boxShadow = "0 0 0 1px black";
+    brushPreview.style.borderRadius = "50%";
+    document.body.appendChild(brushPreview);
+  }
+
+  const size = brushSize * scale;
+  brushPreview.style.width = size + "px";
+  brushPreview.style.height = size + "px";
+  brushPreview.style.display = "block";
+  brushPreview.style.left = e.clientX - size / 2 + "px";
+  brushPreview.style.top = e.clientY - size / 2 + "px";
+}
+
+canvas.addEventListener("mousemove", updateBrushPreview);
+canvas.addEventListener("mouseenter", updateBrushPreview);
+canvas.addEventListener("mouseleave", () => {
+  if (brushPreview) brushPreview.style.display = "none";
+});
+
+// modificar o objeto ImageEngine para incluir o novo controle
 window.ImageEngine = {
   loadImage,
   addLayer,
@@ -799,5 +868,8 @@ window.ImageEngine = {
   },
   setBrushSize: (size) => {
     brushSize = Math.max(1, size);
+  },
+  setBrushHardness: (hardness) => {
+    brushHardness = Math.max(0, Math.min(1, hardness));
   },
 };

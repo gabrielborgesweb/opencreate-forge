@@ -1,5 +1,5 @@
 // renderer/imageEngine.js
-const ZOOM_SENSITIVITY = 0.05; // 0.1 = 10% por scroll (aumente ou diminua)
+const ZOOM_SENSITIVITY = 0.02; // 0.1 = 10% por scroll (aumente ou diminua)
 
 const canvas = document.getElementById("mainCanvas");
 const container = canvas.parentElement;
@@ -422,6 +422,8 @@ canvas.addEventListener("mousedown", (e) => {
     e.button === 0
   ) {
     isDrawing = true;
+    lastX = px;
+    lastY = py;
     drawBrushStroke(px, py);
     return;
   }
@@ -472,6 +474,8 @@ canvas.addEventListener("mouseup", (e) => {
   }
   if (isDrawing && activeLayer) {
     isDrawing = false;
+    lastX = null;
+    lastY = null;
 
     if (strokeCanvas) {
       const img = new Image();
@@ -501,6 +505,8 @@ canvas.addEventListener("mouseleave", () => {
 
   if (isDrawing) {
     isDrawing = false;
+    lastX = null;
+    lastY = null;
     strokeCanvas = null;
     strokeStartBounds = null;
     activeLayer.tempCanvas = null;
@@ -590,6 +596,10 @@ let brushSize = 5;
 let strokeCanvas = null;
 let strokeStartBounds = null;
 
+// Add these variables near other brush-related variables
+let lastX = null;
+let lastY = null;
+
 function drawBrushStroke(x, y) {
   if (
     !activeLayer ||
@@ -601,22 +611,44 @@ function drawBrushStroke(x, y) {
   const localX = x - activeLayer.x;
   const localY = y - activeLayer.y;
 
-  if (isDrawing) {
-    // Start new stroke - initialize bounds tracking
+  if (!isDrawing) {
+    lastX = x;
+    lastY = y;
+    return;
+  }
+
+  // Start new stroke - initialize bounds tracking
+  if (!strokeStartBounds) {
     strokeStartBounds = {
-      minX: activeLayer.x,
-      minY: activeLayer.y,
-      maxX: activeLayer.x + activeLayer.image.width,
-      maxY: activeLayer.y + activeLayer.image.height,
+      minX: Math.min(activeLayer.x, x - brushSize),
+      minY: Math.min(activeLayer.y, y - brushSize),
+      maxX: Math.max(activeLayer.x + activeLayer.image.width, x + brushSize),
+      maxY: Math.max(activeLayer.y + activeLayer.image.height, y + brushSize),
     };
   }
 
   // Track expanded bounds including current stroke
   const strokeRadius = brushSize / 2;
-  strokeStartBounds.minX = Math.min(strokeStartBounds.minX, x - strokeRadius);
-  strokeStartBounds.minY = Math.min(strokeStartBounds.minY, y - strokeRadius);
-  strokeStartBounds.maxX = Math.max(strokeStartBounds.maxX, x + strokeRadius);
-  strokeStartBounds.maxY = Math.max(strokeStartBounds.maxY, y + strokeRadius);
+  strokeStartBounds.minX = Math.min(
+    strokeStartBounds.minX,
+    x - strokeRadius,
+    lastX - strokeRadius
+  );
+  strokeStartBounds.minY = Math.min(
+    strokeStartBounds.minY,
+    y - strokeRadius,
+    lastY - strokeRadius
+  );
+  strokeStartBounds.maxX = Math.max(
+    strokeStartBounds.maxX,
+    x + strokeRadius,
+    lastX + strokeRadius
+  );
+  strokeStartBounds.maxY = Math.max(
+    strokeStartBounds.maxY,
+    y + strokeRadius,
+    lastY + strokeRadius
+  );
 
   // Calculate new dimensions and offset
   const newWidth = Math.ceil(strokeStartBounds.maxX - strokeStartBounds.minX);
@@ -628,12 +660,8 @@ function drawBrushStroke(x, y) {
   if (!strokeCanvas) {
     strokeCanvas = document.createElement("canvas");
     const ctx = strokeCanvas.getContext("2d");
-
-    // Set new dimensions
     strokeCanvas.width = newWidth;
     strokeCanvas.height = newHeight;
-
-    // Copy existing layer content to new position
     ctx.drawImage(activeLayer.image, offsetX, offsetY);
   }
 
@@ -643,29 +671,30 @@ function drawBrushStroke(x, y) {
     strokeCanvas = document.createElement("canvas");
     strokeCanvas.width = newWidth;
     strokeCanvas.height = newHeight;
-
-    // Copy existing content
     const ctx = strokeCanvas.getContext("2d");
     ctx.drawImage(oldCanvas, 0, 0);
   }
 
-  // Draw new stroke
+  // Draw line between points
   const ctx = strokeCanvas.getContext("2d");
-  ctx.fillStyle = brushColor;
+  ctx.strokeStyle = brushColor;
+  ctx.lineWidth = brushSize;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
   ctx.beginPath();
-  ctx.arc(
-    x - strokeStartBounds.minX,
-    y - strokeStartBounds.minY,
-    strokeRadius,
-    0,
-    Math.PI * 2
-  );
-  ctx.fill();
+  ctx.moveTo(lastX - strokeStartBounds.minX, lastY - strokeStartBounds.minY);
+  ctx.lineTo(x - strokeStartBounds.minX, y - strokeStartBounds.minY);
+  ctx.stroke();
 
   // Update layer position and temporary canvas
   activeLayer.x = strokeStartBounds.minX;
   activeLayer.y = strokeStartBounds.minY;
   activeLayer.tempCanvas = strokeCanvas;
+
+  // Update last point
+  lastX = x;
+  lastY = y;
 
   draw();
 }

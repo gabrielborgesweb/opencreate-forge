@@ -453,7 +453,6 @@ canvas.addEventListener(
       ctx.imageSmoothingEnabled = scale <= 1.0;
 
       draw();
-      brushPreview.style.display = "none";
 
       // Request another frame if still animating
       if (Math.abs(targetScale - scale) > 0.001) {
@@ -666,17 +665,16 @@ function setProject(w, h, projLayers, viewportState = {}) {
 // --------- BRUSH TOOL ---------
 let isDrawing = false;
 let brushColor = "#000000";
-let brushSize = 50;
-let brushHardness = 1; // 0-1, onde 1 é sólido e 0 é totalmente borrado
+let brushSize = 5;
 let strokeCanvas = null;
 let strokeStartBounds = null;
 
 // Add these variables near other brush-related variables
 let lastX = null;
 let lastY = null;
-let brushPreview = null;
 
 function drawBrushStroke(x, y) {
+  // Verifica se a camada está ativa e a ferramenta de pincel está selecionada
   if (
     !activeLayer ||
     !document.getElementById("brushTool").hasAttribute("active")
@@ -684,164 +682,77 @@ function drawBrushStroke(x, y) {
     return;
   }
 
+  // Calcula as coordenadas locais dentro da camada
   const localX = x - activeLayer.x;
   const localY = y - activeLayer.y;
 
+  // Se não estiver desenhando, apenas armazena as coordenadas para o próximo ponto
   if (!isDrawing) {
     lastX = x;
     lastY = y;
     return;
   }
 
-  // Start new stroke - initialize bounds tracking
-  if (!strokeStartBounds) {
-    strokeStartBounds = {
-      minX: Math.min(activeLayer.x, x - brushSize),
-      minY: Math.min(activeLayer.y, y - brushSize),
-      maxX: Math.max(activeLayer.x + activeLayer.image.width, x + brushSize),
-      maxY: Math.max(activeLayer.y + activeLayer.image.height, y + brushSize),
-    };
+  // --- ALTERAÇÕES COMEÇAM AQUI ---
+
+  // 1. Usa o canvas da camada (ou cria um temporário se for o primeiro ponto)
+  // Certifique-se de que activeLayer.tempCanvas existe ou use activeLayer.image
+  let currentCanvas = activeLayer.tempCanvas || activeLayer.image;
+  let ctx;
+
+  // Se for o início do traço, precisamos criar um canvas temporário
+  // para desenhar nele e manter a imagem original intacta até o 'stroke end'
+  if (!activeLayer.tempCanvas) {
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = activeLayer.image.width;
+    tempCanvas.height = activeLayer.image.height;
+    ctx = tempCanvas.getContext("2d");
+
+    // Copia o conteúdo da imagem da camada para o canvas temporário
+    ctx.drawImage(activeLayer.image, 0, 0);
+    activeLayer.tempCanvas = tempCanvas;
+    currentCanvas = tempCanvas;
+  } else {
+    ctx = currentCanvas.getContext("2d");
   }
 
-  // Track expanded bounds including current stroke
-  const strokeRadius = brushSize / 2;
-  strokeStartBounds.minX = Math.min(
-    strokeStartBounds.minX,
-    x - strokeRadius,
-    lastX - strokeRadius
-  );
-  strokeStartBounds.minY = Math.min(
-    strokeStartBounds.minY,
-    y - strokeRadius,
-    lastY - strokeRadius
-  );
-  strokeStartBounds.maxX = Math.max(
-    strokeStartBounds.maxX,
-    x + strokeRadius,
-    lastX + strokeRadius
-  );
-  strokeStartBounds.maxY = Math.max(
-    strokeStartBounds.maxY,
-    y + strokeRadius,
-    lastY + strokeRadius
-  );
+  // 2. Adiciona um "clipping mask" para garantir que nada seja pintado fora dos limites do canvas.
+  // Isso é crucial para evitar pintar fora das bordas da camada.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, currentCanvas.width, currentCanvas.height);
+  ctx.clip(); // Limita o desenho à área definida pelo rect
 
-  // Calculate new dimensions and offset
-  const newWidth = Math.ceil(strokeStartBounds.maxX - strokeStartBounds.minX);
-  const newHeight = Math.ceil(strokeStartBounds.maxY - strokeStartBounds.minY);
-  const offsetX = activeLayer.x - strokeStartBounds.minX;
-  const offsetY = activeLayer.y - strokeStartBounds.minY;
-
-  // Create or resize stroke canvas
-  if (!strokeCanvas) {
-    strokeCanvas = document.createElement("canvas");
-    const ctx = strokeCanvas.getContext("2d");
-    strokeCanvas.width = newWidth;
-    strokeCanvas.height = newHeight;
-    ctx.drawImage(activeLayer.image, offsetX, offsetY);
-  }
-
-  // Ensure stroke canvas is large enough
-  if (strokeCanvas.width < newWidth || strokeCanvas.height < newHeight) {
-    const oldCanvas = strokeCanvas;
-    strokeCanvas = document.createElement("canvas");
-    strokeCanvas.width = newWidth;
-    strokeCanvas.height = newHeight;
-    const ctx = strokeCanvas.getContext("2d");
-    ctx.drawImage(oldCanvas, 0, 0);
-  }
-
-  const ctx = strokeCanvas.getContext("2d");
-  // Convert hex color to rgba
-  const color = brushColor;
-  const r = parseInt(color.substr(1, 2), 16);
-  const g = parseInt(color.substr(3, 2), 16);
-  const b = parseInt(color.substr(5, 2), 16);
-
+  // 3. Configurações e desenho do traço
+  ctx.strokeStyle = brushColor;
+  ctx.lineWidth = brushSize;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  const hardness = Math.max(0, Math.min(1, brushHardness / 100));
+  // Os pontos de início e fim precisam ser convertidos para coordenadas locais (relativas à camada)
+  const localLastX = lastX - activeLayer.x;
+  const localLastY = lastY - activeLayer.y;
 
-  const outerR = brushSize / 2;
-  // Defina uma “faixa de transição” — quanto menor hardness, mais lenta a transição
-  // Por exemplo: falloffWidth = outerR * (1 - hardness)
-  const falloffWidth = outerR * (1 - hardness);
-  const innerR = outerR - falloffWidth;
+  ctx.beginPath();
+  // Move para a última coordenada local
+  ctx.moveTo(localLastX, localLastY);
+  // Desenha a linha para a coordenada local atual
+  ctx.lineTo(localX, localY);
+  ctx.stroke();
 
-  // Função para desenhar um “stamp” no ponto (px, py)
-  function stamp(px, py) {
-    const grad = ctx.createRadialGradient(px, py, innerR, px, py, outerR);
-    grad.addColorStop(0, `rgba(${r},${g},${b},1)`);
-    // Ajuste do stop intermediário para controlar suavidade
-    const inter = innerR / outerR;
-    grad.addColorStop(inter, `rgba(${r},${g},${b},1)`);
-    grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(px, py, outerR, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // 4. Restaura o contexto para remover o clipping mask para futuras operações, se necessário
+  ctx.restore();
 
-  // Interpole ao longo da linha entre lastX,lastY e x,y
-  const dx = x - lastX;
-  const dy = y - lastY;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  const steps = Math.max(Math.floor(dist), 1);
-
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const px = lastX + dx * t - strokeStartBounds.minX;
-    const py = lastY + dy * t - strokeStartBounds.minY;
-    stamp(px, py);
-  }
-
-  // Atualiza camada etc.
-  activeLayer.x = strokeStartBounds.minX;
-  activeLayer.y = strokeStartBounds.minY;
-  activeLayer.tempCanvas = strokeCanvas;
-
+  // 5. Atualiza o último ponto para a coordenada atual
   lastX = x;
   lastY = y;
+
+  // Nenhuma alteração na posição (activeLayer.x/y) ou no tamanho da camada é feita.
 
   draw();
 }
 
-// Adicionar após as funções de eventos do mouse
-function updateBrushPreview(e) {
-  if (!document.getElementById("brushTool").hasAttribute("active")) {
-    if (brushPreview) {
-      brushPreview.style.display = "none";
-    }
-    return;
-  }
-
-  if (!brushPreview) {
-    brushPreview = document.createElement("div");
-    brushPreview.style.position = "fixed";
-    brushPreview.style.pointerEvents = "none";
-    brushPreview.style.zIndex = "10000";
-    brushPreview.style.border = "1px solid white";
-    brushPreview.style.boxShadow = "0 0 0 1px black";
-    brushPreview.style.borderRadius = "50%";
-    document.body.appendChild(brushPreview);
-  }
-
-  const size = brushSize * scale;
-  brushPreview.style.width = size + "px";
-  brushPreview.style.height = size + "px";
-  brushPreview.style.display = "block";
-  brushPreview.style.left = e.clientX - size / 2 + "px";
-  brushPreview.style.top = e.clientY - size / 2 + "px";
-}
-
-canvas.addEventListener("mousemove", updateBrushPreview);
-canvas.addEventListener("mouseenter", updateBrushPreview);
-canvas.addEventListener("mouseleave", () => {
-  if (brushPreview) brushPreview.style.display = "none";
-});
-
-// modificar o objeto ImageEngine para incluir o novo controle
+// expose API to global (app.js will call these)
 window.ImageEngine = {
   loadImage,
   addLayer,
@@ -868,8 +779,5 @@ window.ImageEngine = {
   },
   setBrushSize: (size) => {
     brushSize = Math.max(1, size);
-  },
-  setBrushHardness: (hardness) => {
-    brushHardness = Math.max(0, Math.min(1, hardness));
   },
 };

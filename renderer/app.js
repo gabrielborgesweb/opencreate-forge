@@ -286,8 +286,8 @@ function updateSelectedToolUI() {
       <input type="color" id="brushColor" value="${brushColor}" style="margin-left: 10px">
       <input type="range" id="brushSize" min="1" max="2000" value="${brushSize}" style="margin-left: 10px">
       <span id="brushSizeValue">${brushSize}px</span>
-      <input type="range" id="brushHardness" min="0" max="100" value="100" style="margin-left: 10px">
-      <span id="brushHardnessValue">100%</span>
+      <!--<input type="range" id="brushHardness" min="0" max="100" value="100" style="margin-left: 10px">
+      <span id="brushHardnessValue">100%</span> -->
     `
         : ""
     }

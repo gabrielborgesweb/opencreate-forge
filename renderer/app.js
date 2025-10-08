@@ -304,12 +304,12 @@ function updateSelectedToolUI() {
       document.getElementById("brushSizeValue").textContent = size + "px";
     });
 
-    document.getElementById("brushHardness").addEventListener("input", (e) => {
-      const hardness = parseInt(e.target.value) / 100;
-      window.ImageEngine.setBrushHardness(hardness);
-      document.getElementById("brushHardnessValue").textContent =
-        e.target.value + "%";
-    });
+    // document.getElementById("brushHardness").addEventListener("input", (e) => {
+    //   const hardness = parseInt(e.target.value) / 100;
+    //   window.ImageEngine.setBrushHardness(hardness);
+    //   document.getElementById("brushHardnessValue").textContent =
+    //     e.target.value + "%";
+    // });
   }
 }
 

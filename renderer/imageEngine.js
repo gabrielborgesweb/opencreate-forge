@@ -563,7 +563,7 @@ canvas.addEventListener("mouseup", (e) => {
       img.src = strokeCanvas.toDataURL();
     }
 
-    // saveState(); // Save for undo/redo after stroke
+    saveState(); // Save for undo/redo after stroke
   }
   // Save state if we were dragging a layer
   if (draggingLayerState.isDragging) {

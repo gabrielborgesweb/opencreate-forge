@@ -285,13 +285,13 @@ function updateSelectedToolUI() {
   if (toolName === "Brush Tool") {
     toolOptionsHTML = `
       <input type="color" id="brushColor" value="${brushColor}" style="margin-left: 10px">
-      <input type="range" id="brushSize" min="1" max="2000" value="${brushSize}" style="margin-left: 10px">
+      <input type="range" id="brushSize" min="1" max="1000" value="${brushSize}" style="margin-left: 10px">
       <span id="brushSizeValue">${brushSize}px</span>
     `;
   } else if (toolName === "Eraser Tool") {
     toolOptionsHTML = `
       <span style="margin-left:10px">Size:</span>
-      <input type="range" id="brushSize" min="1" max="2000" value="${brushSize}" style="margin-left: 10px">
+      <input type="range" id="brushSize" min="1" max="1000" value="${brushSize}" style="margin-left: 10px">
       <span id="brushSizeValue">${brushSize}px</span>
     `;
   }

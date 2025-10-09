@@ -114,7 +114,8 @@ function draw() {
 
   // NOVO: Desenha o canvas do traço em andamento sobre tudo
   if (isDrawing && strokeCanvas) {
-    ctx.drawImage(strokeCanvas, 0, 0);
+    // AQUI ESTÁ A MUDANÇA: desenha o canvas na sua posição de origem correta
+    ctx.drawImage(strokeCanvas, strokeOriginX, strokeOriginY);
   }
 
   // Desenha a borda do projeto
@@ -453,9 +454,188 @@ canvas.addEventListener(
   { passive: false }
 );
 
-// middle-button drag = pan view
+// REMOVA OS LISTENERS ANTIGOS (mousedown, mousemove, mouseup, mouseleave) DO CANVAS E SUBSTITUA POR ESTE BLOCO
+
+// --- Novas funções de manipulação de eventos de desenho ---
+
+function startDrawing(e) {
+  if (
+    e.button !== 0 ||
+    !activeLayer ||
+    !document.getElementById("brushTool").hasAttribute("active")
+  ) {
+    return;
+  }
+
+  isDrawing = true;
+
+  // Calcula a origem e o tamanho do canvas de pintura expandido
+  strokeOriginX = activeLayer.x - STROKE_PADDING;
+  strokeOriginY = activeLayer.y - STROKE_PADDING;
+  const strokeWidth = activeLayer.image.width + STROKE_PADDING * 2;
+  const strokeHeight = activeLayer.image.height + STROKE_PADDING * 2;
+
+  // Cria o canvas temporário
+  strokeCanvas = document.createElement("canvas");
+  strokeCanvas.width = strokeWidth;
+  strokeCanvas.height = strokeHeight;
+  const strokeCtx = strokeCanvas.getContext("2d");
+
+  // Copia a imagem da camada ativa para o centro do nosso canvas expandido
+  strokeCtx.drawImage(activeLayer.image, STROKE_PADDING, STROKE_PADDING);
+
+  // Pega a posição inicial do mouse em coordenadas do projeto
+  const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
+  lastX = px;
+  lastY = py;
+
+  // NOVO: Inicia os limites do traço
+  const pad = brushSize / 2;
+  currentStrokeBounds = {
+    minX: px - pad,
+    minY: py - pad,
+    maxX: px + pad,
+    maxY: py + pad,
+  };
+
+  // Inicia o traço
+  drawBrushStroke(px, py);
+
+  // Anexa os listeners à JANELA para capturar o movimento/clique em qualquer lugar
+  window.addEventListener("mousemove", processDrawing);
+  window.addEventListener("mouseup", stopDrawing, { once: true }); // { once: true } remove o listener após ser chamado
+}
+
+function processDrawing(e) {
+  if (!isDrawing) return;
+
+  // Precisamos converter as coordenadas do cliente (window) para coordenadas do canvas
+  const canvasRect = canvas.getBoundingClientRect();
+  const canvasX = e.clientX - canvasRect.left;
+  const canvasY = e.clientY - canvasRect.top;
+
+  const { x: px, y: py } = screenToProject(canvasX, canvasY);
+
+  // NOVO: Expande os limites do traço para incluir o novo ponto
+  const pad = brushSize / 2;
+  currentStrokeBounds.minX = Math.min(
+    currentStrokeBounds.minX,
+    px - pad,
+    lastX - pad
+  );
+  currentStrokeBounds.minY = Math.min(
+    currentStrokeBounds.minY,
+    py - pad,
+    lastY - pad
+  );
+  currentStrokeBounds.maxX = Math.max(
+    currentStrokeBounds.maxX,
+    px + pad,
+    lastX + pad
+  );
+  currentStrokeBounds.maxY = Math.max(
+    currentStrokeBounds.maxY,
+    py + pad,
+    lastY + pad
+  );
+
+  drawBrushStroke(px, py);
+}
+
+function stopDrawing(e) {
+  if (!isDrawing) return;
+
+  isDrawing = false;
+  window.removeEventListener("mousemove", processDrawing);
+
+  // --- LÓGICA DE OTIMIZAÇÃO ---
+  // 1. Define os limites da camada original dentro do strokeCanvas
+  const originalLayerBounds = {
+    x: STROKE_PADDING,
+    y: STROKE_PADDING,
+    width: activeLayer.image.width,
+    height: activeLayer.image.height,
+  };
+
+  // 2. Converte os limites do traço (que estão em coords do projeto) para coords do strokeCanvas
+  const strokeRelativeBounds = {
+    x: currentStrokeBounds.minX - strokeOriginX,
+    y: currentStrokeBounds.minY - strokeOriginY,
+    width: currentStrokeBounds.maxX - currentStrokeBounds.minX,
+    height: currentStrokeBounds.maxY - currentStrokeBounds.minY,
+  };
+
+  // 3. Calcula a união da camada original e do novo traço para criar a área de busca
+  const searchBounds = {
+    x: Math.min(originalLayerBounds.x, strokeRelativeBounds.x),
+    y: Math.min(originalLayerBounds.y, strokeRelativeBounds.y),
+    width: 0,
+    height: 0,
+  };
+  const right = Math.max(
+    originalLayerBounds.x + originalLayerBounds.width,
+    strokeRelativeBounds.x + strokeRelativeBounds.width
+  );
+  const bottom = Math.max(
+    originalLayerBounds.y + originalLayerBounds.height,
+    strokeRelativeBounds.y + strokeRelativeBounds.height
+  );
+  searchBounds.width = right - searchBounds.x;
+  searchBounds.height = bottom - searchBounds.y;
+  // --- FIM DA LÓGICA DE OTIMIZAÇÃO ---
+
+  // 4. Encontra os limites finais usando a função otimizada e a área de busca
+  const bounds = getOptimizedBoundingBox(strokeCanvas, searchBounds);
+
+  // Limpa o rastreador de limites
+  currentStrokeBounds = null;
+
+  if (bounds) {
+    const newLayerCanvas = document.createElement("canvas");
+    newLayerCanvas.width = bounds.width;
+    newLayerCanvas.height = bounds.height;
+    const newCtx = newLayerCanvas.getContext("2d");
+    newCtx.drawImage(
+      strokeCanvas,
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+      0,
+      0,
+      bounds.width,
+      bounds.height
+    );
+
+    const img = new Image();
+    img.onload = () => {
+      activeLayer.image = img;
+      activeLayer.x = strokeOriginX + bounds.x;
+      activeLayer.y = strokeOriginY + bounds.y;
+
+      strokeCanvas = null;
+      saveState();
+      draw();
+      updateLayersPanel();
+    };
+    img.src = newLayerCanvas.toDataURL();
+  } else {
+    strokeCanvas = null;
+    draw();
+  }
+}
+
+// --- Listeners de Eventos Principais ---
+
+// state for layer dragging
+const draggingLayerState = {
+  isDragging: false,
+  offsetX: 0,
+  offsetY: 0,
+};
+
 canvas.addEventListener("mousedown", (e) => {
-  // botão do meio = 1
+  // Pan com o botão do meio
   if (e.button === 1) {
     isPanning = true;
     startX = e.clientX - originX;
@@ -464,38 +644,16 @@ canvas.addEventListener("mousedown", (e) => {
     return;
   }
 
-  const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
+  // Iniciar desenho (Brush Tool)
+  startDrawing(e);
 
-  // Handle brush tool
-  if (
-    document.getElementById("brushTool").hasAttribute("active") &&
-    activeLayer &&
-    e.button === 0
-  ) {
-    isDrawing = true;
-    lastX = px;
-    lastY = py;
-
-    // Inicia o canvas de desenho do tamanho do projeto
-    strokeCanvas = document.createElement("canvas");
-    strokeCanvas.width = projectWidth;
-    strokeCanvas.height = projectHeight;
-    const strokeCtx = strokeCanvas.getContext("2d");
-
-    // Copia a camada ativa para o canvas temporário na sua posição correta
-    strokeCtx.drawImage(activeLayer.image, activeLayer.x, activeLayer.y);
-
-    // Inicia o primeiro ponto do traço
-    drawBrushStroke(px, py);
-    return;
-  }
-
-  // Handle move tool (código existente)
+  // Lógica de arrastar camada (Move Tool)
   if (
     document.getElementById("moveTool").hasAttribute("active") &&
     activeLayer &&
     e.button === 0
   ) {
+    const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
     if (
       px >= activeLayer.x &&
       px <= activeLayer.x + activeLayer.image.width &&
@@ -510,7 +668,7 @@ canvas.addEventListener("mousedown", (e) => {
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  // pan com middle button
+  // Pan com o botão do meio
   if (isPanning) {
     originX = e.clientX - startX;
     originY = e.clientY - startY;
@@ -518,13 +676,7 @@ canvas.addEventListener("mousemove", (e) => {
     return;
   }
 
-  // brush tool
-  if (isDrawing && activeLayer) {
-    const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
-    drawBrushStroke(px, py);
-  }
-
-  // arrastar camada
+  // Arrastar camada
   if (draggingLayerState.isDragging && activeLayer) {
     const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
     activeLayer.x = px - draggingLayerState.offsetX;
@@ -538,83 +690,19 @@ canvas.addEventListener("mouseup", (e) => {
   if (e.button === 1) {
     isPanning = false;
   }
-  if (isDrawing && activeLayer) {
-    isDrawing = false;
-
-    // 1. Encontra os novos limites da arte no strokeCanvas
-    const bounds = getBoundingBox(strokeCanvas);
-
-    if (bounds) {
-      // 2. Cria um novo canvas com o tamanho exato dos novos limites
-      const newLayerCanvas = document.createElement("canvas");
-      newLayerCanvas.width = bounds.width;
-      newLayerCanvas.height = bounds.height;
-      const newCtx = newLayerCanvas.getContext("2d");
-
-      // 3. Copia a área delimitada do strokeCanvas para o novo canvas
-      newCtx.drawImage(
-        strokeCanvas,
-        bounds.x,
-        bounds.y,
-        bounds.width,
-        bounds.height, // Source rectangle
-        0,
-        0,
-        bounds.width,
-        bounds.height // Destination rectangle
-      );
-
-      // 4. Cria uma nova imagem e atualiza a camada ativa
-      const img = new Image();
-      img.onload = () => {
-        activeLayer.image = img;
-        activeLayer.x = bounds.x;
-        activeLayer.y = bounds.y;
-
-        // Limpa o canvas temporário e redesenha tudo
-        strokeCanvas = null;
-        saveState();
-        draw();
-        updateLayersPanel(); // Atualiza para refletir a possível mudança de estado
-      };
-      img.src = newLayerCanvas.toDataURL();
-    } else {
-      // Se a camada ficar vazia, podemos optar por limpá-la ou excluí-la
-      strokeCanvas = null;
-      draw();
-    }
-
-    lastX = null;
-    lastY = null;
-  }
 
   if (draggingLayerState.isDragging) {
-    saveState(); // Save for undo/redo after moving layer
+    saveState();
     draggingLayerState.isDragging = false;
   }
 });
 
+// O listener de mouseleave agora só precisa se preocupar com o pan e o arraste
 canvas.addEventListener("mouseleave", () => {
   isPanning = false;
   draggingLayerState.isDragging = false;
-
-  if (isDrawing) {
-    isDrawing = false;
-    lastX = null;
-    lastY = null;
-    strokeCanvas = null;
-    strokeStartBounds = null;
-    activeLayer.tempCanvas = null;
-    draw();
-  }
+  // A lógica de desenho foi removida daqui, pois agora é global
 });
-
-// state for layer dragging
-const draggingLayerState = {
-  isDragging: false,
-  offsetX: 0,
-  offsetY: 0,
-};
 
 function fitToScreen() {
   if (!projectWidth || !projectHeight) return;
@@ -685,41 +773,74 @@ function setProject(w, h, projLayers, viewportState = {}) {
 }
 
 // --------- BRUSH TOOL ---------
+const STROKE_PADDING = 1000; // Píxeis de espaço extra para desenhar fora dos limites
 let isDrawing = false;
 let brushColor = "#000000";
 let brushSize = 5;
-let strokeCanvas = null; // Canvas temporário do tamanho do projeto
+let strokeCanvas = null; // Canvas temporário maior que o projeto
+let strokeOriginX = 0; // Posição X (em coords do projeto) do canto superior esquerdo do strokeCanvas
+let strokeOriginY = 0; // Posição Y (em coords do projeto) do canto superior esquerdo do strokeCanvas
 let lastX = null;
 let lastY = null;
+let currentStrokeBounds = null; // NOVO: Para rastrear a área do traço
 
 /**
- * Encontra a caixa delimitadora (bounding box) dos pixels não transparentes em um canvas.
+ * Encontra a caixa delimitadora (bounding box) de pixels não transparentes
+ * DENTRO de uma área de busca específica para otimização.
  * @param {HTMLCanvasElement} canvas - O canvas para processar.
+ * @param {{x: number, y: number, width: number, height: number}} searchBounds - A área para escanear.
  * @returns {{x: number, y: number, width: number, height: number}|null}
  */
-function getBoundingBox(canvas) {
+function getOptimizedBoundingBox(canvas, searchBounds) {
   const ctx = canvas.getContext("2d");
-  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+  // Garante que a área de busca não saia dos limites do canvas
+  const searchX = Math.max(0, Math.floor(searchBounds.x));
+  const searchY = Math.max(0, Math.floor(searchBounds.y));
+  const searchWidth = Math.min(
+    canvas.width - searchX,
+    Math.ceil(searchBounds.width)
+  );
+  const searchHeight = Math.min(
+    canvas.height - searchY,
+    Math.ceil(searchBounds.height)
+  );
+
+  if (searchWidth <= 0 || searchHeight <= 0) {
+    return null; // Área de busca inválida
+  }
+
+  const data = ctx.getImageData(
+    searchX,
+    searchY,
+    searchWidth,
+    searchHeight
+  ).data;
   let minX = canvas.width,
     minY = canvas.height,
     maxX = -1,
     maxY = -1;
+  let foundPixel = false;
 
-  for (let y = 0; y < canvas.height; y++) {
-    for (let x = 0; x < canvas.width; x++) {
-      // O valor alfa é o 4º byte de cada pixel (RGBA)
-      const alpha = data[(y * canvas.width + x) * 4 + 3];
+  for (let y = 0; y < searchHeight; y++) {
+    for (let x = 0; x < searchWidth; x++) {
+      const alpha = data[(y * searchWidth + x) * 4 + 3];
       if (alpha > 0) {
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
+        // As coordenadas encontradas são relativas à `searchBounds`,
+        // então precisamos convertê-las de volta para as coordenadas do canvas
+        const globalX = searchX + x;
+        const globalY = searchY + y;
+
+        minX = Math.min(minX, globalX);
+        minY = Math.min(minY, globalY);
+        maxX = Math.max(maxX, globalX);
+        maxY = Math.max(maxY, globalY);
+        foundPixel = true;
       }
     }
   }
 
-  // Se maxX for < minX, significa que nenhum pixel foi encontrado (canvas vazio)
-  if (maxX < minX) {
+  if (!foundPixel) {
     return null;
   }
 
@@ -741,16 +862,22 @@ function drawBrushStroke(x, y) {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
+  // Converte as coordenadas do projeto para as coordenadas locais do strokeCanvas
+  const localLastX = lastX - strokeOriginX;
+  const localLastY = lastY - strokeOriginY;
+  const localX = x - strokeOriginX;
+  const localY = y - strokeOriginY;
+
   ctx.beginPath();
-  ctx.moveTo(lastX, lastY);
-  ctx.lineTo(x, y);
+  ctx.moveTo(localLastX, localLastY);
+  ctx.lineTo(localX, localY);
   ctx.stroke();
 
-  // Atualiza a última posição
+  // Atualiza a última posição (ainda em coordenadas do projeto)
   lastX = x;
   lastY = y;
 
-  // Redesenha a cena principal para mostrar o traço em tempo real
+  // Redesenha a cena principal
   draw();
 }
 

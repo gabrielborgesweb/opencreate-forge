@@ -271,45 +271,49 @@ btnSave.addEventListener("click", async () => {
 //   }
 // });
 
-// Modificar a função updateSelectedToolUI()
+// MODIFICADO: Modificar a função updateSelectedToolUI()
 function updateSelectedToolUI() {
   const activeTool = document.querySelector(".tool-button[active]");
   if (!activeTool) return;
 
   let toolName = activeTool.getAttribute("title").split(" (")[0];
+  const { brushColor, brushSize } = window.ImageEngine.getBrushState();
 
-  selectedToolDiv.innerHTML = `
-    <span style="margin-left: 10px">${toolName}</span>
-    ${
-      toolName === "Brush Tool"
-        ? `
+  let toolOptionsHTML = "";
+
+  // Mostrar opções para Brush e Eraser
+  if (toolName === "Brush Tool") {
+    toolOptionsHTML = `
       <input type="color" id="brushColor" value="${brushColor}" style="margin-left: 10px">
       <input type="range" id="brushSize" min="1" max="2000" value="${brushSize}" style="margin-left: 10px">
       <span id="brushSizeValue">${brushSize}px</span>
-      <!--<input type="range" id="brushHardness" min="0" max="100" value="100" style="margin-left: 10px">
-      <span id="brushHardnessValue">100%</span> -->
-    `
-        : ""
-    }
+    `;
+  } else if (toolName === "Eraser Tool") {
+    toolOptionsHTML = `
+      <span style="margin-left:10px">Size:</span>
+      <input type="range" id="brushSize" min="1" max="2000" value="${brushSize}" style="margin-left: 10px">
+      <span id="brushSizeValue">${brushSize}px</span>
+    `;
+  }
+
+  selectedToolDiv.innerHTML = `
+    <span style="margin-left: 10px">${toolName}</span>
+    ${toolOptionsHTML}
   `;
 
+  // Adicionar listeners para as opções
   if (toolName === "Brush Tool") {
     document.getElementById("brushColor").addEventListener("input", (e) => {
       window.ImageEngine.setBrushColor(e.target.value);
     });
+  }
 
+  if (toolName === "Brush Tool" || toolName === "Eraser Tool") {
     document.getElementById("brushSize").addEventListener("input", (e) => {
       const size = parseInt(e.target.value);
       window.ImageEngine.setBrushSize(size);
       document.getElementById("brushSizeValue").textContent = size + "px";
     });
-
-    // document.getElementById("brushHardness").addEventListener("input", (e) => {
-    //   const hardness = parseInt(e.target.value) / 100;
-    //   window.ImageEngine.setBrushHardness(hardness);
-    //   document.getElementById("brushHardnessValue").textContent =
-    //     e.target.value + "%";
-    // });
   }
 }
 
@@ -324,14 +328,18 @@ toolButtons.forEach((btn) => {
 
 // Add empty layer button handler
 btnAddEmptyLayer.addEventListener("click", () => {
-  if (!projectWidth || !projectHeight) {
+  const activeProject = getActiveProject();
+  if (!activeProject) {
     alert("Create a project first");
     return;
   }
-  window.ImageEngine.createEmptyLayer(projectWidth, projectHeight);
+  window.ImageEngine.createEmptyLayer(
+    activeProject.width,
+    activeProject.height
+  );
 });
 
-// Add to keyboard shortcuts
+// MODIFICADO: Adicionar atalhos de teclado
 document.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT") return;
 
@@ -345,6 +353,10 @@ document.addEventListener("keydown", (e) => {
         break;
       case "b":
         document.getElementById("brushTool").click();
+        break;
+      // NOVO: Atalho para a ferramenta borracha
+      case "e":
+        document.getElementById("eraserTool").click();
         break;
     }
   }

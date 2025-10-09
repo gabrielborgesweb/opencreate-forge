@@ -238,8 +238,8 @@ function addLayer(img, name = "Layer") {
 // --------- CREATE EMPTY LAYER ---------
 function createEmptyLayer(w, h, name = "Empty Layer") {
   const canvas = document.createElement("canvas");
-  canvas.width = projectWidth; // Use project dimensions instead of passed w,h
-  canvas.height = projectHeight;
+  canvas.width = w;
+  canvas.height = h;
 
   // Initialize with transparent background
   const ctx = canvas.getContext("2d");
@@ -305,19 +305,23 @@ function redo() {
 }
 
 function restoreState(state) {
-  layers = state.layers.map((l) => ({
-    ...l,
-    image: (() => {
-      const img = new Image();
-      img.src = l.image;
-      return img;
-    })(),
-  }));
-  activeLayer = state.activeLayer
-    ? layers.find((l) => l.id === state.activeLayer)
-    : null;
-  updateLayersPanel();
-  draw();
+  const promises = state.layers.map(
+    (l) =>
+      new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ ...l, image: img });
+        img.src = l.image;
+      })
+  );
+
+  Promise.all(promises).then((loadedLayers) => {
+    layers = loadedLayers;
+    activeLayer = state.activeLayer
+      ? layers.find((l) => l.id === state.activeLayer)
+      : null;
+    updateLayersPanel();
+    draw();
+  });
 }
 
 // Enhance layer panel
@@ -459,11 +463,14 @@ canvas.addEventListener(
 // --- Novas funções de manipulação de eventos de desenho ---
 
 function startDrawing(e) {
-  if (
-    e.button !== 0 ||
-    !activeLayer ||
-    !document.getElementById("brushTool").hasAttribute("active")
-  ) {
+  const isBrushActive = document
+    .getElementById("brushTool")
+    .hasAttribute("active");
+  const isEraserActive = document
+    .getElementById("eraserTool")
+    .hasAttribute("active");
+
+  if (e.button !== 0 || !activeLayer || (!isBrushActive && !isEraserActive)) {
     return;
   }
 
@@ -747,29 +754,30 @@ function resetViewport() {
 function setProject(w, h, projLayers, viewportState = {}) {
   projectWidth = w;
   projectHeight = h;
-  layers = projLayers.map((l) => ({
-    ...l,
-    image: (() => {
-      const img = new Image();
-      img.src = l.image.src; // assume que l.image é um HTMLImageElement ou similar
-      return img;
-    })(),
-  }));
-  activeLayer = layers.length > 0 ? layers[0] : null;
-  updateLayersPanel();
 
-  // --- NOVO: Aplicar estado do viewport ou re-ajustar ---
-  if (viewportState.scale) {
-    scale = viewportState.scale;
-    originX = viewportState.originX;
-    originY = viewportState.originY;
-  } else {
-    // Se não há estado salvo, ajusta a tela como era antes (e.g., primeira vez)
-    fitToScreen();
-  }
-  // ----------------------------------------------------
+  const promises = projLayers.map(
+    (l) =>
+      new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ ...l, image: img });
+        img.src = l.image.src || l.image; // Handle both image elements and data URLs
+      })
+  );
 
-  draw();
+  Promise.all(promises).then((loadedLayers) => {
+    layers = loadedLayers;
+    activeLayer = layers.length > 0 ? layers[0] : null;
+    updateLayersPanel();
+
+    if (viewportState.scale) {
+      scale = viewportState.scale;
+      originX = viewportState.originX;
+      originY = viewportState.originY;
+    } else {
+      fitToScreen();
+    }
+    draw();
+  });
 }
 
 // --------- BRUSH TOOL ---------
@@ -852,10 +860,19 @@ function getOptimizedBoundingBox(canvas, searchBounds) {
   };
 }
 
+// MODIFICADO: Função de desenho do pincel/borracha
 function drawBrushStroke(x, y) {
   if (!isDrawing || !strokeCanvas) return;
 
   const ctx = strokeCanvas.getContext("2d");
+
+  // NOVO: Verifica qual ferramenta está ativa e define a operação de composição
+  const isEraser = document.getElementById("eraserTool").hasAttribute("active");
+  if (isEraser) {
+    ctx.globalCompositeOperation = "destination-out";
+  } else {
+    ctx.globalCompositeOperation = "source-over";
+  }
 
   ctx.strokeStyle = brushColor;
   ctx.lineWidth = brushSize;
@@ -909,4 +926,9 @@ window.ImageEngine = {
   setBrushSize: (size) => {
     brushSize = Math.max(1, size);
   },
+  // NOVO: Expõe o estado do pincel para a UI
+  getBrushState: () => ({
+    brushColor,
+    brushSize,
+  }),
 };

@@ -83,13 +83,11 @@ function draw() {
   // --- desenhar checkerboard em coords de tela (não escala) ---
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
-
   // calcular área do projeto em coords de tela
   const projectXOnScreen = originX;
   const projectYOnScreen = originY;
   const projectWOnScreen = projectWidth * scale;
   const projectHOnScreen = projectHeight * scale;
-
   ctx.fillStyle = getCheckerPattern();
   ctx.fillRect(
     projectXOnScreen,
@@ -97,30 +95,34 @@ function draw() {
     projectWOnScreen,
     projectHOnScreen
   );
-
   ctx.restore();
 
   // --- desenhar camadas e bordas em coords do projeto ---
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, originX, originY);
 
+  // Desenha as camadas
   for (let layer of layers) {
     if (!layer.visible) continue;
+    // Não desenha a camada ativa se estivermos no meio de um traço,
+    // pois o strokeCanvas a substituirá visualmente.
+    if (layer === activeLayer && isDrawing) {
+      continue;
+    }
     ctx.drawImage(layer.image, layer.x, layer.y);
   }
 
-  // sombra (box shadow)
-  // ctx.shadowColor = "rgba(0,0,0,1)"; // cor da sombra
-  // ctx.shadowBlur = 4; // intensidade do blur
-  // ctx.shadowSpread = 8; // espalhamento
-  // ctx.shadowOffsetX = 0; // deslocamento horizontal
-  // ctx.shadowOffsetY = 4; // deslocamento vertical
+  // NOVO: Desenha o canvas do traço em andamento sobre tudo
+  if (isDrawing && strokeCanvas) {
+    ctx.drawImage(strokeCanvas, 0, 0);
+  }
 
-  // stroke
+  // Desenha a borda do projeto
   ctx.strokeStyle = "rgba(0,0,0,0.5)";
   ctx.lineWidth = 2 / Math.max(scale, 1);
   ctx.strokeRect(0, 0, projectWidth, projectHeight);
 
+  // Desenha a borda de seleção da camada ativa
   if (activeLayer) {
     ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
     ctx.lineWidth = 2 / Math.max(scale, 1);
@@ -131,29 +133,6 @@ function draw() {
       activeLayer.image.height
     );
   }
-
-  for (let layer of layers) {
-    if (!layer.visible) continue;
-    // Draw either temp canvas during stroke or regular image
-    if (layer === activeLayer && layer.tempCanvas) {
-      ctx.drawImage(layer.tempCanvas, layer.x, layer.y);
-    } else {
-      ctx.drawImage(layer.image, layer.x, layer.y);
-    }
-  }
-
-  // const currentTab = projectsTabs.querySelectorAll("button.active")[0];
-  // // atualiza o layers do projects (para o caso de mudanças fora do draw)
-  // if (typeof projects !== "undefined" && typeof currentTab !== "undefined") {
-  //   const project = projects.find((p) => p.id === currentTab.id);
-  //   console.log("Projects array:", projects);
-  //   console.log("Active tab:", currentTab);
-  //   console.log("Updating project layers:", project);
-  //   console.log("Current layers:", layers);
-  //   if (project) {
-  //     project.layers = layers;
-  //   }
-  // }
 
   ctx.restore();
 
@@ -195,7 +174,6 @@ function draw() {
     ctx.restore();
   }
 
-  // In the draw() function, after drawing layers but before restore:
   if (shouldShowGrid()) {
     drawGrid();
   }
@@ -497,11 +475,22 @@ canvas.addEventListener("mousedown", (e) => {
     isDrawing = true;
     lastX = px;
     lastY = py;
+
+    // Inicia o canvas de desenho do tamanho do projeto
+    strokeCanvas = document.createElement("canvas");
+    strokeCanvas.width = projectWidth;
+    strokeCanvas.height = projectHeight;
+    const strokeCtx = strokeCanvas.getContext("2d");
+
+    // Copia a camada ativa para o canvas temporário na sua posição correta
+    strokeCtx.drawImage(activeLayer.image, activeLayer.x, activeLayer.y);
+
+    // Inicia o primeiro ponto do traço
     drawBrushStroke(px, py);
     return;
   }
 
-  // Handle move tool
+  // Handle move tool (código existente)
   if (
     document.getElementById("moveTool").hasAttribute("active") &&
     activeLayer &&
@@ -527,10 +516,14 @@ canvas.addEventListener("mousemove", (e) => {
     originY = e.clientY - startY;
     draw();
     return;
-  } else if (isDrawing && activeLayer) {
+  }
+
+  // brush tool
+  if (isDrawing && activeLayer) {
     const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
     drawBrushStroke(px, py);
   }
+
   // arrastar camada
   if (draggingLayerState.isDragging && activeLayer) {
     const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
@@ -547,25 +540,54 @@ canvas.addEventListener("mouseup", (e) => {
   }
   if (isDrawing && activeLayer) {
     isDrawing = false;
-    lastX = null;
-    lastY = null;
 
-    if (strokeCanvas) {
+    // 1. Encontra os novos limites da arte no strokeCanvas
+    const bounds = getBoundingBox(strokeCanvas);
+
+    if (bounds) {
+      // 2. Cria um novo canvas com o tamanho exato dos novos limites
+      const newLayerCanvas = document.createElement("canvas");
+      newLayerCanvas.width = bounds.width;
+      newLayerCanvas.height = bounds.height;
+      const newCtx = newLayerCanvas.getContext("2d");
+
+      // 3. Copia a área delimitada do strokeCanvas para o novo canvas
+      newCtx.drawImage(
+        strokeCanvas,
+        bounds.x,
+        bounds.y,
+        bounds.width,
+        bounds.height, // Source rectangle
+        0,
+        0,
+        bounds.width,
+        bounds.height // Destination rectangle
+      );
+
+      // 4. Cria uma nova imagem e atualiza a camada ativa
       const img = new Image();
       img.onload = () => {
         activeLayer.image = img;
-        activeLayer.tempCanvas = null;
+        activeLayer.x = bounds.x;
+        activeLayer.y = bounds.y;
+
+        // Limpa o canvas temporário e redesenha tudo
         strokeCanvas = null;
-        strokeStartBounds = null;
         saveState();
         draw();
+        updateLayersPanel(); // Atualiza para refletir a possível mudança de estado
       };
-      img.src = strokeCanvas.toDataURL();
+      img.src = newLayerCanvas.toDataURL();
+    } else {
+      // Se a camada ficar vazia, podemos optar por limpá-la ou excluí-la
+      strokeCanvas = null;
+      draw();
     }
 
-    saveState(); // Save for undo/redo after stroke
+    lastX = null;
+    lastY = null;
   }
-  // Save state if we were dragging a layer
+
   if (draggingLayerState.isDragging) {
     saveState(); // Save for undo/redo after moving layer
     draggingLayerState.isDragging = false;
@@ -666,89 +688,69 @@ function setProject(w, h, projLayers, viewportState = {}) {
 let isDrawing = false;
 let brushColor = "#000000";
 let brushSize = 5;
-let strokeCanvas = null;
-let strokeStartBounds = null;
-
-// Add these variables near other brush-related variables
+let strokeCanvas = null; // Canvas temporário do tamanho do projeto
 let lastX = null;
 let lastY = null;
 
+/**
+ * Encontra a caixa delimitadora (bounding box) dos pixels não transparentes em um canvas.
+ * @param {HTMLCanvasElement} canvas - O canvas para processar.
+ * @returns {{x: number, y: number, width: number, height: number}|null}
+ */
+function getBoundingBox(canvas) {
+  const ctx = canvas.getContext("2d");
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let minX = canvas.width,
+    minY = canvas.height,
+    maxX = -1,
+    maxY = -1;
+
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      // O valor alfa é o 4º byte de cada pixel (RGBA)
+      const alpha = data[(y * canvas.width + x) * 4 + 3];
+      if (alpha > 0) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+
+  // Se maxX for < minX, significa que nenhum pixel foi encontrado (canvas vazio)
+  if (maxX < minX) {
+    return null;
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX + 1,
+    height: maxY - minY + 1,
+  };
+}
+
 function drawBrushStroke(x, y) {
-  // Verifica se a camada está ativa e a ferramenta de pincel está selecionada
-  if (
-    !activeLayer ||
-    !document.getElementById("brushTool").hasAttribute("active")
-  ) {
-    return;
-  }
+  if (!isDrawing || !strokeCanvas) return;
 
-  // Calcula as coordenadas locais dentro da camada
-  const localX = x - activeLayer.x;
-  const localY = y - activeLayer.y;
+  const ctx = strokeCanvas.getContext("2d");
 
-  // Se não estiver desenhando, apenas armazena as coordenadas para o próximo ponto
-  if (!isDrawing) {
-    lastX = x;
-    lastY = y;
-    return;
-  }
-
-  // --- ALTERAÇÕES COMEÇAM AQUI ---
-
-  // 1. Usa o canvas da camada (ou cria um temporário se for o primeiro ponto)
-  // Certifique-se de que activeLayer.tempCanvas existe ou use activeLayer.image
-  let currentCanvas = activeLayer.tempCanvas || activeLayer.image;
-  let ctx;
-
-  // Se for o início do traço, precisamos criar um canvas temporário
-  // para desenhar nele e manter a imagem original intacta até o 'stroke end'
-  if (!activeLayer.tempCanvas) {
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = activeLayer.image.width;
-    tempCanvas.height = activeLayer.image.height;
-    ctx = tempCanvas.getContext("2d");
-
-    // Copia o conteúdo da imagem da camada para o canvas temporário
-    ctx.drawImage(activeLayer.image, 0, 0);
-    activeLayer.tempCanvas = tempCanvas;
-    currentCanvas = tempCanvas;
-  } else {
-    ctx = currentCanvas.getContext("2d");
-  }
-
-  // 2. Adiciona um "clipping mask" para garantir que nada seja pintado fora dos limites do canvas.
-  // Isso é crucial para evitar pintar fora das bordas da camada.
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, currentCanvas.width, currentCanvas.height);
-  ctx.clip(); // Limita o desenho à área definida pelo rect
-
-  // 3. Configurações e desenho do traço
   ctx.strokeStyle = brushColor;
   ctx.lineWidth = brushSize;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  // Os pontos de início e fim precisam ser convertidos para coordenadas locais (relativas à camada)
-  const localLastX = lastX - activeLayer.x;
-  const localLastY = lastY - activeLayer.y;
-
   ctx.beginPath();
-  // Move para a última coordenada local
-  ctx.moveTo(localLastX, localLastY);
-  // Desenha a linha para a coordenada local atual
-  ctx.lineTo(localX, localY);
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(x, y);
   ctx.stroke();
 
-  // 4. Restaura o contexto para remover o clipping mask para futuras operações, se necessário
-  ctx.restore();
-
-  // 5. Atualiza o último ponto para a coordenada atual
+  // Atualiza a última posição
   lastX = x;
   lastY = y;
 
-  // Nenhuma alteração na posição (activeLayer.x/y) ou no tamanho da camada é feita.
-
+  // Redesenha a cena principal para mostrar o traço em tempo real
   draw();
 }
 

@@ -194,3 +194,18 @@ canvas {
 .layer-item:hover {
   background: #444;
 }
+
+#brushPreview {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+  border-radius: 50%;
+  pointer-events: none; /* MUITO IMPORTANTE: para não bloquear os cliques no canvas */
+  display: none; /* Começa escondido */
+  transform: translate(-50%, -50%); /* Centraliza o div no cursor */
+  z-index: 1000;
+}
+
+body:has(#brushTool[active="true"], #eraserTool[active="true"]) #mainCanvas {
+  cursor: none; /* Esconde o cursor padrão quando a ferramenta de pincel está ativa */
+}

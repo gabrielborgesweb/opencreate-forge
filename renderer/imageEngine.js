@@ -24,6 +24,22 @@ let projectHeight = undefined;
 let layers = []; // { id, name, image (HTMLImageElement), x, y, visible }
 let activeLayer = null;
 
+let activeToolId = "moveTool"; // Ferramenta ativa por padrão
+const tools = {
+  brushTool: {
+    size: 50,
+    color: "#000000",
+    hardness: 1.0, // Para o futuro
+  },
+  eraserTool: {
+    size: 100,
+    hardness: 1.0, // Para o futuro
+  },
+  // Outras ferramentas podem ser adicionadas aqui
+  moveTool: {},
+  selectTool: {},
+};
+
 // helpers
 function uid() {
   return Date.now() + "-" + Math.floor(Math.random() * 10000);
@@ -463,14 +479,13 @@ canvas.addEventListener(
 // --- Novas funções de manipulação de eventos de desenho ---
 
 function startDrawing(e) {
-  const isBrushActive = document
-    .getElementById("brushTool")
-    .hasAttribute("active");
-  const isEraserActive = document
-    .getElementById("eraserTool")
-    .hasAttribute("active");
+  // const isBrushActive = document.getElementById("brushTool").hasAttribute("active"); // <-- REMOVER
+  // const isEraserActive = document.getElementById("eraserTool").hasAttribute("active"); // <-- REMOVER
 
-  if (e.button !== 0 || !activeLayer || (!isBrushActive && !isEraserActive)) {
+  const isDrawableTool =
+    activeToolId === "brushTool" || activeToolId === "eraserTool";
+
+  if (e.button !== 0 || !activeLayer || !isDrawableTool) {
     return;
   }
 
@@ -496,8 +511,8 @@ function startDrawing(e) {
   lastX = px;
   lastY = py;
 
-  // NOVO: Inicia os limites do traço
-  const pad = brushSize / 2;
+  const toolOptions = tools[activeToolId];
+  const pad = toolOptions.size / 2;
   currentStrokeBounds = {
     minX: px - pad,
     minY: py - pad,
@@ -524,7 +539,9 @@ function processDrawing(e) {
   const { x: px, y: py } = screenToProject(canvasX, canvasY);
 
   // NOVO: Expande os limites do traço para incluir o novo ponto
-  const pad = brushSize / 2;
+  // const pad = brushSize / 2;
+  const pad = tools[activeToolId].size / 2;
+
   currentStrokeBounds.minX = Math.min(
     currentStrokeBounds.minX,
     px - pad,
@@ -781,16 +798,16 @@ function setProject(w, h, projLayers, viewportState = {}) {
 }
 
 // --------- BRUSH TOOL ---------
-const STROKE_PADDING = 1000; // Píxeis de espaço extra para desenhar fora dos limites
+const STROKE_PADDING = 1000;
 let isDrawing = false;
-let brushColor = "#000000";
-let brushSize = 50;
-let strokeCanvas = null; // Canvas temporário maior que o projeto
-let strokeOriginX = 0; // Posição X (em coords do projeto) do canto superior esquerdo do strokeCanvas
-let strokeOriginY = 0; // Posição Y (em coords do projeto) do canto superior esquerdo do strokeCanvas
+// let brushColor = "#000000"; // <-- REMOVER
+// let brushSize = 5; // <-- REMOVER
+let strokeCanvas = null;
+let strokeOriginX = 0;
+let strokeOriginY = 0;
 let lastX = null;
 let lastY = null;
-let currentStrokeBounds = null; // NOVO: Para rastrear a área do traço
+let currentStrokeBounds = null;
 
 /**
  * Encontra a caixa delimitadora (bounding box) de pixels não transparentes
@@ -865,21 +882,19 @@ function drawBrushStroke(x, y) {
   if (!isDrawing || !strokeCanvas) return;
 
   const ctx = strokeCanvas.getContext("2d");
+  const toolOptions = tools[activeToolId]; // Pega as opções da ferramenta ativa
 
-  // NOVO: Verifica qual ferramenta está ativa e define a operação de composição
-  const isEraser = document.getElementById("eraserTool").hasAttribute("active");
-  if (isEraser) {
+  if (activeToolId === "eraserTool") {
     ctx.globalCompositeOperation = "destination-out";
   } else {
     ctx.globalCompositeOperation = "source-over";
   }
 
-  ctx.strokeStyle = brushColor;
-  ctx.lineWidth = brushSize;
+  ctx.strokeStyle = toolOptions.color || "#000000"; // Usa a cor da ferramenta ou preto como padrão
+  ctx.lineWidth = toolOptions.size;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  // Converte as coordenadas do projeto para as coordenadas locais do strokeCanvas
   const localLastX = lastX - strokeOriginX;
   const localLastY = lastY - strokeOriginY;
   const localX = x - strokeOriginX;
@@ -890,11 +905,9 @@ function drawBrushStroke(x, y) {
   ctx.lineTo(localX, localY);
   ctx.stroke();
 
-  // Atualiza a última posição (ainda em coordenadas do projeto)
   lastX = x;
   lastY = y;
 
-  // Redesenha a cena principal
   draw();
 }
 
@@ -920,15 +933,20 @@ window.ImageEngine = {
   undo,
   redo,
   createEmptyLayer,
-  setBrushColor: (color) => {
-    brushColor = color;
+
+  // --- NOVA API DE FERRAMENTAS ---
+  setActiveTool: (toolId) => {
+    if (tools[toolId]) {
+      activeToolId = toolId;
+    }
   },
-  setBrushSize: (size) => {
-    brushSize = Math.max(1, size);
+  setToolOption: (toolId, option, value) => {
+    if (tools[toolId]) {
+      tools[toolId][option] = value;
+    }
   },
-  // NOVO: Expõe o estado do pincel para a UI
-  getBrushState: () => ({
-    brushColor,
-    brushSize,
-  }),
+  getToolState: (toolId) => {
+    return tools[toolId] || {};
+  },
+  getActiveToolId: () => activeToolId,
 };

@@ -8,6 +8,12 @@ const toolButtons = document.querySelectorAll(".tool-button");
 
 const btnAddEmptyLayer = document.getElementById("btnAddEmptyLayer");
 const selectedToolDiv = document.getElementById("selectedtool");
+// NOVO: Elemento de pré-visualização
+const brushPreview = document.getElementById("brushPreview");
+const canvasContainer = document.getElementById("canvasContainer");
+
+// NOVO: Variável para armazenar o último evento do mouse
+let lastMouseEvent = null;
 
 const projects = [
   // { id, name, width, height, layers: [...] }
@@ -273,26 +279,32 @@ btnSave.addEventListener("click", async () => {
 
 // MODIFICADO: Modificar a função updateSelectedToolUI()
 function updateSelectedToolUI() {
-  const activeTool = document.querySelector(".tool-button[active]");
-  if (!activeTool) return;
+  const activeToolButton = document.querySelector(".tool-button[active]");
+  if (!activeToolButton) {
+    selectedToolDiv.innerHTML = "";
+    return;
+  }
 
-  let toolName = activeTool.getAttribute("title").split(" (")[0];
-  const { brushColor, brushSize } = window.ImageEngine.getBrushState();
+  const activeToolId = activeToolButton.id;
+  const toolState = window.ImageEngine.getToolState(activeToolId);
+  const toolName = activeToolButton.getAttribute("title").split(" (")[0];
 
   let toolOptionsHTML = "";
 
-  // Mostrar opções para Brush e Eraser
-  if (toolName === "Brush Tool") {
+  // Mostra cor e tamanho para o Pincel
+  if (activeToolId === "brushTool") {
     toolOptionsHTML = `
-      <input type="color" id="brushColor" value="${brushColor}" style="margin-left: 10px">
-      <input type="range" id="brushSize" min="1" max="1000" value="${brushSize}" style="margin-left: 10px">
-      <span id="brushSizeValue">${brushSize}px</span>
+      <input type="color" id="toolColor" value="${toolState.color}" style="margin-left: 10px">
+      <input type="range" id="toolSize" min="1" max="2000" value="${toolState.size}" style="margin-left: 10px">
+      <span id="toolSizeValue">${toolState.size}px</span>
     `;
-  } else if (toolName === "Eraser Tool") {
+  }
+  // Mostra apenas tamanho para a Borracha
+  else if (activeToolId === "eraserTool") {
     toolOptionsHTML = `
       <span style="margin-left:10px">Size:</span>
-      <input type="range" id="brushSize" min="1" max="1000" value="${brushSize}" style="margin-left: 10px">
-      <span id="brushSizeValue">${brushSize}px</span>
+      <input type="range" id="toolSize" min="1" max="2000" value="${toolState.size}" style="margin-left: 10px">
+      <span id="toolSizeValue">${toolState.size}px</span>
     `;
   }
 
@@ -301,28 +313,38 @@ function updateSelectedToolUI() {
     ${toolOptionsHTML}
   `;
 
-  // Adicionar listeners para as opções
-  if (toolName === "Brush Tool") {
-    document.getElementById("brushColor").addEventListener("input", (e) => {
-      window.ImageEngine.setBrushColor(e.target.value);
+  // Adiciona listeners para as opções
+  if (document.getElementById("toolColor")) {
+    document.getElementById("toolColor").addEventListener("input", (e) => {
+      window.ImageEngine.setToolOption(activeToolId, "color", e.target.value);
     });
   }
 
-  if (toolName === "Brush Tool" || toolName === "Eraser Tool") {
-    document.getElementById("brushSize").addEventListener("input", (e) => {
-      const size = parseInt(e.target.value);
-      window.ImageEngine.setBrushSize(size);
-      document.getElementById("brushSizeValue").textContent = size + "px";
+  if (document.getElementById("toolSize")) {
+    document.getElementById("toolSize").addEventListener("input", (e) => {
+      const size = parseInt(e.target.value, 10);
+      window.ImageEngine.setToolOption(activeToolId, "size", size);
+      document.getElementById("toolSizeValue").textContent = size + "px";
+      // Atualiza a pré-visualização em tempo real
+      updateBrushPreview(e);
     });
   }
 }
 
 // Modify the tool buttons click handler
 toolButtons.forEach((btn) => {
-  btn.addEventListener("click", () => {
+  btn.addEventListener("click", (e) => {
+    // Recebe o evento 'e'
     toolButtons.forEach((b) => b.removeAttribute("active"));
     btn.setAttribute("active", "true");
+    window.ImageEngine.setActiveTool(btn.id);
     updateSelectedToolUI();
+
+    // A CORREÇÃO: Força a atualização da pré-visualização
+    // Se o clique foi programático (via atalho), usa o último evento de mouse conhecido
+    if (lastMouseEvent) {
+      updateBrushPreview(lastMouseEvent);
+    }
   });
 });
 
@@ -388,5 +410,57 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// --- NOVO: LÓGICA DE PRÉ-VISUALIZAÇÃO DO PINCEL ---
+
+function updateBrushPreview(e) {
+  const activeToolId = window.ImageEngine.getActiveToolId();
+  const toolState = window.ImageEngine.getToolState(activeToolId);
+
+  if (!toolState || typeof toolState.size === "undefined") {
+    brushPreview.style.display = "none";
+    return;
+  }
+
+  const engineState = window.ImageEngine.getState();
+  const currentScale = engineState.scale;
+
+  const previewSize = toolState.size * currentScale;
+
+  const rect = canvasContainer.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  brushPreview.style.width = `${previewSize}px`;
+  brushPreview.style.height = `${previewSize}px`;
+  brushPreview.style.left = `${x}px`;
+  brushPreview.style.top = `${y}px`;
+
+  // Garante que a pré-visualização esteja visível se for uma ferramenta de desenho
+  if (activeToolId === "brushTool" || activeToolId === "eraserTool") {
+    brushPreview.style.display = "block";
+  }
+}
+
+canvasContainer.addEventListener("mouseenter", (e) => {
+  // Armazena o evento para o caso de um atalho de teclado ser usado
+  lastMouseEvent = e;
+  const activeToolId = window.ImageEngine.getActiveToolId();
+  if (activeToolId === "brushTool" || activeToolId === "eraserTool") {
+    brushPreview.style.display = "block";
+  }
+});
+
+canvasContainer.addEventListener("mouseleave", () => {
+  brushPreview.style.display = "none";
+});
+
+// MODIFICADO: O mousemove agora armazena o evento mais recente
+canvasContainer.addEventListener("mousemove", (e) => {
+  // Armazena continuamente o evento mais recente do mouse
+  lastMouseEvent = e;
+  updateBrushPreview(e);
+});
+
 // Initialize UI
+document.getElementById("moveTool").click();
 updateSelectedToolUI();

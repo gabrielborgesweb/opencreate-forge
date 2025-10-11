@@ -291,21 +291,30 @@ function updateSelectedToolUI() {
 
   let toolOptionsHTML = "";
 
-  // Mostra cor e tamanho para o Pincel
-  if (activeToolId === "brushTool") {
-    toolOptionsHTML = `
-      <input type="color" id="toolColor" value="${toolState.color}" style="margin-left: 10px">
-      <input type="range" id="toolSize" min="1" max="2000" value="${toolState.size}" style="margin-left: 10px">
+  // Gera as opções de UI para ferramentas de desenho (pincel, borracha)
+  if (activeToolId === "brushTool" || activeToolId === "eraserTool") {
+    const sizeHTML = `
+      <span style="margin-left: 10px">Size:</span>
+      <input type="range" id="toolSize" min="1" max="2000" value="${toolState.size}">
       <span id="toolSizeValue">${toolState.size}px</span>
     `;
-  }
-  // Mostra apenas tamanho para a Borracha
-  else if (activeToolId === "eraserTool") {
-    toolOptionsHTML = `
-      <span style="margin-left:10px">Size:</span>
-      <input type="range" id="toolSize" min="1" max="2000" value="${toolState.size}" style="margin-left: 10px">
-      <span id="toolSizeValue">${toolState.size}px</span>
+
+    const hardnessHTML = `
+      <span style="margin-left: 10px">Hardness:</span>
+      <input type="range" id="toolHardness" min="0" max="100" value="${Math.round(
+        (toolState.hardness || 1.0) * 100
+      )}">
+      <span id="toolHardnessValue">${Math.round(
+        (toolState.hardness || 1.0) * 100
+      )}%</span>
     `;
+
+    if (activeToolId === "brushTool") {
+      const colorHTML = `<input type="color" id="toolColor" value="${toolState.color}" style="margin-left: 10px">`;
+      toolOptionsHTML = colorHTML + sizeHTML + hardnessHTML;
+    } else {
+      toolOptionsHTML = sizeHTML + hardnessHTML;
+    }
   }
 
   selectedToolDiv.innerHTML = `
@@ -326,7 +335,22 @@ function updateSelectedToolUI() {
       window.ImageEngine.setToolOption(activeToolId, "size", size);
       document.getElementById("toolSizeValue").textContent = size + "px";
       // Atualiza a pré-visualização em tempo real
-      updateBrushPreview(e);
+      if (lastMouseEvent) {
+        updateBrushPreview(lastMouseEvent);
+      }
+    });
+  }
+
+  if (document.getElementById("toolHardness")) {
+    document.getElementById("toolHardness").addEventListener("input", (e) => {
+      const hardness = parseInt(e.target.value, 10) / 100;
+      window.ImageEngine.setToolOption(activeToolId, "hardness", hardness);
+      document.getElementById("toolHardnessValue").textContent = `${Math.round(
+        hardness * 100
+      )}%`;
+      if (lastMouseEvent) {
+        updateBrushPreview(lastMouseEvent);
+      }
     });
   }
 }
@@ -355,10 +379,7 @@ btnAddEmptyLayer.addEventListener("click", () => {
     alert("Create a project first");
     return;
   }
-  window.ImageEngine.createEmptyLayer(
-    activeProject.width,
-    activeProject.height
-  );
+  window.ImageEngine.createEmptyLayer();
 });
 
 // MODIFICADO: Adicionar atalhos de teclado
@@ -424,7 +445,10 @@ function updateBrushPreview(e) {
   const engineState = window.ImageEngine.getState();
   const currentScale = engineState.scale;
 
-  const previewSize = toolState.size * currentScale;
+  const hardness =
+    typeof toolState.hardness === "number" ? toolState.hardness : 1.0;
+  const effectiveSize = toolState.size * (1 + (1 - hardness) * 0.5);
+  const previewSize = effectiveSize * currentScale;
 
   const rect = canvasContainer.getBoundingClientRect();
   const x = e.clientX - rect.left;

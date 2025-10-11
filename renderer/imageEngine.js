@@ -29,11 +29,11 @@ const tools = {
   brushTool: {
     size: 50,
     color: "#000000",
-    hardness: 1.0, // Para o futuro
+    hardness: 1.0,
   },
   eraserTool: {
     size: 100,
-    hardness: 1.0, // Para o futuro
+    hardness: 1.0,
   },
   // Outras ferramentas podem ser adicionadas aqui
   moveTool: {},
@@ -252,18 +252,26 @@ function addLayer(img, name = "Layer") {
 }
 
 // --------- CREATE EMPTY LAYER ---------
-function createEmptyLayer(w, h, name = "Empty Layer") {
+function createEmptyLayer(name = "Empty Layer") {
   const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-
-  // Initialize with transparent background
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  canvas.width = 1;
+  canvas.height = 1;
 
   const img = new Image();
   img.onload = () => {
-    addLayer(img, name);
+    const newLayer = {
+      id: uid(),
+      name,
+      image: img,
+      x: 0, // Posicionar no canto para consistência com camadas apagadas
+      y: 0,
+      visible: true,
+    };
+    layers.push(newLayer);
+    setActiveLayer(newLayer.id);
+    updateLayersPanel();
+    saveState();
+    draw();
   };
   img.src = canvas.toDataURL();
 }
@@ -512,7 +520,10 @@ function startDrawing(e) {
   lastY = py;
 
   const toolOptions = tools[activeToolId];
-  const pad = toolOptions.size / 2;
+  const hardness =
+    typeof toolOptions.hardness === "number" ? toolOptions.hardness : 1.0;
+  const effectiveSize = toolOptions.size * (1 + (1 - hardness) * 0.5);
+  const pad = effectiveSize / 2;
   currentStrokeBounds = {
     minX: px - pad,
     minY: py - pad,
@@ -538,9 +549,19 @@ function processDrawing(e) {
 
   const { x: px, y: py } = screenToProject(canvasX, canvasY);
 
-  // NOVO: Expande os limites do traço para incluir o novo ponto
+  // NOVO: Apenas desenha se o mouse se moveu o suficiente
+  const dist = Math.hypot(px - lastX, py - lastY);
+  if (dist < MIN_BRUSH_MOVE_DISTANCE) {
+    return;
+  }
+
+  // Expande os limites do traço para incluir o novo ponto
   // const pad = brushSize / 2;
-  const pad = tools[activeToolId].size / 2;
+  const toolOptions = tools[activeToolId];
+  const hardness =
+    typeof toolOptions.hardness === "number" ? toolOptions.hardness : 1.0;
+  const effectiveSize = toolOptions.size * (1 + (1 - hardness) * 0.5);
+  const pad = effectiveSize / 2;
 
   currentStrokeBounds.minX = Math.min(
     currentStrokeBounds.minX,
@@ -644,8 +665,24 @@ function stopDrawing(e) {
     };
     img.src = newLayerCanvas.toDataURL();
   } else {
-    strokeCanvas = null;
-    draw();
+    // CORREÇÃO: Lida com o caso em que a camada fica totalmente vazia
+    const emptyCanvas = document.createElement("canvas");
+    emptyCanvas.width = 1;
+    emptyCanvas.height = 1;
+
+    const img = new Image();
+    img.onload = () => {
+      activeLayer.image = img;
+      // Reseta a posição para o canto superior esquerdo para consistência
+      activeLayer.x = 0;
+      activeLayer.y = 0;
+
+      strokeCanvas = null;
+      saveState();
+      draw();
+      updateLayersPanel();
+    };
+    img.src = emptyCanvas.toDataURL();
   }
 }
 
@@ -799,6 +836,7 @@ function setProject(w, h, projLayers, viewportState = {}) {
 
 // --------- BRUSH TOOL ---------
 const STROKE_PADDING = 1000;
+const MIN_BRUSH_MOVE_DISTANCE = 1; // Distância mínima (em pixels do projeto) para registrar um novo ponto de pintura
 let isDrawing = false;
 // let brushColor = "#000000"; // <-- REMOVER
 // let brushSize = 5; // <-- REMOVER
@@ -877,12 +915,58 @@ function getOptimizedBoundingBox(canvas, searchBounds) {
   };
 }
 
+function hexToRgba(hex, alpha = 1) {
+  if (!hex.startsWith("#")) return `rgba(0,0,0,${alpha})`;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function drawDab(ctx, x, y, radius, hardness, color) {
+  const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+  const innerStop = Math.max(0, Math.min(1, hardness));
+
+  let opaque, mid, transparent;
+
+  if (ctx.globalCompositeOperation === "destination-out") {
+    opaque = "rgba(0,0,0,1)";
+    mid = "rgba(0,0,0,0.25)"; // y=(1-0.5)^2=0.25
+    transparent = "rgba(0,0,0,0)";
+  } else {
+    opaque = hexToRgba(color, 1);
+    mid = hexToRgba(color, 0.25); // y=(1-0.5)^2=0.25
+    transparent = hexToRgba(color, 0);
+  }
+
+  gradient.addColorStop(0, opaque);
+  gradient.addColorStop(innerStop, opaque);
+
+  // Ao adicionar uma parada intermediária, mudamos a queda linear para uma
+  // aproximação de 2 segmentos de uma curva. Esta curva (y=(1-x)^2) derruba
+  // o alfa muito mais rápido, o que evita o acúmulo excessivo de alfa quando
+  // os dabs se sobrepõem, resultando em um traço muito mais suave.
+  if (innerStop < 1.0) {
+    const midStop = innerStop + (1.0 - innerStop) * 0.5;
+    gradient.addColorStop(midStop, mid);
+  }
+
+  gradient.addColorStop(1, transparent);
+
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 // MODIFICADO: Função de desenho do pincel/borracha
 function drawBrushStroke(x, y) {
   if (!isDrawing || !strokeCanvas) return;
 
   const ctx = strokeCanvas.getContext("2d");
   const toolOptions = tools[activeToolId]; // Pega as opções da ferramenta ativa
+  const hardness =
+    typeof toolOptions.hardness === "number" ? toolOptions.hardness : 1.0;
 
   if (activeToolId === "eraserTool") {
     ctx.globalCompositeOperation = "destination-out";
@@ -890,20 +974,46 @@ function drawBrushStroke(x, y) {
     ctx.globalCompositeOperation = "source-over";
   }
 
-  ctx.strokeStyle = toolOptions.color || "#000000"; // Usa a cor da ferramenta ou preto como padrão
-  ctx.lineWidth = toolOptions.size;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-
   const localLastX = lastX - strokeOriginX;
   const localLastY = lastY - strokeOriginY;
   const localX = x - strokeOriginX;
   const localY = y - strokeOriginY;
 
-  ctx.beginPath();
-  ctx.moveTo(localLastX, localLastY);
-  ctx.lineTo(localX, localY);
-  ctx.stroke();
+  // Optimization for 100% hardness: use native line drawing which is faster
+  if (hardness >= 1.0) {
+    ctx.strokeStyle = toolOptions.color || "#000000";
+    if (activeToolId === "eraserTool") {
+      ctx.strokeStyle = "#000000"; // any opaque color works for destination-out
+    }
+    ctx.lineWidth = toolOptions.size;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    ctx.beginPath();
+    ctx.moveTo(localLastX, localLastY);
+    ctx.lineTo(localX, localY);
+    ctx.stroke();
+  } else {
+    // Soft brush: draw dabs along the path
+    const size = toolOptions.size;
+    const color = toolOptions.color || "#000000";
+    const dist = Math.hypot(localX - localLastX, localY - localLastY);
+    const angle = Math.atan2(localY - localLastY, localX - localLastX);
+    const effectiveSize = size * (1 + (1 - hardness) * 0.5);
+    const radius = effectiveSize / 2;
+
+    // Spacing should be a fraction of the brush size to ensure a continuous line
+    const spacing = Math.max(1, (size / 2) * 0.25);
+
+    for (let i = 0; i < dist; i += spacing) {
+      const px = localLastX + Math.cos(angle) * i;
+      const py = localLastY + Math.sin(angle) * i;
+      drawDab(ctx, px, py, radius, hardness, color);
+    }
+
+    // Draw final dab at the current mouse position to ensure it's responsive
+    drawDab(ctx, localX, localY, radius, hardness, color);
+  }
 
   lastX = x;
   lastY = y;

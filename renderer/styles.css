@@ -80,6 +80,7 @@ button {
   display: flex;
   flex-direction: column;
   background: #222; /* sólido fora do projeto */
+  overflow: hidden;
 }
 
 #zoomScale {

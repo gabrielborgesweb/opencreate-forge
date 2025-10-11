@@ -15,8 +15,8 @@
   <body>
     <main id="app" class="flex flex-column">
       <div id="menubar" class="flex flex-row">
-        <button id="btnNew">New Project...</button>
-        <button id="btnOpen">Open Image...</button>
+        <!-- <button id="btnNew">New Project...</button> -->
+        <!-- <button id="btnOpen">Open Image...</button> -->
         <button id="btnSave">Save Image...</button>
         <!-- <button id="btnGrayscale">Filter: Grayscale</button> -->
 
@@ -54,6 +54,42 @@
             </button>
             <!-- abas de projetos -->
           </div>
+          <div id="homeScreen">
+            <div class="home-left-panel">
+              <div class="home-categories">
+                <!-- category tabs will be generated here -->
+              </div>
+              <div class="home-presets-grid">
+                <!-- presets will be generated here -->
+              </div>
+            </div>
+            <div class="home-right-panel">
+              <h3>New Project</h3>
+              <label>
+                <span>Name</span>
+                <input id="home-proj-name" type="text" value="Untitled" />
+              </label>
+              <label>
+                <span>Width</span>
+                <input
+                  id="home-proj-width"
+                  type="number"
+                  value="1080"
+                  min="1"
+                />
+              </label>
+              <label>
+                <span>Height</span>
+                <input
+                  id="home-proj-height"
+                  type="number"
+                  value="1080"
+                  min="1"
+                />
+              </label>
+              <button id="home-create-project">Create New Project</button>
+            </div>
+          </div>
           <canvas id="mainCanvas"></canvas>
           <div id="zoomScale" style="display: none"></div>
         </div>
@@ -63,7 +99,7 @@
             <div id="layersList" class="list"></div>
             <div style="display: flex; gap: 8px">
               <button id="btnAddEmptyLayer">Empty Layer</button>
-              <button id="btnAddLayer">Add Image Layer</button>
+              <button id="btnOpen">Add Image Layer</button>
             </div>
           </div>
           <div id="propertiesPanel" class="panel">

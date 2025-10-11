@@ -11,6 +11,9 @@ const selectedToolDiv = document.getElementById("selectedtool");
 // NOVO: Elemento de pré-visualização
 const brushPreview = document.getElementById("brushPreview");
 const canvasContainer = document.getElementById("canvasContainer");
+// NOVO: Elementos da tela inicial
+const homeScreen = document.getElementById("homeScreen");
+const mainCanvas = document.getElementById("mainCanvas");
 
 // NOVO: Variável para armazenar o último evento do mouse
 let lastMouseEvent = null;
@@ -21,6 +24,29 @@ const projects = [
 const projectsTabs = document.getElementById("projectsTabs");
 const homeTab = document.getElementById("homeTab");
 
+// --- NOVO: DADOS DOS PRESETS ---
+const presetsData = {
+  Social: [
+    { name: "Facebook Page Cover", w: 1640, h: 664 },
+    { name: "Facebook Event Image", w: 1920, h: 1080 },
+    { name: "Facebook Group Header", w: 1640, h: 856 },
+    { name: "Instagram", w: 1080, h: 1080 },
+    { name: "Instagram Story", w: 1080, h: 1920 },
+    { name: "Instagram Portrait", w: 1080, h: 1350 },
+    { name: "YouTube Thumbnail", w: 1280, h: 720 },
+    { name: "YouTube Profile", w: 800, h: 800 },
+    { name: "YouTube Cover", w: 2560, h: 1440 },
+    { name: "Twitter Profile", w: 400, h: 400 },
+    { name: "Twitter Header", w: 1500, h: 500 },
+  ],
+  Print: [
+    { name: "A4", w: 2480, h: 3508 },
+    { name: "A5", w: 1748, h: 2480 },
+    { name: "Letter", w: 2550, h: 3300 },
+  ],
+  // Adicionar mais categorias conforme necessário
+};
+
 function getActiveProject() {
   const activeTab = projectsTabs.querySelector("button.active:not(#homeTab)");
   if (!activeTab) return null;
@@ -28,8 +54,107 @@ function getActiveProject() {
   return projects.find((p) => p.id == activeTab.id);
 }
 
+// --- NOVO: FUNÇÕES DA TELA INICIAL ---
+function showHomeScreen() {
+  homeScreen.classList.add("visible");
+  mainCanvas.style.display = "none";
+  document.getElementById("zoomScale").style.display = "none";
+  document.getElementById("sidebar").style.display = "none";
+  // document.getElementById("toolbar").style.display = "none";
+  document.getElementById("selectedtool").style.display = "none";
+}
+
+function hideHomeScreen() {
+  homeScreen.classList.remove("visible");
+  mainCanvas.style.display = "block";
+  document.getElementById("sidebar").style.display = "flex";
+  // document.getElementById("toolbar").style.display = "block";
+  document.getElementById("selectedtool").style.display = "flex";
+}
+
+function renderPresets(category) {
+  const grid = document.querySelector(".home-presets-grid");
+  const nameInput = document.getElementById("home-proj-name");
+  const widthInput = document.getElementById("home-proj-width");
+  const heightInput = document.getElementById("home-proj-height");
+  grid.innerHTML = "";
+
+  const presets = presetsData[category] || [];
+  presets.forEach((p) => {
+    const item = document.createElement("div");
+    item.className = "preset-item";
+    item.dataset.w = p.w;
+    item.dataset.h = p.h;
+    item.dataset.name = p.name;
+
+    const previewContainerHeight = 90; // Corresponds to the CSS height
+    const maxDim = Math.max(p.w, p.h);
+    const scale = (previewContainerHeight / maxDim) * 0.8; // 80% of container height
+    const previewBoxW = p.w * scale;
+    const previewBoxH = p.h * scale;
+
+    item.innerHTML = `
+      <div class="preview">
+        <div class="preview-box" style="width: ${previewBoxW}px; height: ${previewBoxH}px;"></div>
+      </div>
+      <div class="title">${p.name}</div>
+      <div class="dims">${p.w} x ${p.h} px</div>
+    `;
+
+    item.addEventListener("click", () => {
+      // Remove selection from others
+      grid
+        .querySelectorAll(".preset-item")
+        .forEach((el) => el.classList.remove("selected"));
+      // Add selection to current
+      item.classList.add("selected");
+
+      nameInput.value = p.name;
+      widthInput.value = p.w;
+      heightInput.value = p.h;
+    });
+
+    item.addEventListener("dblclick", () => {
+      nameInput.value = p.name;
+      widthInput.value = p.w;
+      heightInput.value = p.h;
+      document.getElementById("home-create-project").click();
+    });
+
+    grid.appendChild(item);
+  });
+}
+
+function setupHomeScreen() {
+  const categoriesContainer = document.querySelector(".home-categories");
+  const categories = Object.keys(presetsData);
+
+  categories.forEach((cat, index) => {
+    const btn = document.createElement("button");
+    btn.textContent = cat;
+    if (index === 0) {
+      btn.classList.add("active");
+      renderPresets(cat);
+    }
+    btn.addEventListener("click", () => {
+      categoriesContainer
+        .querySelectorAll("button")
+        .forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderPresets(cat);
+    });
+    categoriesContainer.appendChild(btn);
+  });
+
+  document
+    .getElementById("home-create-project")
+    .addEventListener("click", createProjectFromHome);
+}
+
 // set initial state
 homeTab.classList.add("active");
+showHomeScreen(); // Mostrar a tela inicial ao carregar
+setupHomeScreen();
 
 // ao clicar em Home, resetar viewport
 homeTab.addEventListener("click", () => {
@@ -63,61 +188,55 @@ homeTab.addEventListener("click", () => {
     b.classList.remove("active");
   });
   homeTab.classList.add("active");
-  document.getElementById("zoomScale").style.display = "none";
+  showHomeScreen();
 });
 
 // show modal for new project (programmatic simple modal)
-function showNewProjectModal() {
-  // evitar duplicar
-  if (document.getElementById("ocf-new-project-modal")) return;
+// REMOVED: function showNewProjectModal() { ... }
 
-  const modal = document.createElement("div");
-  modal.id = "ocf-new-project-modal";
-  modal.style.position = "fixed";
-  modal.style.left = "0";
-  modal.style.top = "0";
-  modal.style.right = "0";
-  modal.style.bottom = "0";
-  modal.style.display = "flex";
-  modal.style.alignItems = "center";
-  modal.style.justifyContent = "center";
-  modal.style.background = "rgba(0,0,0,0.45)";
-  modal.style.zIndex = "9999";
+// --- NOVA FUNÇÃO PARA CRIAR PROJETO ---
+function createProjectFromHome() {
+  const w = parseInt(document.getElementById("home-proj-width").value, 10);
+  const h = parseInt(document.getElementById("home-proj-height").value, 10);
+  if (!isFinite(w) || w <= 0 || !isFinite(h) || h <= 0) {
+    alert("Width/Height inválidos");
+    return;
+  }
 
-  modal.innerHTML = `
-    <div style="background:#222;color:#fff;padding:18px;border-radius:8px;min-width:260px;">
-      <h3 style="margin:0 0 8px 0">Create New Project</h3>
-      <label style="display:block;margin-bottom:6px">
-        Name: <input id="ocf-proj-name" type="text" value="Untitled" min="1" style="width:100px;margin-left:6px" />
-      </label>
-      <label style="display:block;margin-bottom:6px">
-        Width: <input id="ocf-proj-width" type="number" value="1080" min="1" style="width:100px;margin-left:6px" />
-      </label>
-      <label style="display:block;margin-bottom:12px">
-        Height: <input id="ocf-proj-height" type="number" value="1080" min="1" style="width:100px;margin-left:6px" />
-      </label>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button id="ocf-cancel" style="padding:6px 10px">Cancel</button>
-        <button id="ocf-create" style="padding:6px 10px">Create</button>
-      </div>
-    </div>
-  `;
+  // caso estar focado em outro projeto, salvar estado antes de criar novo
+  const currentProject = getActiveProject();
+  if (currentProject) {
+    const state = window.ImageEngine.getState();
+    currentProject.layers = state.layers;
+    // Salvar estado do viewport
+    currentProject.scale = state.scale;
+    currentProject.originX = state.originX;
+    currentProject.originY = state.originY;
+    console.log(
+      "Salvando layers e viewport do projeto '",
+      currentProject.name,
+      "' antes de criar novo:",
+      state
+    );
+  }
+  // ------------------------------------
 
-  document.body.appendChild(modal);
+  // usar um id único consistente para a aba e o projeto
+  const projectId = Date.now();
 
-  document.getElementById("ocf-cancel").addEventListener("click", () => {
-    modal.remove();
+  // registrar aba
+  const tab = document.createElement("button");
+  tab.textContent =
+    document.getElementById("home-proj-name").value || "Untitled";
+  tab.id = projectId;
+  projectsTabs.querySelectorAll("button").forEach((b) => {
+    b.classList.remove("active");
   });
+  tab.classList.add("active");
 
-  document.getElementById("ocf-create").addEventListener("click", () => {
-    const w = parseInt(document.getElementById("ocf-proj-width").value, 10);
-    const h = parseInt(document.getElementById("ocf-proj-height").value, 10);
-    if (!isFinite(w) || w <= 0 || !isFinite(h) || h <= 0) {
-      alert("Width/Height inválidos");
-      return;
-    }
-
-    // caso estar focado em outro projeto, salvar estado antes de criar novo
+  // ao clicar na aba, trocar para o projeto
+  tab.addEventListener("click", () => {
+    // --- SALVAR ESTADO ANTES DE TROCAR ---
     const currentProject = getActiveProject();
     if (currentProject) {
       const state = window.ImageEngine.getState();
@@ -129,100 +248,67 @@ function showNewProjectModal() {
       console.log(
         "Salvando layers e viewport do projeto '",
         currentProject.name,
-        "' antes de criar novo:",
+        "' antes de trocar:",
         state
       );
     }
     // ------------------------------------
 
-    // usar um id único consistente para a aba e o projeto
-    const projectId = Date.now();
-
-    // registrar aba
-    const tab = document.createElement("button");
-    tab.textContent =
-      document.getElementById("ocf-proj-name").value || "Untitled";
-    tab.id = projectId;
-    projectsTabs.querySelectorAll("button").forEach((b) => {
-      b.classList.remove("active");
-    });
-    tab.classList.add("active");
-
-    // ao clicar na aba, trocar para o projeto
-    tab.addEventListener("click", () => {
-      // --- SALVAR ESTADO ANTES DE TROCAR ---
-      const currentProject = getActiveProject();
-      if (currentProject) {
-        const state = window.ImageEngine.getState();
-        currentProject.layers = state.layers;
-        // Salvar estado do viewport
-        currentProject.scale = state.scale;
-        currentProject.originX = state.originX;
-        currentProject.originY = state.originY;
-        console.log(
-          "Salvando layers e viewport do projeto '",
-          currentProject.name,
-          "' antes de trocar:",
-          state
-        );
-      }
+    const proj = projects.find((p) => p.id == tab.id);
+    console.log("Switching to project:", proj);
+    if (proj) {
+      // --- CARREGAR ESTADO DO VIEWPORT ---
+      const viewportState = {
+        scale: proj.scale,
+        originX: proj.originX,
+        originY: proj.originY,
+      };
+      window.ImageEngine.setProject(
+        proj.width,
+        proj.height,
+        proj.layers,
+        viewportState
+      );
       // ------------------------------------
-
-      const proj = projects.find((p) => p.id == tab.id);
-      console.log("Switching to project:", proj);
-      if (proj) {
-        // --- CARREGAR ESTADO DO VIEWPORT ---
-        const viewportState = {
-          scale: proj.scale,
-          originX: proj.originX,
-          originY: proj.originY,
-        };
-        window.ImageEngine.setProject(
-          proj.width,
-          proj.height,
-          proj.layers,
-          viewportState
-        );
-        // ------------------------------------
-        projectsTabs.querySelectorAll("button").forEach((b) => {
-          b.classList.remove("active");
-        });
-        tab.classList.add("active");
-        document.getElementById("zoomScale").style.display = "block";
-      }
-    });
-
-    projectsTabs.appendChild(tab);
-
-    // --- INICIALIZAR PROJETO COM O ESTADO ATUAL DO VIEWPORT ---
-    // Pega o estado atual após o createNewProject (que chama fitToScreen)
-    const initialState = window.ImageEngine.getState();
-
-    projects.push({
-      id: projectId,
-      name: tab.textContent,
-      width: w,
-      height: h,
-      layers: [],
-      // Adicionar estado inicial do viewport
-      scale: initialState.scale,
-      originX: initialState.originX,
-      originY: initialState.originY,
-    });
-    // --------------------------------------------------------
-
-    // chama a engine para criar o novo projeto
-    window.ImageEngine.createNewProject(w, h);
-
-    document.getElementById("zoomScale").style.display = "block";
-
-    modal.remove();
+      projectsTabs.querySelectorAll("button").forEach((b) => {
+        b.classList.remove("active");
+      });
+      tab.classList.add("active");
+      document.getElementById("zoomScale").style.display = "block";
+      hideHomeScreen(); // Esconde a tela inicial
+    }
   });
+
+  projectsTabs.appendChild(tab);
+
+  // chama a engine para criar o novo projeto
+  window.ImageEngine.createNewProject(w, h);
+
+  // --- INICIALIZAR PROJETO COM O ESTADO ATUAL DO VIEWPORT ---
+  // Pega o estado atual após o createNewProject (que chama fitToScreen)
+  const initialState = window.ImageEngine.getState();
+
+  projects.push({
+    id: projectId,
+    name: tab.textContent,
+    width: w,
+    height: h,
+    layers: [],
+    // Adicionar estado inicial do viewport
+    scale: initialState.scale,
+    originX: initialState.originX,
+    originY: initialState.originY,
+  });
+  // --------------------------------------------------------
+
+  document.getElementById("zoomScale").style.display = "block";
+  hideHomeScreen(); // Esconde a tela inicial
 }
 
 // New Project button
 btnNew.addEventListener("click", () => {
-  showNewProjectModal();
+  // Em vez de modal, apenas volta para a home tab
+  homeTab.click();
 });
 
 // Open file (usa API exposta via preload)

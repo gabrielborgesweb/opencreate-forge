@@ -31,9 +31,16 @@ const tools = {
     color: "#000000",
     hardness: 1.0,
   },
+  pencilTool: {
+    size: 1,
+    color: "#000000",
+    shape: "square", // 'square' or 'sphere'
+  },
   eraserTool: {
     size: 100,
     hardness: 1.0,
+    mode: "brush", // 'brush' or 'pencil'
+    shape: "square", // 'square' or 'sphere'
   },
   // Outras ferramentas podem ser adicionadas aqui
   moveTool: {},
@@ -203,6 +210,12 @@ function screenToProject(screenX, screenY) {
   const px = (screenX - originX) / scale;
   const py = (screenY - originY) / scale;
   return { x: px, y: py };
+}
+
+function projectToScreen(projectX, projectY) {
+  const sx = projectX * scale + originX;
+  const sy = projectY * scale + originY;
+  return { x: sx, y: sy };
 }
 
 // --------- CREATE NEW PROJECT ---------
@@ -518,7 +531,9 @@ function startDrawing(e) {
   // const isEraserActive = document.getElementById("eraserTool").hasAttribute("active"); // <-- REMOVER
 
   const isDrawableTool =
-    activeToolId === "brushTool" || activeToolId === "eraserTool";
+    activeToolId === "brushTool" ||
+    activeToolId === "eraserTool" ||
+    activeToolId === "pencilTool";
 
   if (e.button !== 0 || !activeLayer || !isDrawableTool) {
     return;
@@ -538,6 +553,15 @@ function startDrawing(e) {
   strokeCanvas.height = strokeHeight;
   const strokeCtx = strokeCanvas.getContext("2d");
 
+  // NOVO: Desabilita anti-aliasing para o lápis
+  const toolOptions = tools[activeToolId];
+  const isPencilMode =
+    activeToolId === "pencilTool" ||
+    (activeToolId === "eraserTool" && toolOptions.mode === "pencil");
+  if (isPencilMode) {
+    strokeCtx.imageSmoothingEnabled = false;
+  }
+
   // Copia a imagem da camada ativa para o centro do nosso canvas expandido
   strokeCtx.drawImage(activeLayer.image, STROKE_PADDING, STROKE_PADDING);
 
@@ -546,10 +570,14 @@ function startDrawing(e) {
   lastX = px;
   lastY = py;
 
-  const toolOptions = tools[activeToolId];
-  const hardness =
-    typeof toolOptions.hardness === "number" ? toolOptions.hardness : 1.0;
-  const effectiveSize = toolOptions.size * (1 + (1 - hardness) * 0.5);
+  let effectiveSize;
+  if (isPencilMode) {
+    effectiveSize = toolOptions.size;
+  } else {
+    const hardness =
+      typeof toolOptions.hardness === "number" ? toolOptions.hardness : 1.0;
+    effectiveSize = toolOptions.size * (1 + (1 - hardness) * 0.5);
+  }
   const pad = effectiveSize / 2;
   currentStrokeBounds = {
     minX: px - pad,
@@ -585,9 +613,18 @@ function processDrawing(e) {
   // Expande os limites do traço para incluir o novo ponto
   // const pad = brushSize / 2;
   const toolOptions = tools[activeToolId];
-  const hardness =
-    typeof toolOptions.hardness === "number" ? toolOptions.hardness : 1.0;
-  const effectiveSize = toolOptions.size * (1 + (1 - hardness) * 0.5);
+  const isPencilMode =
+    activeToolId === "pencilTool" ||
+    (activeToolId === "eraserTool" && toolOptions.mode === "pencil");
+
+  let effectiveSize;
+  if (isPencilMode) {
+    effectiveSize = toolOptions.size;
+  } else {
+    const hardness =
+      typeof toolOptions.hardness === "number" ? toolOptions.hardness : 1.0;
+    effectiveSize = toolOptions.size * (1 + (1 - hardness) * 0.5);
+  }
   const pad = effectiveSize / 2;
 
   currentStrokeBounds.minX = Math.min(
@@ -992,8 +1029,10 @@ function drawBrushStroke(x, y) {
 
   const ctx = strokeCanvas.getContext("2d");
   const toolOptions = tools[activeToolId]; // Pega as opções da ferramenta ativa
-  const hardness =
-    typeof toolOptions.hardness === "number" ? toolOptions.hardness : 1.0;
+
+  const isPencilMode =
+    activeToolId === "pencilTool" ||
+    (activeToolId === "eraserTool" && toolOptions.mode === "pencil");
 
   if (activeToolId === "eraserTool") {
     ctx.globalCompositeOperation = "destination-out";
@@ -1006,40 +1045,112 @@ function drawBrushStroke(x, y) {
   const localX = x - strokeOriginX;
   const localY = y - strokeOriginY;
 
-  // Optimization for 100% hardness: use native line drawing which is faster
-  if (hardness >= 1.0) {
-    ctx.strokeStyle = toolOptions.color || "#000000";
+  if (isPencilMode) {
+    ctx.fillStyle = toolOptions.color || "#000000";
     if (activeToolId === "eraserTool") {
-      ctx.strokeStyle = "#000000"; // any opaque color works for destination-out
+      ctx.fillStyle = "#000000"; // any opaque color works for destination-out
     }
-    ctx.lineWidth = toolOptions.size;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+    const size = toolOptions.size;
+    const shape = toolOptions.shape;
 
-    ctx.beginPath();
-    ctx.moveTo(localLastX, localLastY);
-    ctx.lineTo(localX, localY);
-    ctx.stroke();
+    // Bresenham's line algorithm to draw a continuous line of "pixels"
+    let x0 = Math.floor(localLastX);
+    let y0 = Math.floor(localLastY);
+    const x1 = Math.floor(localX);
+    const y1 = Math.floor(localY);
+
+    const dx = Math.abs(x1 - x0);
+    const sx = x0 < x1 ? 1 : -1;
+    const dy = -Math.abs(y1 - y0);
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+
+    while (true) {
+      if (shape === "square") {
+        ctx.fillRect(
+          x0 - Math.floor(size / 2),
+          y0 - Math.floor(size / 2),
+          size,
+          size
+        );
+      } else {
+        // sphere
+        if (size % 2 !== 0) {
+          // Odd size, use integer math for classic pixel circle
+          const r = (size - 1) / 2;
+          for (let dy = -r; dy <= r; dy++) {
+            const dx = Math.floor(Math.sqrt(r * r - dy * dy));
+            ctx.fillRect(x0 - dx, y0 + dy, 2 * dx + 1, 1);
+          }
+        } else {
+          // Even size, use distance check which works well for these
+          const radius = size / 2;
+          // Center the bounding box on the pixel grid
+          const topLeftX = x0 - radius;
+          const topLeftY = y0 - radius;
+
+          for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+              const dist_x = x + 0.5 - radius;
+              const dist_y = y + 0.5 - radius;
+              if (dist_x * dist_x + dist_y * dist_y <= radius * radius) {
+                ctx.fillRect(topLeftX + x, topLeftY + y, 1, 1);
+              }
+            }
+          }
+        }
+      }
+
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        x0 += sx;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        y0 += sy;
+      }
+    }
   } else {
     // Soft brush: draw dabs along the path
-    const size = toolOptions.size;
-    const color = toolOptions.color || "#000000";
-    const dist = Math.hypot(localX - localLastX, localY - localLastY);
-    const angle = Math.atan2(localY - localLastY, localX - localLastX);
-    const effectiveSize = size * (1 + (1 - hardness) * 0.5);
-    const radius = effectiveSize / 2;
+    const hardness =
+      typeof toolOptions.hardness === "number" ? toolOptions.hardness : 1.0;
 
-    // Spacing should be a fraction of the brush size to ensure a continuous line
-    const spacing = Math.max(1, (size / 2) * 0.25);
+    if (hardness >= 1.0) {
+      ctx.strokeStyle = toolOptions.color || "#000000";
+      if (activeToolId === "eraserTool") {
+        ctx.strokeStyle = "#000000"; // any opaque color works for destination-out
+      }
+      ctx.lineWidth = toolOptions.size;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
 
-    for (let i = 0; i < dist; i += spacing) {
-      const px = localLastX + Math.cos(angle) * i;
-      const py = localLastY + Math.sin(angle) * i;
-      drawDab(ctx, px, py, radius, hardness, color);
+      ctx.beginPath();
+      ctx.moveTo(localLastX, localLastY);
+      ctx.lineTo(localX, localY);
+      ctx.stroke();
+    } else {
+      // Soft brush: draw dabs along the path
+      const size = toolOptions.size;
+      const color = toolOptions.color || "#000000";
+      const dist = Math.hypot(localX - localLastX, localY - localLastY);
+      const angle = Math.atan2(localY - localLastY, localX - localLastX);
+      const effectiveSize = size * (1 + (1 - hardness) * 0.5);
+      const radius = effectiveSize / 2;
+
+      // Spacing should be a fraction of the brush size to ensure a continuous line
+      const spacing = Math.max(1, (size / 2) * 0.25);
+
+      for (let i = 0; i < dist; i += spacing) {
+        const px = localLastX + Math.cos(angle) * i;
+        const py = localLastY + Math.sin(angle) * i;
+        drawDab(ctx, px, py, radius, hardness, color);
+      }
+
+      // Draw final dab at the current mouse position to ensure it's responsive
+      drawDab(ctx, localX, localY, radius, hardness, color);
     }
-
-    // Draw final dab at the current mouse position to ensure it's responsive
-    drawDab(ctx, localX, localY, radius, hardness, color);
   }
 
   lastX = x;
@@ -1087,4 +1198,6 @@ window.ImageEngine = {
     return tools[toolId] || {};
   },
   getActiveToolId: () => activeToolId,
+  screenToProject,
+  projectToScreen,
 };

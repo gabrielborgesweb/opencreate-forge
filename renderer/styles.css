@@ -398,6 +398,7 @@ canvas {
   z-index: 1000;
 }
 
-body:has(#brushTool[active="true"], #eraserTool[active="true"]) #mainCanvas {
+body:has(#brushTool[active="true"], #eraserTool[active="true"], #pencilTool[active="true"])
+  #mainCanvas {
   cursor: none; /* Esconde o cursor padrão quando a ferramenta de pincel está ativa */
 }

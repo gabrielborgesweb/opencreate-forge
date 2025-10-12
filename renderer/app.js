@@ -469,29 +469,82 @@ function updateSelectedToolUI() {
 
   let toolOptionsHTML = "";
 
-  // Gera as opções de UI para ferramentas de desenho (pincel, borracha)
-  if (activeToolId === "brushTool" || activeToolId === "eraserTool") {
+  // Gera as opções de UI para ferramentas de desenho (pincel, lápis, borracha)
+  if (
+    activeToolId === "brushTool" ||
+    activeToolId === "eraserTool" ||
+    activeToolId === "pencilTool"
+  ) {
     const sizeHTML = `
       <span style="margin-left: 10px">Size:</span>
-      <input type="range" id="toolSize" min="1" max="2000" value="${toolState.size}">
+      <input type="range" id="toolSize" min="1" max="200" value="${toolState.size}">
       <span id="toolSizeValue">${toolState.size}px</span>
-    `;
-
-    const hardnessHTML = `
-      <span style="margin-left: 10px">Hardness:</span>
-      <input type="range" id="toolHardness" min="0" max="100" value="${Math.round(
-        (toolState.hardness || 1.0) * 100
-      )}">
-      <span id="toolHardnessValue">${Math.round(
-        (toolState.hardness || 1.0) * 100
-      )}%</span>
     `;
 
     if (activeToolId === "brushTool") {
       const colorHTML = `<input type="color" id="toolColor" value="${toolState.color}" style="margin-left: 10px">`;
+      const hardnessHTML = `
+        <span style="margin-left: 10px">Hardness:</span>
+        <input type="range" id="toolHardness" min="0" max="100" value="${Math.round(
+          (toolState.hardness || 1.0) * 100
+        )}">
+        <span id="toolHardnessValue">${Math.round(
+          (toolState.hardness || 1.0) * 100
+        )}%</span>
+      `;
       toolOptionsHTML = colorHTML + sizeHTML + hardnessHTML;
-    } else {
-      toolOptionsHTML = sizeHTML + hardnessHTML;
+    } else if (activeToolId === "pencilTool") {
+      const colorHTML = `<input type="color" id="toolColor" value="${toolState.color}" style="margin-left: 10px">`;
+      const shapeHTML = `
+        <span style="margin-left: 10px">Shape:</span>
+        <select id="toolShape" style="background: #333; border: 1px solid #555; border-radius: 4px; color: #fff; padding: 2px;">
+          <option value="square" ${
+            toolState.shape === "square" ? "selected" : ""
+          }>Square</option>
+          <option value="sphere" ${
+            toolState.shape === "sphere" ? "selected" : ""
+          }>Sphere</option>
+        </select>
+      `;
+      toolOptionsHTML = colorHTML + sizeHTML + shapeHTML;
+    } else if (activeToolId === "eraserTool") {
+      const modeHTML = `
+        <span style="margin-left: 10px">Mode:</span>
+        <select id="toolMode" style="background: #333; border: 1px solid #555; border-radius: 4px; color: #fff; padding: 2px;">
+          <option value="brush" ${
+            toolState.mode === "brush" ? "selected" : ""
+          }>Brush</option>
+          <option value="pencil" ${
+            toolState.mode === "pencil" ? "selected" : ""
+          }>Pencil</option>
+        </select>
+      `;
+      let modeSpecificHTML = "";
+      if (toolState.mode === "brush") {
+        modeSpecificHTML = `
+          <span style="margin-left: 10px">Hardness:</span>
+          <input type="range" id="toolHardness" min="0" max="100" value="${Math.round(
+            (toolState.hardness || 1.0) * 100
+          )}">
+          <span id="toolHardnessValue">${Math.round(
+            (toolState.hardness || 1.0) * 100
+          )}%</span>
+        `;
+      } else {
+        // pencil mode
+        modeSpecificHTML = `
+          <span style="margin-left: 10px">Shape:</span>
+          <select id="toolShape" style="background: #333; border: 1px solid #555; border-radius: 4px; color: #fff; padding: 2px;">
+            <option value="square" ${
+              toolState.shape === "square" ? "selected" : ""
+            }>Square</option>
+            <option value="sphere" ${
+              toolState.shape === "sphere" ? "selected" : ""
+            }>Sphere</option>
+          </select>
+        `;
+      }
+      toolOptionsHTML = sizeHTML + modeHTML + modeSpecificHTML;
     }
   }
 
@@ -529,6 +582,22 @@ function updateSelectedToolUI() {
       if (lastMouseEvent) {
         updateBrushPreview(lastMouseEvent);
       }
+    });
+  }
+
+  if (document.getElementById("toolShape")) {
+    document.getElementById("toolShape").addEventListener("change", (e) => {
+      window.ImageEngine.setToolOption(activeToolId, "shape", e.target.value);
+      if (lastMouseEvent) {
+        updateBrushPreview(lastMouseEvent);
+      }
+    });
+  }
+
+  if (document.getElementById("toolMode")) {
+    document.getElementById("toolMode").addEventListener("change", (e) => {
+      window.ImageEngine.setToolOption(activeToolId, "mode", e.target.value);
+      updateSelectedToolUI(); // Re-render options for the new mode
     });
   }
 }
@@ -574,6 +643,10 @@ document.addEventListener("keydown", (e) => {
         break;
       case "b":
         document.getElementById("brushTool").click();
+        break;
+      // NOVO: Atalho para a ferramenta lápis
+      case "n":
+        document.getElementById("pencilTool").click();
         break;
       // NOVO: Atalho para a ferramenta borracha
       case "e":
@@ -632,17 +705,57 @@ function updateBrushPreview(e) {
     return;
   }
 
+  const isPencilMode =
+    activeToolId === "pencilTool" ||
+    (activeToolId === "eraserTool" && toolState.mode === "pencil");
+
+  if (isPencilMode && toolState.shape === "square") {
+    brushPreview.style.borderRadius = "0";
+  } else {
+    brushPreview.style.borderRadius = "50%";
+  }
+
   const engineState = window.ImageEngine.getState();
   const currentScale = engineState.scale;
 
-  const hardness =
-    typeof toolState.hardness === "number" ? toolState.hardness : 1.0;
-  const effectiveSize = toolState.size * (1 + (1 - hardness) * 0.5);
+  let effectiveSize = toolState.size;
+  if (!isPencilMode) {
+    // It's a brush
+    const hardness =
+      typeof toolState.hardness === "number" ? toolState.hardness : 1.0;
+    effectiveSize = toolState.size * (1 + (1 - hardness) * 0.5);
+  }
   const previewSize = effectiveSize * currentScale;
 
   const rect = canvasContainer.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+  let x = e.clientX - rect.left;
+  let y = e.clientY - rect.top;
+
+  // Snap preview to pixel grid for pencil tool
+  if (isPencilMode) {
+    if (window.ImageEngine.screenToProject) {
+      const projectCoords = window.ImageEngine.screenToProject(x, y);
+      const snappedProjectX = Math.floor(projectCoords.x);
+      const snappedProjectY = Math.floor(projectCoords.y);
+
+      const size = toolState.size;
+      let centerX, centerY;
+
+      if (size % 2 !== 0) {
+        // Odd size: center of pixel
+        centerX = snappedProjectX + 0.5;
+        centerY = snappedProjectY + 0.5;
+      } else {
+        // Even size: top-left corner of pixel (matches drawing logic)
+        centerX = snappedProjectX;
+        centerY = snappedProjectY;
+      }
+
+      const screenCoords = window.ImageEngine.projectToScreen(centerX, centerY);
+      x = screenCoords.x;
+      y = screenCoords.y;
+    }
+  }
 
   brushPreview.style.width = `${previewSize}px`;
   brushPreview.style.height = `${previewSize}px`;
@@ -650,7 +763,11 @@ function updateBrushPreview(e) {
   brushPreview.style.top = `${y}px`;
 
   // Garante que a pré-visualização esteja visível se for uma ferramenta de desenho
-  if (activeToolId === "brushTool" || activeToolId === "eraserTool") {
+  if (
+    activeToolId === "brushTool" ||
+    activeToolId === "eraserTool" ||
+    activeToolId === "pencilTool"
+  ) {
     brushPreview.style.display = "block";
   }
 }
@@ -659,7 +776,11 @@ canvasContainer.addEventListener("mouseenter", (e) => {
   // Armazena o evento para o caso de um atalho de teclado ser usado
   lastMouseEvent = e;
   const activeToolId = window.ImageEngine.getActiveToolId();
-  if (activeToolId === "brushTool" || activeToolId === "eraserTool") {
+  if (
+    activeToolId === "brushTool" ||
+    activeToolId === "eraserTool" ||
+    activeToolId === "pencilTool"
+  ) {
     brushPreview.style.display = "block";
   }
 });

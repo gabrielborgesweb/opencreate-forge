@@ -4,12 +4,14 @@ const path = require("path");
 
 function createWindow() {
   // A lógica para escolher o ícone da janela continua útil, vamos mantê-la.
-  let iconPath = path.join(__dirname, "favicon-linux.png");
+  let iconPath = null;
 
   if (process.platform === "win32") {
-    iconPath = path.join(__dirname, "favicon-win.ico");
+    iconPath = path.join(__dirname, "favicon-windows.ico");
+  } else if (process.platform === "linux") {
+    iconPath = path.join(__dirname, "favicon-linux.png");
   } else if (process.platform === "darwin") {
-    iconPath = path.join(__dirname, "favicon-darwin.png");
+    iconPath = path.join(__dirname, "favicon-darwin.icns");
   }
 
   const win = new BrowserWindow({
@@ -86,11 +88,6 @@ app.whenReady().then(() => {
       return { success: false, error: err.message };
     }
   });
-
-  if (process.platform === "darwin") {
-    const iconPath = path.join(__dirname, "favicon-darwin.png");
-    app.dock.setIcon(iconPath);
-  }
 
   createWindow();
 

@@ -4,12 +4,24 @@
   "version": "0.0.1",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build-mac": "electron-builder --mac",
+    "build-win": "electron-builder --win",
+    "build-linux": "electron-builder --linux",
+    "build-all": "electron-builder --mac --win --linux"
   },
   "dependencies": {
     "wasm-vips": "^0.0.14"
   },
   "devDependencies": {
-    "electron": "latest"
+    "electron": "^38.2.2",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.opencreate.forge",
+    "mac": {
+      "category": "public.app-category.graphics-design",
+      "icon": "favicon-darwin.icns"
+    }
   }
 }

@@ -69,7 +69,66 @@ button {
   display: flex;
   flex-direction: row;
   align-items: center;
+  gap: 0.5rem;
 }
+
+/* NOVO: Estilos para o componente numeric-slider */
+.numeric-slider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.numeric-slider .value-input {
+  width: 40px;
+  padding: 2px 4px;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #fff;
+  text-align: right;
+  -moz-appearance: textfield; /* Firefox */
+}
+
+.numeric-slider .value-input::-webkit-outer-spin-button,
+.numeric-slider .value-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.numeric-slider .slider-toggle {
+  all: unset;
+  cursor: pointer;
+  padding: 0 4px;
+  color: #aaa;
+  line-height: 1;
+}
+.numeric-slider .slider-toggle:hover {
+  color: #fff;
+}
+
+.numeric-slider .slider-container {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #5a5a5a;
+  padding: 0.5rem;
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  margin-top: 4px;
+}
+
+.numeric-slider .slider-container.visible {
+  display: block;
+}
+
+.numeric-slider .slider-container input[type="range"] {
+  width: 120px;
+}
+
 #editor {
   flex: 1;
 }
@@ -398,7 +457,11 @@ canvas {
   z-index: 1000;
 }
 
-body:has(#brushTool[active="true"], #eraserTool[active="true"], #pencilTool[active="true"])
+body:has(
+    #brushTool[active="true"],
+    #eraserTool[active="true"],
+    #pencilTool[active="true"]
+  )
   #mainCanvas {
   cursor: none; /* Esconde o cursor padrão quando a ferramenta de pincel está ativa */
 }

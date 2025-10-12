@@ -464,6 +464,72 @@ btnSave.addEventListener("click", async () => {
 //   }
 // });
 
+// NOVO: Helper para o componente de input numérico com slider
+function setupNumericSlider(containerId, toolId, option, config) {
+  const { min, max, isPercentage } = config;
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const numberInput = container.querySelector('input[type="number"]');
+  const rangeInput = container.querySelector('input[type="range"]');
+  const toggleBtn = container.querySelector(".slider-toggle");
+  const sliderContainer = container.querySelector(".slider-container");
+
+  const updateEngine = (value) => {
+    const engineValue = isPercentage ? value / 100 : value;
+    window.ImageEngine.setToolOption(toolId, option, engineValue);
+    if (lastMouseEvent) {
+      updateBrushPreview(lastMouseEvent);
+    }
+  };
+
+  numberInput.addEventListener("input", (e) => {
+    let value = parseInt(e.target.value, 10);
+    if (isNaN(value)) value = min;
+    value = Math.max(min, Math.min(max, value));
+    e.target.value = value;
+    rangeInput.value = value;
+    updateEngine(value);
+  });
+
+  numberInput.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const step = e.shiftKey ? 10 : 1;
+    let value = parseInt(numberInput.value, 10);
+    if (e.deltaY < 0) {
+      value += step;
+    } else {
+      value -= step;
+    }
+    value = Math.max(min, Math.min(max, value));
+    numberInput.value = value;
+    rangeInput.value = value;
+    updateEngine(value);
+  });
+
+  rangeInput.addEventListener("input", (e) => {
+    const value = parseInt(e.target.value, 10);
+    numberInput.value = value;
+    updateEngine(value);
+  });
+
+  toggleBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    sliderContainer.classList.toggle("visible");
+  });
+
+  // Fecha o dropdown se clicar fora
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (!container.contains(e.target)) {
+        sliderContainer.classList.remove("visible");
+      }
+    },
+    true
+  );
+}
+
 // MODIFICADO: Modificar a função updateSelectedToolUI()
 function updateSelectedToolUI() {
   const activeToolButton = document.querySelector(".tool-button[active]");
@@ -484,22 +550,36 @@ function updateSelectedToolUI() {
     activeToolId === "eraserTool" ||
     activeToolId === "pencilTool"
   ) {
+    const isPencilLike =
+      activeToolId === "pencilTool" ||
+      (activeToolId === "eraserTool" && toolState.mode === "pencil");
+    const maxSize = isPencilLike ? 50 : 200;
+
     const sizeHTML = `
-      <span style="margin-left: 10px">Size:</span>
-      <input type="range" id="toolSize" min="1" max="200" value="${toolState.size}">
-      <span id="toolSizeValue">${toolState.size}px</span>
+      <div class="numeric-slider" id="size-container">
+        <label for="toolSizeNumber" style="margin-left: 10px">Size:</label>
+        <input type="number" id="toolSizeNumber" value="${toolState.size}" min="1" max="${maxSize}" class="value-input">
+        <span class="unit">px</span>
+        <button class="slider-toggle">▼</button>
+        <div class="slider-container">
+          <input type="range" id="toolSizeRange" value="${toolState.size}" min="1" max="${maxSize}">
+        </div>
+      </div>
     `;
 
     if (activeToolId === "brushTool") {
       const colorHTML = `<input type="color" id="toolColor" value="${toolState.color}" style="margin-left: 10px">`;
+      const hardnessValue = Math.round((toolState.hardness || 1.0) * 100);
       const hardnessHTML = `
-        <span style="margin-left: 10px">Hardness:</span>
-        <input type="range" id="toolHardness" min="0" max="100" value="${Math.round(
-          (toolState.hardness || 1.0) * 100
-        )}">
-        <span id="toolHardnessValue">${Math.round(
-          (toolState.hardness || 1.0) * 100
-        )}%</span>
+        <div class="numeric-slider" id="hardness-container">
+          <label for="toolHardnessNumber" style="margin-left: 10px">Hardness:</label>
+          <input type="number" id="toolHardnessNumber" value="${hardnessValue}" min="0" max="100" class="value-input">
+          <span class="unit">%</span>
+          <button class="slider-toggle">▼</button>
+          <div class="slider-container">
+            <input type="range" id="toolHardnessRange" value="${hardnessValue}" min="0" max="100">
+          </div>
+        </div>
       `;
       toolOptionsHTML = colorHTML + sizeHTML + hardnessHTML;
     } else if (activeToolId === "pencilTool") {
@@ -530,14 +610,17 @@ function updateSelectedToolUI() {
       `;
       let modeSpecificHTML = "";
       if (toolState.mode === "brush") {
+        const hardnessValue = Math.round((toolState.hardness || 1.0) * 100);
         modeSpecificHTML = `
-          <span style="margin-left: 10px">Hardness:</span>
-          <input type="range" id="toolHardness" min="0" max="100" value="${Math.round(
-            (toolState.hardness || 1.0) * 100
-          )}">
-          <span id="toolHardnessValue">${Math.round(
-            (toolState.hardness || 1.0) * 100
-          )}%</span>
+          <div class="numeric-slider" id="hardness-container">
+            <label for="toolHardnessNumber" style="margin-left: 10px">Hardness:</label>
+            <input type="number" id="toolHardnessNumber" value="${hardnessValue}" min="0" max="100" class="value-input">
+            <span class="unit">%</span>
+            <button class="slider-toggle">▼</button>
+            <div class="slider-container">
+              <input type="range" id="toolHardnessRange" value="${hardnessValue}" min="0" max="100">
+            </div>
+          </div>
         `;
       } else {
         // pencil mode
@@ -569,28 +652,23 @@ function updateSelectedToolUI() {
     });
   }
 
-  if (document.getElementById("toolSize")) {
-    document.getElementById("toolSize").addEventListener("input", (e) => {
-      const size = parseInt(e.target.value, 10);
-      window.ImageEngine.setToolOption(activeToolId, "size", size);
-      document.getElementById("toolSizeValue").textContent = size + "px";
-      // Atualiza a pré-visualização em tempo real
-      if (lastMouseEvent) {
-        updateBrushPreview(lastMouseEvent);
-      }
+  // NOVO: Setup para os numeric sliders
+  if (document.getElementById("size-container")) {
+    const isPencilLike =
+      activeToolId === "pencilTool" ||
+      (activeToolId === "eraserTool" && toolState.mode === "pencil");
+    const max = isPencilLike ? 50 : 200;
+    setupNumericSlider("size-container", activeToolId, "size", {
+      min: 1,
+      max: max,
+      isPercentage: false,
     });
   }
-
-  if (document.getElementById("toolHardness")) {
-    document.getElementById("toolHardness").addEventListener("input", (e) => {
-      const hardness = parseInt(e.target.value, 10) / 100;
-      window.ImageEngine.setToolOption(activeToolId, "hardness", hardness);
-      document.getElementById("toolHardnessValue").textContent = `${Math.round(
-        hardness * 100
-      )}%`;
-      if (lastMouseEvent) {
-        updateBrushPreview(lastMouseEvent);
-      }
+  if (document.getElementById("hardness-container")) {
+    setupNumericSlider("hardness-container", activeToolId, "hardness", {
+      min: 0,
+      max: 100,
+      isPercentage: true,
     });
   }
 

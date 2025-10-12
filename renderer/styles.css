@@ -190,9 +190,25 @@ button {
   gap: 1rem;
 }
 
+.form-groups-columns {
+  display: flex;
+  gap: 1rem;
+}
+
+.form-groups-columns .form-group {
+  flex: 1;
+  min-width: 0; /* Prevents overflow by allowing flex items to shrink */
+}
+
 .home-right-panel h3 {
   margin: 0;
   font-size: 1.2em;
+}
+
+.home-right-panel .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .home-right-panel label {
@@ -207,6 +223,15 @@ button {
   border: 1px solid #555;
   border-radius: 4px;
   color: #fff;
+}
+
+.home-right-panel select {
+  padding: 0.5rem;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #fff;
+  font: inherit;
 }
 
 .home-right-panel button {

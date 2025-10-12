@@ -251,6 +251,38 @@ function addLayer(img, name = "Layer") {
   draw();
 }
 
+// --- NOVO: ADD FILL LAYER ---
+function addFillLayer(color, name = "Fill Layer") {
+  if (!projectWidth || !projectHeight) return;
+
+  const fillCanvas = document.createElement("canvas");
+  fillCanvas.width = projectWidth;
+  fillCanvas.height = projectHeight;
+  const fillCtx = fillCanvas.getContext("2d");
+
+  fillCtx.fillStyle = color;
+  fillCtx.fillRect(0, 0, projectWidth, projectHeight);
+
+  const img = new Image();
+  img.onload = () => {
+    // Para camadas de preenchimento, queremos que elas se alinhem com o projeto
+    const newLayer = {
+      id: uid(),
+      name,
+      image: img,
+      x: 0,
+      y: 0,
+      visible: true,
+    };
+    layers.unshift(newLayer); // Adiciona no início (fundo)
+    setActiveLayer(newLayer.id);
+    updateLayersPanel();
+    saveState();
+    draw();
+  };
+  img.src = fillCanvas.toDataURL();
+}
+
 // --------- CREATE EMPTY LAYER ---------
 function createEmptyLayer(name = "Empty Layer") {
   const canvas = document.createElement("canvas");
@@ -1043,6 +1075,7 @@ window.ImageEngine = {
   undo,
   redo,
   createEmptyLayer,
+  addFillLayer,
 
   // --- NOVA API DE FERRAMENTAS ---
   setActiveTool: (toolId) => {

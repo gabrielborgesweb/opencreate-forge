@@ -1,6 +1,6 @@
 // renderer/app.js
 
-const btnNew = document.getElementById("btnNew");
+// const btnNew = document.getElementById("btnNew");
 const btnOpen = document.getElementById("btnOpen");
 const btnSave = document.getElementById("btnSave");
 const btnGrayscale = document.getElementById("btnGrayscale");
@@ -61,7 +61,7 @@ function showHomeScreen() {
   document.getElementById("zoomScale").style.display = "none";
   document.getElementById("sidebar").style.display = "none";
   // document.getElementById("toolbar").style.display = "none";
-  document.getElementById("selectedtool").style.display = "none";
+  // document.getElementById("selectedtool").style.display = "none";
 }
 
 function hideHomeScreen() {
@@ -69,7 +69,7 @@ function hideHomeScreen() {
   mainCanvas.style.display = "block";
   document.getElementById("sidebar").style.display = "flex";
   // document.getElementById("toolbar").style.display = "block";
-  document.getElementById("selectedtool").style.display = "flex";
+  // document.getElementById("selectedtool").style.display = "flex";
 }
 
 function renderPresets(category) {
@@ -128,6 +128,16 @@ function renderPresets(category) {
 function setupHomeScreen() {
   const categoriesContainer = document.querySelector(".home-categories");
   const categories = Object.keys(presetsData);
+  const bgSelect = document.getElementById("home-bg-select");
+  const bgColorPicker = document.getElementById("home-bg-color");
+
+  bgSelect.addEventListener("change", () => {
+    if (bgSelect.value === "custom") {
+      bgColorPicker.style.display = "block";
+    } else {
+      bgColorPicker.style.display = "none";
+    }
+  });
 
   categories.forEach((cat, index) => {
     const btn = document.createElement("button");
@@ -284,6 +294,23 @@ function createProjectFromHome() {
   // chama a engine para criar o novo projeto
   window.ImageEngine.createNewProject(w, h);
 
+  // --- NOVO: Adicionar camada de fundo se necessário ---
+  const bgSelect = document.getElementById("home-bg-select");
+  const bgColorPicker = document.getElementById("home-bg-color");
+  const bgType = bgSelect.value;
+
+  if (bgType !== "none") {
+    let color;
+    if (bgType === "white") color = "#ffffff";
+    else if (bgType === "black") color = "#000000";
+    else if (bgType === "custom") color = bgColorPicker.value;
+
+    if (color) {
+      window.ImageEngine.addFillLayer(color, "Background");
+    }
+  }
+  // --------------------------------------------------
+
   // --- INICIALIZAR PROJETO COM O ESTADO ATUAL DO VIEWPORT ---
   // Pega o estado atual após o createNewProject (que chama fitToScreen)
   const initialState = window.ImageEngine.getState();
@@ -306,10 +333,10 @@ function createProjectFromHome() {
 }
 
 // New Project button
-btnNew.addEventListener("click", () => {
-  // Em vez de modal, apenas volta para a home tab
-  homeTab.click();
-});
+// btnNew.addEventListener("click", () => {
+//   // Em vez de modal, apenas volta para a home tab
+//   homeTab.click();
+// });
 
 // Open file (usa API exposta via preload)
 btnOpen.addEventListener("click", async () => {
@@ -321,11 +348,16 @@ btnOpen.addEventListener("click", async () => {
     alert("Crie um novo projeto antes de abrir uma imagem");
     return;
   }
-  // abre dialog e retorna caminho do arquivo
-  const result = await window.electronAPI.openFile();
-  if (result) {
-    // window.ImageEngine.loadImage adiciona como nova camada
-    window.ImageEngine.loadImage(result);
+  try {
+    // abre dialog e retorna caminho do arquivo
+    const result = await window.electronAPI.openFile();
+    if (result) {
+      // window.ImageEngine.loadImage adiciona como nova camada
+      window.ImageEngine.loadImage(result);
+    }
+  } catch (error) {
+    console.error("Failed to open file:", error);
+    alert("Failed to open file");
   }
 });
 

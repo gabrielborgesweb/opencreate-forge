@@ -93,7 +93,6 @@ button {
   border-radius: 4px;
   color: #fff;
   text-align: right;
-  -moz-appearance: textfield; /* Firefox */
 }
 
 .numeric-slider .value-input::-webkit-outer-spin-button,
@@ -132,6 +131,11 @@ button {
 
 .numeric-slider .slider-container input[type="range"] {
   width: 120px;
+  accent-color: var(--accent-color);
+
+  &:focus {
+    outline: none;
+  }
 }
 
 #editor {
@@ -381,6 +385,7 @@ canvas {
   background: #111;
   overflow-x: auto;
   height: 2.3rem; /* Set a fixed height to prevent layout shifts on refresh */
+  z-index: 1;
 }
 
 #projectsTabs button {
@@ -466,7 +471,11 @@ canvas {
   pointer-events: none; /* MUITO IMPORTANTE: para não bloquear os cliques no canvas */
   display: none; /* Começa escondido */
   transform: translate(-50%, -50%); /* Centraliza o div no cursor */
-  z-index: 1000;
+  z-index: 0;
+}
+/* Esconde o #brushPreview quando o homeTab está ativo */
+body:has(#homeTab.active) #brushPreview {
+  display: none !important;
 }
 
 body:has(

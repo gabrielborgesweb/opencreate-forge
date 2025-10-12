@@ -499,6 +499,9 @@ canvas.addEventListener(
       // Disable image smoothing at high zoom levels
       ctx.imageSmoothingEnabled = scale <= 1.0;
 
+      // Hide brush preview during zoom for performance
+      brushPreview.style.display = "none";
+
       draw();
 
       // Request another frame if still animating
@@ -766,6 +769,7 @@ canvas.addEventListener("mousedown", (e) => {
     startX = e.clientX - originX;
     startY = e.clientY - originY;
     e.preventDefault();
+    // brushPreview.style.display = "block"; // Reexibe o preview do pincel após o pan
     return;
   }
 
@@ -798,6 +802,7 @@ canvas.addEventListener("mousemove", (e) => {
     originX = e.clientX - startX;
     originY = e.clientY - startY;
     draw();
+    // brushPreview.style.display = "block";
     return;
   }
 

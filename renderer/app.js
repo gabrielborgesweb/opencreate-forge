@@ -792,6 +792,12 @@ function updateBrushPreview(e) {
     return;
   }
 
+  // Esconde a pré-visualização se não está no canvas
+  if (e.target !== canvas && !canvas.contains(e.target)) {
+    brushPreview.style.display = "none";
+    return;
+  }
+
   const isPencilMode =
     activeToolId === "pencilTool" ||
     (activeToolId === "eraserTool" && toolState.mode === "pencil");

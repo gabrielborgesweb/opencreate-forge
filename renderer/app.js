@@ -54,6 +54,50 @@ function getActiveProject() {
   return projects.find((p) => p.id == activeTab.id);
 }
 
+// --- NOVO: FUNÇÃO PARA FECHAR PROJETO ---
+function closeProject(projectId) {
+  const projectIndex = projects.findIndex((p) => p.id == projectId);
+  if (projectIndex === -1) return;
+
+  const project = projects[projectIndex];
+
+  // Use native confirm dialog
+  if (
+    !confirm(
+      `Are you sure you want to close "${project.name}"? Unsaved changes will be lost.`
+    )
+  ) {
+    return;
+  }
+
+  const tabToClose = document.getElementById(projectId);
+  const wasActive = tabToClose.classList.contains("active");
+
+  let nextActiveTab = null;
+  if (wasActive) {
+    // Try to activate the tab to the right
+    nextActiveTab = tabToClose.nextElementSibling;
+    // If there's no tab to the right, try the one to the left
+    if (!nextActiveTab) {
+      nextActiveTab = tabToClose.previousElementSibling;
+    }
+  }
+
+  // Remove project from array and tab from DOM
+  projects.splice(projectIndex, 1);
+  tabToClose.remove();
+
+  if (wasActive) {
+    if (nextActiveTab) {
+      // This will either be another project tab or the home tab
+      nextActiveTab.click();
+    } else {
+      // Fallback to home tab if no other tabs exist
+      homeTab.click();
+    }
+  }
+}
+
 // --- NOVO: FUNÇÕES DA TELA INICIAL ---
 function showHomeScreen() {
   homeScreen.classList.add("visible");
@@ -86,6 +130,7 @@ function renderPresets(category) {
     item.dataset.w = p.w;
     item.dataset.h = p.h;
     item.dataset.name = p.name;
+    item.title = p.name;
 
     const previewContainerHeight = 90; // Corresponds to the CSS height
     const maxDim = Math.max(p.w, p.h);
@@ -233,12 +278,27 @@ function createProjectFromHome() {
 
   // usar um id único consistente para a aba e o projeto
   const projectId = Date.now();
+  const projectName =
+    document.getElementById("home-proj-name").value || "Untitled";
 
   // registrar aba
   const tab = document.createElement("button");
-  tab.textContent =
-    document.getElementById("home-proj-name").value || "Untitled";
   tab.id = projectId;
+
+  const tabTitle = document.createElement("span");
+  tabTitle.textContent = projectName;
+  tab.appendChild(tabTitle);
+
+  const closeBtn = document.createElement("button");
+  closeBtn.innerHTML = "✕"; // Using times symbol for 'x'
+  closeBtn.className = "close-tab-btn";
+  closeBtn.title = "Close Project";
+  closeBtn.addEventListener("click", (e) => {
+    e.stopPropagation(); // Don't trigger tab switch
+    closeProject(projectId);
+  });
+  tab.appendChild(closeBtn);
+
   projectsTabs.querySelectorAll("button").forEach((b) => {
     b.classList.remove("active");
   });
@@ -317,7 +377,7 @@ function createProjectFromHome() {
 
   projects.push({
     id: projectId,
-    name: tab.textContent,
+    name: projectName,
     width: w,
     height: h,
     layers: [],
@@ -536,6 +596,18 @@ document.addEventListener("keydown", (e) => {
       case "s":
         e.preventDefault();
         btnSave.click();
+        break;
+      case "w":
+        e.preventDefault();
+        const activeProject = getActiveProject();
+        // fechar projeto ativo
+        if (activeProject) {
+          closeProject(activeProject.id);
+        }
+        // else, se estiver na home tab, fechar o app
+        else {
+          window.close(); // Fecha a janela atual
+        }
         break;
       case "z":
         e.preventDefault();

@@ -3,6 +3,15 @@ const fs = require("fs");
 const path = require("path");
 
 function createWindow() {
+  // A lógica para escolher o ícone da janela continua útil, vamos mantê-la.
+  let iconPath = path.join(__dirname, "favicon-linux.png");
+
+  if (process.platform === "win32") {
+    iconPath = path.join(__dirname, "favicon-win.ico");
+  } else if (process.platform === "darwin") {
+    iconPath = path.join(__dirname, "favicon-darwin.png");
+  }
+
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -11,6 +20,7 @@ function createWindow() {
     backgroundColor: "#000",
     center: true,
     darkTheme: true,
+    icon: iconPath, // Esta linha define o ícone da janela.
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -31,6 +41,9 @@ function createWindow() {
   win.maximize();
   win.setMenu(null);
 }
+
+// Set app name before it's ready
+// app.setName("OpenCreate Forge");
 
 app.whenReady().then(() => {
   // handler para abrir arquivo (já vimos)
@@ -73,6 +86,11 @@ app.whenReady().then(() => {
       return { success: false, error: err.message };
     }
   });
+
+  if (process.platform === "darwin") {
+    const iconPath = path.join(__dirname, "favicon-darwin.png");
+    app.dock.setIcon(iconPath);
+  }
 
   createWindow();
 

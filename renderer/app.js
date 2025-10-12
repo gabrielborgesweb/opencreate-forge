@@ -745,6 +745,14 @@ document.addEventListener("keydown", (e) => {
   // Common shortcuts
   if (e.ctrlKey || e.metaKey) {
     switch (e.key.toLowerCase()) {
+      case "a":
+        e.preventDefault();
+        window.ImageEngine.selectAll();
+        break;
+      case "d":
+        e.preventDefault();
+        window.ImageEngine.clearSelection();
+        break;
       case "n":
         e.preventDefault();
         showNewProjectModal();

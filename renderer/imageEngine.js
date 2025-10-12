@@ -16,6 +16,16 @@ let isPanning = false;
 let startX = 0,
   startY = 0;
 
+// --- Selection ---
+let selectionRect = null; // { x, y, width, height } in project coords
+let isSelecting = false;
+let selectionStartX = 0;
+let selectionStartY = 0;
+let lineDashOffset = 0;
+let animationFrameId = null;
+let lastFrameTime = 0;
+const frameInterval = 1000 / 15; // 15 fps
+
 // --- Project (separate from viewport) ---
 let projectWidth = undefined; // undefined = no project yet
 let projectHeight = undefined;
@@ -71,6 +81,34 @@ function getCheckerPattern() {
     checkerPattern = ctx.createPattern(patternCanvas, "repeat");
   }
   return checkerPattern;
+}
+
+// --- NOVO: Animação para a seleção "marching ants" ---
+function animate(currentTime) {
+  animationFrameId = requestAnimationFrame(animate);
+
+  const elapsed = currentTime - lastFrameTime;
+
+  if (elapsed > frameInterval) {
+    lastFrameTime = currentTime - (elapsed % frameInterval);
+
+    lineDashOffset = (lineDashOffset - 1) % 16;
+    draw();
+  }
+}
+
+function startAnimation() {
+  if (!animationFrameId) {
+    lastFrameTime = performance.now();
+    animationFrameId = requestAnimationFrame(animate);
+  }
+}
+
+function stopAnimation() {
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
 }
 
 // ajusta canvas para ocupar o viewport (em CSS pixels)
@@ -153,6 +191,36 @@ function draw() {
     );
   }
 
+  // Draw selection
+  if (selectionRect && (selectionRect.width > 0 || selectionRect.height > 0)) {
+    ctx.save();
+    ctx.lineWidth = 1 / scale;
+    const dashSize = 4 / scale;
+    ctx.setLineDash([dashSize, dashSize]);
+
+    // Black dashes
+    ctx.strokeStyle = "black";
+    ctx.lineDashOffset = lineDashOffset / scale;
+    ctx.strokeRect(
+      selectionRect.x,
+      selectionRect.y,
+      selectionRect.width,
+      selectionRect.height
+    );
+
+    // White dashes
+    ctx.strokeStyle = "white";
+    ctx.lineDashOffset = (lineDashOffset + 4) / scale;
+    ctx.strokeRect(
+      selectionRect.x,
+      selectionRect.y,
+      selectionRect.width,
+      selectionRect.height
+    );
+
+    ctx.restore();
+  }
+
   ctx.restore();
 
   if (scale > 1.0) {
@@ -226,6 +294,7 @@ function createNewProject(w, h) {
   // limpar camadas
   layers = [];
   activeLayer = null;
+  clearSelection();
   updateLayersPanel();
   fitToScreen();
 
@@ -331,6 +400,22 @@ function setActiveLayer(id) {
   const layer = layers.find((l) => l.id === id);
   activeLayer = layer || null;
   updateLayersPanel();
+  draw();
+}
+
+// --- NOVO: Funções de Seleção ---
+function clearSelection() {
+  if (selectionRect) {
+    selectionRect = null;
+    stopAnimation();
+    draw();
+  }
+}
+
+function selectAll() {
+  if (!projectWidth) return;
+  selectionRect = { x: 0, y: 0, width: projectWidth, height: projectHeight };
+  startAnimation();
   draw();
 }
 
@@ -773,6 +858,21 @@ canvas.addEventListener("mousedown", (e) => {
     return;
   }
 
+  // Lógica da ferramenta de seleção
+  if (activeToolId === "selectTool" && e.button === 0) {
+    isSelecting = true;
+    const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
+    selectionStartX = Math.floor(px);
+    selectionStartY = Math.floor(py);
+    // Limpa a seleção existente ao iniciar uma nova.
+    if (selectionRect) {
+      selectionRect = null;
+      stopAnimation();
+      draw();
+    }
+    return;
+  }
+
   // Iniciar desenho (Brush Tool)
   startDrawing(e);
 
@@ -806,6 +906,20 @@ canvas.addEventListener("mousemove", (e) => {
     return;
   }
 
+  // Desenhar retângulo de seleção
+  if (isSelecting) {
+    const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
+    const currentX = Math.floor(px);
+    const currentY = Math.floor(py);
+    const x = Math.min(selectionStartX, currentX);
+    const y = Math.min(selectionStartY, currentY);
+    const width = Math.abs(currentX - selectionStartX);
+    const height = Math.abs(currentY - selectionStartY);
+    selectionRect = { x, y, width, height };
+    draw();
+    return;
+  }
+
   // Arrastar camada
   if (draggingLayerState.isDragging && activeLayer) {
     const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
@@ -821,6 +935,28 @@ canvas.addEventListener("mouseup", (e) => {
     isPanning = false;
   }
 
+  if (isSelecting) {
+    isSelecting = false;
+    const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
+    const currentX = Math.floor(px);
+    const currentY = Math.floor(py);
+    const width = Math.abs(currentX - selectionStartX);
+    const height = Math.abs(currentY - selectionStartY);
+
+    if (width < 1 || height < 1) {
+      // Click, not drag, or invalid selection -> deselect
+      selectionRect = null;
+      // A animação já foi parada no mousedown
+    } else {
+      // Finalize selection
+      const x = Math.min(selectionStartX, currentX);
+      const y = Math.min(selectionStartY, currentY);
+      selectionRect = { x, y, width, height };
+      startAnimation();
+    }
+    draw();
+  }
+
   if (draggingLayerState.isDragging) {
     saveState();
     draggingLayerState.isDragging = false;
@@ -832,6 +968,12 @@ canvas.addEventListener("mouseleave", () => {
   isPanning = false;
   draggingLayerState.isDragging = false;
   // A lógica de desenho foi removida daqui, pois agora é global
+});
+
+canvas.addEventListener("dblclick", (e) => {
+  if (activeToolId === "selectTool") {
+    selectAll();
+  }
 });
 
 function fitToScreen() {
@@ -867,6 +1009,7 @@ function resetViewport() {
   scale = 1;
   originX = canvas.width / 2;
   originY = canvas.height / 2;
+  clearSelection();
   updateLayersPanel();
   draw();
 }
@@ -1187,6 +1330,8 @@ window.ImageEngine = {
   redo,
   createEmptyLayer,
   addFillLayer,
+  selectAll,
+  clearSelection,
 
   // --- NOVA API DE FERRAMENTAS ---
   setActiveTool: (toolId) => {

@@ -44,6 +44,15 @@ const presetsData = {
     { name: "A5", w: 1748, h: 2480 },
     { name: "Letter", w: 2550, h: 3300 },
   ],
+  "2ᴺ": [
+    { name: "16x16", w: 16, h: 16 },
+    { name: "32x32", w: 32, h: 32 },
+    { name: "64x64", w: 64, h: 64 },
+    { name: "128x128", w: 128, h: 128 },
+    { name: "256x256", w: 256, h: 256 },
+    { name: "512x512", w: 512, h: 512 },
+    { name: "1024x1024", w: 1024, h: 1024 },
+  ],
   // Adicionar mais categorias conforme necessário
 };
 

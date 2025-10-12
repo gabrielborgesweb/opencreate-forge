@@ -268,6 +268,7 @@ button {
   /* border: 1px solid rgba(0,0,0,0.12); */
   flex: 1; /* Make canvas fill remaining space */
   min-height: 0; /* Prevent flexbox overflow issues */
+  min-width: 0; /* Prevent flexbox overflow issues */
 }
 
 canvas {
@@ -305,15 +306,15 @@ canvas {
 
 #projectsTabs {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   background: #111;
   overflow-x: auto;
-  /* height: 2.5rem; */
+  height: 2.3rem; /* Set a fixed height to prevent layout shifts on refresh */
 }
 
 #projectsTabs button {
   all: unset;
-  padding: 0.5rem 0.75rem;
+  padding: 0.3rem 0.75rem;
   /* margin-right: 0.25rem; */
   background: #444;
   color: #fff;
@@ -340,8 +341,8 @@ canvas {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 16px;
-    height: 16px;
+    width: 1rem;
+    height: 1rem;
     line-height: 1;
     color: #ccc;
     flex-shrink: 0;

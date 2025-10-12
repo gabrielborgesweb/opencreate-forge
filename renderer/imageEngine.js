@@ -75,11 +75,6 @@ function resizeViewport() {
   canvas.height =
     container.clientHeight -
     document.getElementById("projectsTabs").clientHeight;
-  canvas.style.width = container.clientWidth + "px";
-  canvas.style.height =
-    container.clientHeight -
-    document.getElementById("projectsTabs").clientHeight +
-    "px";
 
   // manter a mesma posição visual do centro do projeto ao redimensionar
   originX += (canvas.width - oldW) / 2;
@@ -806,7 +801,7 @@ function fitToScreen() {
   // fator de escala mínimo para caber em width/height
   const scaleX = viewW / projectWidth;
   const scaleY = viewH / projectHeight;
-  scale = Math.min(scaleX, scaleY) * 0.9; // 90% para dar uma margem
+  scale = Math.min(scaleX, scaleY) * 0.7; // 70% para dar uma margem
 
   // centralizar
   originX = (viewW - projectWidth * scale) / 2;

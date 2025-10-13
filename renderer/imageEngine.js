@@ -16,11 +16,18 @@ let isPanning = false;
 let startX = 0,
   startY = 0;
 
-// --- Selection ---
-let selectionRect = null; // { x, y, width, height } in project coords
+// --- SELEÇÃO: ARQUITETURA REFEITA COM BOUNDS DINÂMICOS ---
+let selectionCanvas = null;
+let selectionCtx = null;
+let hasSelection = false;
+let selectionBounds = null; // { x, y, width, height } em coordenadas do projeto
+let newSelectionRect = null;
 let isSelecting = false;
-let selectionStartX = 0;
-let selectionStartY = 0;
+let isMovingSelection = false;
+let selectionMoveStart = { x: 0, y: 0 };
+let selectionMoveStartBounds = null; // Guarda os bounds no início do movimento
+let selectionEdges = null; // Cache para as bordas da seleção
+
 let lineDashOffset = 0;
 let animationFrameId = null;
 let lastFrameTime = 0;
@@ -54,7 +61,9 @@ const tools = {
   },
   // Outras ferramentas podem ser adicionadas aqui
   moveTool: {},
-  selectTool: {},
+  selectTool: {
+    mode: "replace", // replace, unite, subtract, intersect
+  },
 };
 
 // helpers
@@ -130,6 +139,17 @@ function resizeViewport() {
 window.addEventListener("resize", resizeViewport);
 resizeViewport(); // inicializa
 
+// --- NOVO: Função para calcular e armazenar em cache as bordas da seleção ---
+function cacheSelectionEdges() {
+  if (!hasSelection) {
+    selectionEdges = null;
+    return;
+  }
+  // Usa a sua função existente para encontrar as bordas.
+  // Em uma aplicação real, otimizações mais avançadas poderiam ser usadas aqui.
+  selectionEdges = findSelectionEdges();
+}
+
 // --------- DRAW: desenha o viewport, mostrando apenas a área do projeto desenhada nas coordenadas certas ---------
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -191,33 +211,52 @@ function draw() {
     );
   }
 
-  // Draw selection
-  if (selectionRect && (selectionRect.width > 0 || selectionRect.height > 0)) {
+  // MODIFICADO: Usa selectionBounds para o translate
+  if (hasSelection && selectionEdges && selectionBounds) {
+    ctx.save();
+    ctx.translate(selectionBounds.x, selectionBounds.y); // USA BOUNDS
+
+    const lineWidth = 1 / scale;
+    const dashLength = 4 / scale;
+    ctx.lineWidth = lineWidth;
+    ctx.setLineDash([dashLength, dashLength]);
+    const pixelFix = 0.5 / scale;
+
+    const drawSegments = (segments, offset) => {
+      ctx.lineDashOffset = offset;
+      ctx.beginPath();
+      for (const seg of segments.horizontal) {
+        const y = seg.y + pixelFix;
+        ctx.moveTo(seg.x, y);
+        ctx.lineTo(seg.x + seg.length, y);
+      }
+      for (const seg of segments.vertical) {
+        const x = seg.x + pixelFix;
+        ctx.moveTo(x, seg.y);
+        ctx.lineTo(x, seg.y + seg.length);
+      }
+      ctx.stroke();
+    };
+
+    ctx.strokeStyle = "white";
+    drawSegments(selectionEdges, lineDashOffset / scale);
+    ctx.strokeStyle = "black";
+    drawSegments(selectionEdges, (lineDashOffset + 4) / scale);
+    ctx.restore();
+  }
+
+  // Draw temporary selection rectangle for visual feedback during creation
+  if (newSelectionRect) {
     ctx.save();
     ctx.lineWidth = 1 / scale;
-    const dashSize = 4 / scale;
-    ctx.setLineDash([dashSize, dashSize]);
-
-    // Black dashes
-    ctx.strokeStyle = "black";
-    ctx.lineDashOffset = lineDashOffset / scale;
+    ctx.strokeStyle = "rgba(150, 150, 150, 0.8)";
+    ctx.setLineDash([4 / scale, 2 / scale]);
     ctx.strokeRect(
-      selectionRect.x,
-      selectionRect.y,
-      selectionRect.width,
-      selectionRect.height
+      newSelectionRect.x,
+      newSelectionRect.y,
+      newSelectionRect.width,
+      newSelectionRect.height
     );
-
-    // White dashes
-    ctx.strokeStyle = "white";
-    ctx.lineDashOffset = (lineDashOffset + 4) / scale;
-    ctx.strokeRect(
-      selectionRect.x,
-      selectionRect.y,
-      selectionRect.width,
-      selectionRect.height
-    );
-
     ctx.restore();
   }
 
@@ -272,6 +311,84 @@ function draw() {
   }
 }
 
+/**
+ * Analisa a máscara de seleção e retorna os segmentos de linha que formam seu contorno.
+ * @returns {{horizontal: Array, vertical: Array}} Um objeto com arrays de segmentos de linha.
+ * Cada segmento é { x, y, length }.
+ */
+function findSelectionEdges() {
+  if (!hasSelection || !selectionCtx || !selectionBounds) {
+    return { horizontal: [], vertical: [] };
+  }
+
+  const w = selectionBounds.width;
+  const h = selectionBounds.height;
+  const imageData = selectionCtx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+
+  const horizontal = [];
+  const vertical = [];
+
+  const isSelected = (x, y) => {
+    if (x < 0 || x >= w || y < 0 || y >= h) return false;
+    return data[(y * w + x) * 4 + 3] > 0;
+  };
+
+  // MODIFICADO: Os loops agora começam em -1 para detectar as bordas em x=0 e y=0.
+  for (let y = -1; y < h; y++) {
+    for (let x = -1; x < w; x++) {
+      const current = isSelected(x, y);
+
+      // Checa a transição para o pixel de baixo
+      if (current !== isSelected(x, y + 1)) {
+        horizontal.push({ x: x, y: y + 1, length: 1 });
+      }
+      // Checa a transição para o pixel da direita
+      if (current !== isSelected(x + 1, y)) {
+        vertical.push({ x: x + 1, y: y, length: 1 });
+      }
+    }
+  }
+
+  // A LÓGICA DE FUSÃO PERMANECE A MESMA E FUNCIONARÁ CORRETAMENTE
+  const mergeSegments = (segments, orientation) => {
+    if (segments.length === 0) return [];
+
+    const isHorizontal = orientation === "horizontal";
+
+    if (isHorizontal) {
+      segments.sort((a, b) => a.y - b.y || a.x - b.x);
+    } else {
+      segments.sort((a, b) => a.x - b.x || a.y - b.y);
+    }
+
+    const merged = [segments[0]];
+    for (let i = 1; i < segments.length; i++) {
+      const last = merged[merged.length - 1];
+      const current = segments[i];
+      if (isHorizontal) {
+        if (current.y === last.y && current.x === last.x + last.length) {
+          last.length += current.length;
+        } else {
+          merged.push(current);
+        }
+      } else {
+        if (current.x === last.x && current.y === last.y + last.length) {
+          last.length += current.length;
+        } else {
+          merged.push(current);
+        }
+      }
+    }
+    return merged;
+  };
+
+  return {
+    horizontal: mergeSegments(horizontal, "horizontal"),
+    vertical: mergeSegments(vertical, "vertical"),
+  };
+}
+
 // --------- UTIL: converte coordenadas de evento -> coords do projeto ---------
 function screenToProject(screenX, screenY) {
   // screenX/screenY: coordenadas em pixels relativos ao canvas (mouse offsetX/offsetY)
@@ -290,6 +407,17 @@ function projectToScreen(projectX, projectY) {
 function createNewProject(w, h) {
   projectWidth = Math.max(1, Math.floor(w));
   projectHeight = Math.max(1, Math.floor(h));
+
+  if (!selectionCanvas) {
+    selectionCanvas = document.createElement("canvas");
+    // MODIFICADO: Adiciona o atributo de otimização aqui
+    selectionCtx = selectionCanvas.getContext("2d", {
+      willReadFrequently: true,
+    });
+  }
+  selectionCanvas.width = projectWidth;
+  selectionCanvas.height = projectHeight;
+  // --- FIM DA MODIFICAÇÃO ---
 
   // limpar camadas
   layers = [];
@@ -403,20 +531,161 @@ function setActiveLayer(id) {
   draw();
 }
 
-// --- NOVO: Funções de Seleção ---
+// --- MODIFICADO: Funções de Seleção com Máscara ---
 function clearSelection() {
-  if (selectionRect) {
-    selectionRect = null;
+  if (hasSelection) {
+    hasSelection = false;
+    selectionBounds = null; // Limpa os bounds
+    cacheSelectionEdges();
     stopAnimation();
     draw();
+    saveState();
   }
 }
 
 function selectAll() {
   if (!projectWidth) return;
-  selectionRect = { x: 0, y: 0, width: projectWidth, height: projectHeight };
+  // Define os bounds para corresponder ao projeto
+  selectionBounds = { x: 0, y: 0, width: projectWidth, height: projectHeight };
+  // Ajusta o canvas da seleção
+  selectionCanvas.width = projectWidth;
+  selectionCanvas.height = projectHeight;
+  selectionCtx.fillStyle = "white";
+  selectionCtx.fillRect(0, 0, projectWidth, projectHeight);
+
+  hasSelection = true;
+  cacheSelectionEdges();
   startAnimation();
   draw();
+  saveState();
+}
+
+// ATUALIZAR isPointInSelection para considerar o offset
+function isPointInSelection(px, py) {
+  if (!hasSelection || !selectionBounds) return false;
+  // Converte para coordenadas locais do canvas da seleção
+  const localX = Math.floor(px - selectionBounds.x);
+  const localY = Math.floor(py - selectionBounds.y);
+
+  // Checa se o ponto está dentro dos limites do canvas da máscara
+  if (
+    localX < 0 ||
+    localX >= selectionBounds.width ||
+    localY < 0 ||
+    localY >= selectionBounds.height
+  ) {
+    return false;
+  }
+  const pixelData = selectionCtx.getImageData(localX, localY, 1, 1).data;
+  return pixelData[3] > 0; // Checa o canal alfa
+}
+
+// --- MODIFICADO: Função central para atualizar a máscara ---
+function updateSelectionWithRect(rect, mode) {
+  if (!rect || rect.width < 1 || rect.height < 1) return;
+
+  if (mode === "replace") {
+    clearSelection(); // Limpa a seleção e reseta os bounds
+  }
+
+  if (!hasSelection) {
+    // Criando a primeira seleção
+    selectionBounds = { ...rect };
+    selectionCanvas.width = rect.width;
+    selectionCanvas.height = rect.height;
+    selectionCtx.fillStyle = "white";
+    selectionCtx.fillRect(0, 0, rect.width, rect.height);
+  } else {
+    // Unindo com uma seleção existente
+    const oldBounds = selectionBounds;
+    const newBounds = {
+      x: Math.min(oldBounds.x, rect.x),
+      y: Math.min(oldBounds.y, rect.y),
+      right: Math.max(oldBounds.x + oldBounds.width, rect.x + rect.width),
+      bottom: Math.max(oldBounds.y + oldBounds.height, rect.y + rect.height),
+    };
+    newBounds.width = newBounds.right - newBounds.x;
+    newBounds.height = newBounds.bottom - newBounds.y;
+
+    // Se o canvas precisa crescer para acomodar o novo retângulo
+    if (
+      newBounds.width > oldBounds.width ||
+      newBounds.height > oldBounds.height
+    ) {
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = newBounds.width;
+      tempCanvas.height = newBounds.height;
+      const tempCtx = tempCanvas.getContext("2d", { willReadFrequently: true });
+
+      const offsetX = oldBounds.x - newBounds.x;
+      const offsetY = oldBounds.y - newBounds.y;
+      tempCtx.drawImage(selectionCanvas, offsetX, offsetY);
+
+      selectionCanvas.width = newBounds.width;
+      selectionCanvas.height = newBounds.height;
+      selectionCtx.drawImage(tempCanvas, 0, 0);
+      selectionBounds = {
+        x: newBounds.x,
+        y: newBounds.y,
+        width: newBounds.width,
+        height: newBounds.height,
+      };
+    }
+
+    const localRect = {
+      x: rect.x - selectionBounds.x,
+      y: rect.y - selectionBounds.y,
+      width: rect.width,
+      height: rect.height,
+    };
+
+    switch (mode) {
+      case "unite":
+      case "replace": // 'replace' já foi tratado, mas aqui ele desenha
+        selectionCtx.globalCompositeOperation = "source-over";
+        break;
+      case "subtract":
+        selectionCtx.globalCompositeOperation = "destination-out";
+        break;
+      case "intersect":
+        selectionCtx.globalCompositeOperation = "destination-in";
+        break;
+    }
+
+    selectionCtx.fillStyle = "white";
+    selectionCtx.fillRect(
+      localRect.x,
+      localRect.y,
+      localRect.width,
+      localRect.height
+    );
+    selectionCtx.globalCompositeOperation = "source-over"; // Reset
+  }
+
+  // Verifica se a seleção ainda existe
+  const selectionData = selectionCtx.getImageData(
+    0,
+    0,
+    selectionCanvas.width,
+    selectionCanvas.height
+  ).data;
+  let stillHasSelection = false;
+  for (let i = 3; i < selectionData.length; i += 4) {
+    if (selectionData[i] > 0) {
+      stillHasSelection = true;
+      break;
+    }
+  }
+  hasSelection = stillHasSelection;
+
+  if (hasSelection) {
+    cacheSelectionEdges();
+    startAnimation();
+  } else {
+    clearSelection(); // Limpa completamente se a seleção ficou vazia
+  }
+  draw();
+  saveState();
 }
 
 // Undo/redo stacks
@@ -428,6 +697,9 @@ function saveState() {
   const state = {
     layers: layers.map((l) => ({ ...l, image: l.image.src })),
     activeLayer: activeLayer ? activeLayer.id : null,
+    hasSelection: hasSelection,
+    selectionDataURL: hasSelection ? selectionCanvas.toDataURL() : null,
+    selectionBounds: hasSelection ? { ...selectionBounds } : null, // Salva bounds
   };
   console.log("Saving state for undo:", state);
 
@@ -469,7 +741,29 @@ function restoreState(state) {
       ? layers.find((l) => l.id === state.activeLayer)
       : null;
     updateLayersPanel();
-    draw();
+
+    selectionBounds = state.selectionBounds
+      ? { ...state.selectionBounds }
+      : null; // Restaura bounds
+
+    if (state.hasSelection && state.selectionDataURL && selectionBounds) {
+      const img = new Image();
+      img.onload = () => {
+        selectionCanvas.width = selectionBounds.width;
+        selectionCanvas.height = selectionBounds.height;
+        selectionCtx.drawImage(img, 0, 0);
+        hasSelection = true;
+        cacheSelectionEdges();
+        startAnimation();
+        draw();
+      };
+      img.src = state.selectionDataURL;
+    } else {
+      clearSelection();
+    }
+
+    // O draw() final é chamado dentro do bloco de seleção ou por clearSelection()
+    draw(); // Este draw pode ser removido para evitar redesenho duplo
   });
 }
 
@@ -860,15 +1154,25 @@ canvas.addEventListener("mousedown", (e) => {
 
   // Lógica da ferramenta de seleção
   if (activeToolId === "selectTool" && e.button === 0) {
-    isSelecting = true;
     const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
+
+    if (hasSelection && isPointInSelection(px, py)) {
+      isMovingSelection = true;
+      selectionMoveStart = { x: px, y: py };
+      selectionMoveStartBounds = { ...selectionBounds }; // Salva os bounds iniciais
+      return;
+    }
+    // Fim da modificação
+
+    isSelecting = true;
     selectionStartX = Math.floor(px);
     selectionStartY = Math.floor(py);
-    // Limpa a seleção existente ao iniciar uma nova.
-    if (selectionRect) {
-      selectionRect = null;
-      stopAnimation();
-      draw();
+
+    const toolOptions = tools.selectTool;
+    if (toolOptions.mode === "replace") {
+      // Limpa a seleção visualmente ao começar a arrastar,
+      // mas a limpeza final ocorre no mouseup.
+      clearSelection();
     }
     return;
   }
@@ -906,6 +1210,19 @@ canvas.addEventListener("mousemove", (e) => {
     return;
   }
 
+  if (isMovingSelection) {
+    const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
+    const dx = Math.round(px - selectionMoveStart.x);
+    const dy = Math.round(py - selectionMoveStart.y);
+
+    // Atualiza os bounds com base no deslocamento
+    selectionBounds.x = selectionMoveStartBounds.x + dx;
+    selectionBounds.y = selectionMoveStartBounds.y + dy;
+
+    draw(); // Apenas redesenha, os dados do canvas não mudam
+    return;
+  }
+
   // Desenhar retângulo de seleção
   if (isSelecting) {
     const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
@@ -915,7 +1232,7 @@ canvas.addEventListener("mousemove", (e) => {
     const y = Math.min(selectionStartY, currentY);
     const width = Math.abs(currentX - selectionStartX);
     const height = Math.abs(currentY - selectionStartY);
-    selectionRect = { x, y, width, height };
+    newSelectionRect = { x, y, width, height }; // Update temp rect
     draw();
     return;
   }
@@ -935,26 +1252,34 @@ canvas.addEventListener("mouseup", (e) => {
     isPanning = false;
   }
 
+  if (isMovingSelection) {
+    isMovingSelection = false;
+    selectionMoveStartBounds = null; // Limpa
+    saveState(); // Salva o estado com os novos bounds
+    return;
+  }
+
   if (isSelecting) {
     isSelecting = false;
-    const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
-    const currentX = Math.floor(px);
-    const currentY = Math.floor(py);
-    const width = Math.abs(currentX - selectionStartX);
-    const height = Math.abs(currentY - selectionStartY);
+    const finalRect = newSelectionRect;
+    newSelectionRect = null; // Limpa o retângulo temporário
 
-    if (width < 1 || height < 1) {
-      // Click, not drag, or invalid selection -> deselect
-      selectionRect = null;
-      // A animação já foi parada no mousedown
-    } else {
-      // Finalize selection
-      const x = Math.min(selectionStartX, currentX);
-      const y = Math.min(selectionStartY, currentY);
-      selectionRect = { x, y, width, height };
-      startAnimation();
+    if (!finalRect || finalRect.width < 1 || finalRect.height < 1) {
+      if (tools.selectTool.mode === "replace") {
+        clearSelection();
+      }
+      draw(); // Redesenha para remover o retângulo temporário
+      return;
     }
-    draw();
+
+    // --- LÓGICA DE SELEÇÃO MODIFICADA ---
+    updateSelectionWithRect(finalRect, tools.selectTool.mode);
+    // --- FIM DA MODIFICAÇÃO ---
+  }
+
+  if (draggingLayerState.isDragging) {
+    saveState();
+    draggingLayerState.isDragging = false;
   }
 
   if (draggingLayerState.isDragging) {
@@ -1016,24 +1341,54 @@ function resetViewport() {
 
 // --------- AO TROCAR PARA A ABA DO PROJETO ---------
 
-// Mudar a assinatura para aceitar o estado do viewport salvo
-function setProject(w, h, projLayers, viewportState = {}) {
+// Mudar a assinatura para aceitar o estado da seleção
+function setProject(
+  w,
+  h,
+  projLayers,
+  viewportState = {},
+  selectionDataURL = null
+) {
   projectWidth = w;
   projectHeight = h;
+
+  // Garante que o canvas de seleção tenha o tamanho certo para o projeto
+  if (selectionCanvas) {
+    selectionCanvas.width = w;
+    selectionCanvas.height = h;
+  }
 
   const promises = projLayers.map(
     (l) =>
       new Promise((resolve) => {
         const img = new Image();
         img.onload = () => resolve({ ...l, image: img });
-        img.src = l.image.src || l.image; // Handle both image elements and data URLs
+        img.src = l.image.src || l.image;
       })
   );
 
   Promise.all(promises).then((loadedLayers) => {
     layers = loadedLayers;
-    activeLayer = layers.length > 0 ? layers[0] : null;
+    // MODIFICADO: Seleciona a última camada da lista como ativa (mais comum em editores)
+    activeLayer = layers.length > 0 ? layers[layers.length - 1] : null;
     updateLayersPanel();
+
+    selectionBounds = selBounds ? { ...selBounds } : null; // Restaura bounds do projeto
+    if (selectionDataURL && selectionBounds) {
+      const img = new Image();
+      img.onload = () => {
+        selectionCanvas.width = selectionBounds.width;
+        selectionCanvas.height = selectionBounds.height;
+        selectionCtx.drawImage(img, 0, 0);
+        hasSelection = true;
+        cacheSelectionEdges();
+        startAnimation();
+        draw();
+      };
+      img.src = selectionDataURL;
+    } else {
+      clearSelection();
+    }
 
     if (viewportState.scale) {
       scale = viewportState.scale;
@@ -1042,6 +1397,8 @@ function setProject(w, h, projLayers, viewportState = {}) {
     } else {
       fitToScreen();
     }
+
+    // O draw() será chamado pela lógica de restauração da seleção ou por clearSelection
     draw();
   });
 }
@@ -1156,7 +1513,7 @@ function drawDab(ctx, x, y, radius, hardness, color) {
 
   // Ao adicionar uma parada intermediária, mudamos a queda linear para uma
   // aproximação de 2 segmentos de uma curva. Esta curva (y=(1-x)^2) derruba
-  // o alfa muito mais rápido, o que evita o acúmulo excessivo de alfa quando
+  // o acúmulo excessivo de alfa quando
   // os dabs se sobrepõem, resultando em um traço muito mais suave.
   if (innerStop < 1.0) {
     const midStop = innerStop + (1.0 - innerStop) * 0.5;
@@ -1325,6 +1682,9 @@ window.ImageEngine = {
     scale,
     originX,
     originY,
+    hasSelection: hasSelection,
+    selectionDataURL: hasSelection ? selectionCanvas.toDataURL() : null,
+    selectionBounds: hasSelection ? selectionBounds : null, // Expõe bounds
   }),
   undo,
   redo,
@@ -1332,6 +1692,7 @@ window.ImageEngine = {
   addFillLayer,
   selectAll,
   clearSelection,
+  isPointInSelection,
 
   // --- NOVA API DE FERRAMENTAS ---
   setActiveTool: (toolId) => {

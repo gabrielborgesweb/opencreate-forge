@@ -19,7 +19,7 @@ const mainCanvas = document.getElementById("mainCanvas");
 let lastMouseEvent = null;
 
 const projects = [
-  // { id, name, width, height, layers: [...] }
+  // { id, name, width, height, layers: [...], selection, scale, originX, originY }
 ];
 const projectsTabs = document.getElementById("projectsTabs");
 const homeTab = document.getElementById("homeTab");
@@ -238,6 +238,8 @@ homeTab.addEventListener("click", () => {
     currentProject.scale = state.scale;
     currentProject.originX = state.originX;
     currentProject.originY = state.originY;
+    currentProject.selectionDataURL = state.selectionDataURL;
+    currentProject.selectionOffset = state.selectionOffset; // NOVO
     console.log(
       "Salvando layers e viewport do projeto '",
       currentProject.name,
@@ -272,14 +274,15 @@ function createProjectFromHome() {
   if (currentProject) {
     const state = window.ImageEngine.getState();
     currentProject.layers = state.layers;
-    // Salvar estado do viewport
     currentProject.scale = state.scale;
     currentProject.originX = state.originX;
     currentProject.originY = state.originY;
+    currentProject.selectionDataURL = state.selectionDataURL;
+    currentProject.selectionOffset = state.selectionOffset; // NOVO
     console.log(
-      "Salvando layers e viewport do projeto '",
+      "Salvando estado completo do projeto '",
       currentProject.name,
-      "' antes de criar novo:",
+      "':",
       state
     );
   }
@@ -324,6 +327,8 @@ function createProjectFromHome() {
       currentProject.scale = state.scale;
       currentProject.originX = state.originX;
       currentProject.originY = state.originY;
+      currentProject.selectionDataURL = state.selectionDataURL;
+      currentProject.selectionOffset = state.selectionOffset; // NOVO
       console.log(
         "Salvando layers e viewport do projeto '",
         currentProject.name,
@@ -346,7 +351,9 @@ function createProjectFromHome() {
         proj.width,
         proj.height,
         proj.layers,
-        viewportState
+        viewportState,
+        proj.selectionDataURL,
+        proj.selectionOffset // NOVO
       );
       // ------------------------------------
       projectsTabs.querySelectorAll("button").forEach((b) => {
@@ -389,11 +396,12 @@ function createProjectFromHome() {
     name: projectName,
     width: w,
     height: h,
-    layers: [],
-    // Adicionar estado inicial do viewport
+    layers: initialState.layers, // Camadas iniciais (ex: fundo)
     scale: initialState.scale,
     originX: initialState.originX,
     originY: initialState.originY,
+    selectionDataURL: initialState.selectionDataURL,
+    selectionOffset: initialState.selectionOffset, // NOVO
   });
   // --------------------------------------------------------
 
@@ -544,6 +552,38 @@ function updateSelectedToolUI() {
 
   let toolOptionsHTML = "";
 
+  if (activeToolId === "selectTool") {
+    const modes = ["replace", "unite", "subtract", "intersect"];
+    const modeNames = {
+      replace: "New",
+      unite: "Add",
+      subtract: "Sub",
+      intersect: "Int",
+    };
+    const modeTitles = {
+      replace: "New Selection",
+      unite: "Add to Selection",
+      subtract: "Subtract from Selection",
+      intersect: "Intersect with Selection",
+    };
+    const modeButtonsHTML = modes
+      .map(
+        (mode) => `
+        <button 
+            class="select-mode-button ${
+              toolState.mode === mode ? "active" : ""
+            }" 
+            id="select-mode-${mode}" 
+            title="${modeTitles[mode]}">
+            ${modeNames[mode]}
+        </button>
+    `
+      )
+      .join("");
+
+    toolOptionsHTML = `<div class="select-modes">${modeButtonsHTML}</div>`;
+  }
+
   // Gera as opções de UI para ferramentas de desenho (pincel, lápis, borracha)
   if (
     activeToolId === "brushTool" ||
@@ -645,6 +685,16 @@ function updateSelectedToolUI() {
     ${toolOptionsHTML}
   `;
 
+  if (activeToolId === "selectTool") {
+    document.querySelectorAll(".select-mode-button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const mode = btn.id.replace("select-mode-", "");
+        window.ImageEngine.setToolOption("selectTool", "mode", mode);
+        updateSelectedToolUI();
+      });
+    });
+  }
+
   // Adiciona listeners para as opções
   if (document.getElementById("toolColor")) {
     document.getElementById("toolColor").addEventListener("input", (e) => {
@@ -697,6 +747,7 @@ toolButtons.forEach((btn) => {
     btn.setAttribute("active", "true");
     window.ImageEngine.setActiveTool(btn.id);
     updateSelectedToolUI();
+    mainCanvas.style.cursor = ""; // Reset cursor on tool change
 
     // A CORREÇÃO: Força a atualização da pré-visualização
     // Se o clique foi programático (via atalho), usa o último evento de mouse conhecido
@@ -894,6 +945,24 @@ canvasContainer.addEventListener("mouseleave", () => {
 canvasContainer.addEventListener("mousemove", (e) => {
   // Armazena continuamente o evento mais recente do mouse
   lastMouseEvent = e;
+
+  const activeToolId = window.ImageEngine.getActiveToolId();
+  if (activeToolId === "selectTool") {
+    const rect = canvasContainer.getBoundingClientRect();
+    const canvasX = e.clientX - rect.left;
+    const canvasY = e.clientY - rect.top;
+    if (window.ImageEngine.screenToProject) {
+      const projCoords = window.ImageEngine.screenToProject(canvasX, canvasY);
+      if (window.ImageEngine.isPointInSelection(projCoords.x, projCoords.y)) {
+        mainCanvas.style.cursor = "move";
+      } else {
+        mainCanvas.style.cursor = "crosshair";
+      }
+    }
+  } else {
+    mainCanvas.style.cursor = ""; // Reset to default/CSS-defined
+  }
+
   updateBrushPreview(e);
 });
 

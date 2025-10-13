@@ -155,6 +155,7 @@ function cacheSelectionEdges() {
 
 // --------- DRAW: desenha o viewport, mostrando apenas a área do projeto desenhada nas coordenadas certas ---------
 function draw() {
+  // limpar tela
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   if (!projectWidth || !projectHeight) return;
@@ -425,6 +426,7 @@ function createNewProject(w, h) {
   // limpar camadas
   layers = [];
   activeLayer = null;
+  // resizeViewport(); // ajusta viewport
   clearSelection();
   updateLayersPanel();
   fitToScreen();
@@ -1625,6 +1627,7 @@ function setProject(
 
     // O draw() será chamado pela lógica de restauração da seleção ou por clearSelection
     draw();
+    resizeViewport();
   });
 }
 

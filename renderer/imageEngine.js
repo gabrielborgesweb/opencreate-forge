@@ -852,6 +852,96 @@ async function pasteFromClipboard() {
 }
 
 /**
+ * Deleta o conteúdo dentro da seleção da camada ativa.
+ */
+function deleteSelectionContent() {
+  if (!activeLayer || !hasSelection || !selectionBounds) return;
+
+  // 1. Cria um novo canvas com o conteúdo da camada atual
+  const newLayerCanvas = document.createElement("canvas");
+  newLayerCanvas.width = activeLayer.image.width;
+  newLayerCanvas.height = activeLayer.image.height;
+  const newCtx = newLayerCanvas.getContext("2d");
+  newCtx.drawImage(activeLayer.image, 0, 0);
+
+  // 2. Usa 'destination-out' para "apagar" a área da seleção
+  newCtx.globalCompositeOperation = "destination-out";
+
+  // 3. Calcula a posição da máscara de seleção relativa à camada
+  const drawX = selectionBounds.x - activeLayer.x;
+  const drawY = selectionBounds.y - activeLayer.y;
+  newCtx.drawImage(selectionCanvas, drawX, drawY);
+
+  // 4. Encontra o novo bounding box para otimizar o tamanho da camada
+  const bounds = getOptimizedBoundingBox(newLayerCanvas, {
+    x: 0,
+    y: 0,
+    width: newLayerCanvas.width,
+    height: newLayerCanvas.height,
+  });
+
+  if (bounds) {
+    // Se ainda há conteúdo na camada
+    const finalCanvas = document.createElement("canvas");
+    finalCanvas.width = bounds.width;
+    finalCanvas.height = bounds.height;
+    const finalCtx = finalCanvas.getContext("2d");
+    finalCtx.drawImage(
+      newLayerCanvas,
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+      0,
+      0,
+      bounds.width,
+      bounds.height
+    );
+
+    const img = new Image();
+    img.onload = () => {
+      activeLayer.image = img;
+      // Atualiza a posição da camada com base no novo bounding box
+      activeLayer.x += bounds.x;
+      activeLayer.y += bounds.y;
+
+      saveState(); // Salva o estado para o 'undo'
+      draw();
+      updateLayersPanel();
+    };
+    img.src = finalCanvas.toDataURL();
+  } else {
+    // Se a camada ficou completamente vazia
+    const emptyCanvas = document.createElement("canvas");
+    emptyCanvas.width = 1;
+    emptyCanvas.height = 1;
+    const img = new Image();
+    img.onload = () => {
+      activeLayer.image = img;
+      activeLayer.x = 0;
+      activeLayer.y = 0;
+      saveState();
+      draw();
+      updateLayersPanel();
+    };
+    img.src = emptyCanvas.toDataURL();
+  }
+}
+
+/**
+ * [ASSÍNCRONO] Recorta a área selecionada (Copia e depois Deleta).
+ */
+async function cutSelection() {
+  if (!activeLayer || !hasSelection) return;
+
+  // 1. Copia a seleção para a área de transferência
+  await copySelection();
+
+  // 2. Deleta o conteúdo da seleção na camada
+  deleteSelectionContent();
+}
+
+/**
  * Helper para criar uma camada a partir de um Blob de imagem, convertendo-o para um data URL permanente.
  * @param {Blob} blob - O blob da imagem.
  * @param {{x: number, y: number}} position - A posição desejada (canto superior esquerdo ou centro).
@@ -1922,10 +2012,11 @@ window.ImageEngine = {
   clearSelection,
   isPointInSelection,
 
-  // NOVO: Funções de copiar e colar
   copySelection,
   pasteFromClipboard,
-  createLayerFromBlob, // NOVO
+  cutSelection, // <-- ADICIONE ESTA
+  deleteSelectionContent, // <-- ADICIONE ESTA
+  createLayerFromBlob,
 
   setActiveTool: (toolId) => {
     if (tools[toolId]) {

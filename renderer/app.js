@@ -782,13 +782,16 @@ document.addEventListener("keydown", (e) => {
       case "b":
         document.getElementById("brushTool").click();
         break;
-      // NOVO: Atalho para a ferramenta lápis
       case "n":
         document.getElementById("pencilTool").click();
         break;
-      // NOVO: Atalho para a ferramenta borracha
       case "e":
         document.getElementById("eraserTool").click();
+        break;
+      // NOVO: Atalho para a tecla Delete
+      case "delete":
+        e.preventDefault();
+        window.ImageEngine.deleteSelectionContent();
         break;
     }
   }
@@ -805,16 +808,20 @@ document.addEventListener("keydown", (e) => {
         window.ImageEngine.clearSelection();
         break;
 
-      // NOVO: Atalho para Copiar
       case "c":
         e.preventDefault();
         window.ImageEngine.copySelection();
         break;
 
-      // NOVO: Atalho para Colar
       case "v":
         e.preventDefault();
         window.ImageEngine.pasteFromClipboard();
+        break;
+
+      // NOVO: Atalho para Recortar (Cut)
+      case "x":
+        e.preventDefault();
+        window.ImageEngine.cutSelection();
         break;
 
       case "n":

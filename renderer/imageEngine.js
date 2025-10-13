@@ -28,6 +28,9 @@ let selectionMoveStart = { x: 0, y: 0 };
 let selectionMoveStartBounds = null; // Guarda os bounds no início do movimento
 let selectionEdges = null; // Cache para as bordas da seleção
 
+// NOVO: Clipboard interno para copiar e colar
+// let internalClipboard = null;
+
 let lineDashOffset = 0;
 let animationFrameId = null;
 let lastFrameTime = 0;
@@ -686,6 +689,227 @@ function updateSelectionWithRect(rect, mode) {
   }
   draw();
   saveState();
+}
+
+/**
+ * [ASSÍNCRONO] Copia a área selecionada da camada ativa para o clipboard do sistema.
+ * Se não houver seleção, copia a camada ativa inteira.
+ */
+async function copySelection() {
+  if (!activeLayer) return;
+
+  let sourceCanvas;
+  let originalBounds = {}; // Armazenará a posição original
+
+  if (!hasSelection) {
+    // Caso 1: Sem seleção, usa a imagem da camada inteira
+    sourceCanvas = activeLayer.image;
+    originalBounds = { x: activeLayer.x, y: activeLayer.y };
+  } else {
+    // Caso 2: Com seleção, recorta a área (lógica que você já tinha)
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = selectionBounds.width;
+    tempCanvas.height = selectionBounds.height;
+    const tempCtx = tempCanvas.getContext("2d");
+
+    const layerOffsetX = activeLayer.x - selectionBounds.x;
+    const layerOffsetY = activeLayer.y - selectionBounds.y;
+    tempCtx.drawImage(activeLayer.image, layerOffsetX, layerOffsetY);
+    tempCtx.globalCompositeOperation = "destination-in";
+    tempCtx.drawImage(selectionCanvas, 0, 0);
+
+    const bounds = getOptimizedBoundingBox(tempCanvas, {
+      x: 0,
+      y: 0,
+      width: tempCanvas.width,
+      height: tempCanvas.height,
+    });
+    if (!bounds) return; // Nada para copiar
+
+    const finalCanvas = document.createElement("canvas");
+    finalCanvas.width = bounds.width;
+    finalCanvas.height = bounds.height;
+    const finalCtx = finalCanvas.getContext("2d");
+    finalCtx.drawImage(
+      tempCanvas,
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+      0,
+      0,
+      bounds.width,
+      bounds.height
+    );
+    sourceCanvas = finalCanvas;
+
+    originalBounds = {
+      x: selectionBounds.x + bounds.x,
+      y: selectionBounds.y + bounds.y,
+    };
+  }
+
+  // Converte o canvas final para um Blob e escreve no clipboard
+  try {
+    const blob = await new Promise((resolve) =>
+      sourceCanvas.toBlob(resolve, "image/png")
+    );
+
+    const activeTab = projectsTabs.querySelector("button.active:not(#homeTab)");
+    // O ID do projeto é armazenado como o ID do botão
+    const currentProjectID =
+      projects.find((p) => p.id == activeTab.id).id || "";
+    const metadata = {
+      source: `opencreate-forge-editor__${currentProjectID}`, // Carimbo para reconhecer colagens internas por projeto
+      x: originalBounds.x,
+      y: originalBounds.y,
+    };
+    const metadataBlob = new Blob([JSON.stringify(metadata)], {
+      type: "text/plain",
+    });
+
+    // Escreve ambos os blobs (imagem e metadados) no clipboard
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        "image/png": blob,
+        "text/plain": metadataBlob, // Adiciona o carimbo
+      }),
+    ]);
+    console.log("Image copied to system clipboard.");
+  } catch (err) {
+    console.error("Failed to copy image to clipboard:", err);
+    alert(
+      "Could not copy image to clipboard. Check permissions or console for errors."
+    );
+  }
+}
+
+/**
+ * [ASSÍNCRONO] Lê o clipboard do sistema. Se encontrar uma imagem,
+ * cola como uma nova camada no centro da visão atual.
+ */
+async function pasteFromClipboard() {
+  try {
+    const clipboardItems = await navigator.clipboard.read();
+
+    for (const item of clipboardItems) {
+      const imageType = item.types.find((type) => type.startsWith("image/"));
+      if (!imageType) continue; // Pula se não houver imagem
+
+      let isInternalPaste = false;
+      let pastePosition = null;
+
+      // 1. Tenta ler nossos metadados primeiro
+      if (item.types.includes("text/plain")) {
+        const metadataBlob = await item.getType("text/plain");
+        const metadataText = await metadataBlob.text();
+
+        console.log("Clipboard metadata:", metadataText);
+
+        try {
+          const metadata = JSON.parse(metadataText);
+          const activeTab = projectsTabs.querySelector(
+            "button.active:not(#homeTab)"
+          );
+          // O ID do projeto é armazenado como o ID do botão
+          const currentProjectID =
+            projects.find((p) => p.id == activeTab.id).id || "";
+          if (
+            metadata.source === `opencreate-forge-editor__${currentProjectID}`
+          ) {
+            isInternalPaste = true;
+            pastePosition = { x: metadata.x, y: metadata.y };
+          }
+        } catch (e) {
+          /* Não é nosso JSON, ignora */
+        }
+      }
+
+      // 2. Se não for interno, calcula a posição centralizada
+      if (!isInternalPaste) {
+        const center = screenToProject(canvas.width / 2, canvas.height / 2);
+        pastePosition = center; // A posição será ajustada pelo tamanho da imagem depois
+      }
+
+      // 3. Processa a imagem
+      const blob = await item.getType(imageType);
+      createLayerFromBlob(blob, pastePosition, !isInternalPaste);
+
+      saveState();
+
+      return; // Processamos o primeiro item de imagem e paramos
+    }
+
+    console.log("No image found in clipboard.", clipboardItems);
+  } catch (err) {
+    console.error("Failed to read from clipboard:", err);
+    alert(
+      "Could not paste from clipboard. Check permissions or console for errors."
+    );
+  }
+}
+
+/**
+ * Helper para criar uma camada a partir de um Blob de imagem, convertendo-o para um data URL permanente.
+ * @param {Blob} blob - O blob da imagem.
+ * @param {{x: number, y: number}} position - A posição desejada (canto superior esquerdo ou centro).
+ * @param {boolean} isCenterPosition - Se a posição fornecida é para o centro da imagem.
+ */
+function createLayerFromBlob(blob, position, isCenterPosition = false) {
+  const imageUrl = URL.createObjectURL(blob); // 1. Cria a URL temporária para carregar a imagem
+  const img = new Image();
+  const imgName = blob.name || "Imported Image";
+
+  img.onload = () => {
+    // 2. Após carregar a imagem do blob, nós a convertemos
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = img.width;
+    tempCanvas.height = img.height;
+    const tempCtx = tempCanvas.getContext("2d");
+    tempCtx.drawImage(img, 0, 0);
+
+    // 3. Libera a memória do blob, pois já o temos no canvas
+    URL.revokeObjectURL(imageUrl);
+
+    // 4. Converte o canvas para um data URL permanente
+    const dataURL = tempCanvas.toDataURL();
+
+    // 5. Cria a imagem final que será armazenada no estado
+    const finalImage = new Image();
+    finalImage.onload = () => {
+      let layerX, layerY;
+      if (isCenterPosition) {
+        layerX = position.x - finalImage.width / 2;
+        layerY = position.y - finalImage.height / 2;
+      } else {
+        layerX = position.x;
+        layerY = position.y;
+      }
+
+      const newLayer = {
+        id: uid(),
+        name: imgName,
+        image: finalImage, // A imagem agora tem um src="data:..."
+        x: layerX,
+        y: layerY,
+        visible: true,
+      };
+
+      layers.push(newLayer);
+      setActiveLayer(newLayer.id);
+      clearSelection();
+
+      updateLayersPanel();
+      saveState();
+      draw();
+      console.log("Image from blob converted and added as a new layer.");
+    };
+
+    // 6. Define o src da imagem final para o data URL
+    finalImage.src = dataURL;
+  };
+
+  img.src = imageUrl;
 }
 
 // Undo/redo stacks
@@ -1347,7 +1571,8 @@ function setProject(
   h,
   projLayers,
   viewportState = {},
-  selectionDataURL = null
+  selectionDataURL = null,
+  selBounds = null
 ) {
   projectWidth = w;
   projectHeight = h;
@@ -1694,7 +1919,11 @@ window.ImageEngine = {
   clearSelection,
   isPointInSelection,
 
-  // --- NOVA API DE FERRAMENTAS ---
+  // NOVO: Funções de copiar e colar
+  copySelection,
+  pasteFromClipboard,
+  createLayerFromBlob, // NOVO
+
   setActiveTool: (toolId) => {
     if (tools[toolId]) {
       activeToolId = toolId;

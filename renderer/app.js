@@ -804,6 +804,19 @@ document.addEventListener("keydown", (e) => {
         e.preventDefault();
         window.ImageEngine.clearSelection();
         break;
+
+      // NOVO: Atalho para Copiar
+      case "c":
+        e.preventDefault();
+        window.ImageEngine.copySelection();
+        break;
+
+      // NOVO: Atalho para Colar
+      case "v":
+        e.preventDefault();
+        window.ImageEngine.pasteFromClipboard();
+        break;
+
       case "n":
         e.preventDefault();
         showNewProjectModal();
@@ -964,6 +977,61 @@ canvasContainer.addEventListener("mousemove", (e) => {
   }
 
   updateBrushPreview(e);
+});
+
+/**
+ * --- NOVO: LÓGICA DE ARRASTAR E SOLTAR (DRAG & DROP) ---
+ */
+canvasContainer.addEventListener("dragover", (e) => {
+  e.preventDefault(); // MUITO IMPORTANTE: Prevenir o comportamento padrão para permitir o drop.
+  e.stopPropagation();
+  // Verificar se há arquivos sendo arrastados
+  if (e.dataTransfer.items) {
+    const hasFiles = Array.from(e.dataTransfer.items).some(
+      (item) => item.kind === "file"
+    );
+    if (!hasFiles) return; // Se não houver arquivos, não faz nada
+  }
+  // Verificar se há um projeto ativo
+  const activeProject = getActiveProject();
+  if (!activeProject) return; // Se não houver projeto, não faz nada
+  // Opcional: Adicionar um feedback visual, como uma borda
+  // canvasContainer.style.outline = "2px dashed var(--accent-color)";
+  canvasContainer.classList.add("drag-over");
+});
+
+canvasContainer.addEventListener("dragleave", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  // Remove o feedback visual
+  // canvasContainer.style.outline = "none";
+  canvasContainer.classList.remove("drag-over");
+});
+
+canvasContainer.addEventListener("drop", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  // canvasContainer.style.outline = "none"; // Limpa o feedback visual
+  canvasContainer.classList.remove("drag-over");
+
+  // Verificar se há um projeto ativo
+  const activeProject = getActiveProject();
+  if (!activeProject) return; // Se não houver projeto, não faz nada
+
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    for (const file of files) {
+      // Checa se é um tipo de imagem suportado
+      if (file.type.startsWith("image/")) {
+        // Usa a mesma lógica do paste externo: calcula o centro e cria a camada
+        const center = window.ImageEngine.screenToProject(
+          canvas.width / 2,
+          canvas.height / 2
+        );
+        window.ImageEngine.createLayerFromBlob(file, center, true);
+      }
+    }
+  }
 });
 
 // Initialize UI

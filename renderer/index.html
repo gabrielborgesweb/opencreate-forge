@@ -9,7 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+      content="default-src 'self'; script-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'"
     />
   </head>
   <body>
@@ -17,7 +17,7 @@
       <div id="menubar" class="flex flex-row">
         <!-- <button id="btnNew">New Project...</button> -->
         <!-- <button id="btnOpen">Open Image...</button> -->
-        <button id="btnSave">Save Image...</button>
+        <!-- <button id="btnSave">Save Image...</button> -->
         <!-- <button id="btnGrayscale">Filter: Grayscale</button> -->
 
         <!-- mais botões de filtro / ferramenta -->
@@ -125,11 +125,14 @@
         </div>
         <div id="sidebar" class="flex flex-column">
           <div id="layersPanel" class="panel">
-            <h3>Layers</h3>
+            <h3 style="margin-block-start: 0">Layers</h3>
             <div id="layersList" class="list"></div>
-            <div style="display: flex; gap: 8px">
+            <div
+              style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px"
+            >
               <button id="btnAddEmptyLayer">Empty Layer</button>
               <button id="btnOpen">Add Image Layer</button>
+              <button id="btnSave">Save Image...</button>
             </div>
           </div>
           <div id="propertiesPanel" class="panel">

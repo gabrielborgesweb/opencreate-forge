@@ -6,6 +6,9 @@ const btnSave = document.getElementById("btnSave");
 const btnGrayscale = document.getElementById("btnGrayscale");
 const toolButtons = document.querySelectorAll(".tool-button");
 
+// NOVO: Variável para guardar a escolha do usuário para a ferramenta de seleção
+let lastUserSelectMode = "replace";
+
 const btnAddEmptyLayer = document.getElementById("btnAddEmptyLayer");
 const selectedToolDiv = document.getElementById("selectedtool");
 // NOVO: Elemento de pré-visualização
@@ -239,7 +242,8 @@ homeTab.addEventListener("click", () => {
     currentProject.originX = state.originX;
     currentProject.originY = state.originY;
     currentProject.selectionDataURL = state.selectionDataURL;
-    currentProject.selectionOffset = state.selectionOffset; // NOVO
+    // CORREÇÃO: Usar selectionBounds
+    currentProject.selectionBounds = state.selectionBounds;
     console.log(
       "Salvando layers e viewport do projeto '",
       currentProject.name,
@@ -278,7 +282,8 @@ function createProjectFromHome() {
     currentProject.originX = state.originX;
     currentProject.originY = state.originY;
     currentProject.selectionDataURL = state.selectionDataURL;
-    currentProject.selectionOffset = state.selectionOffset; // NOVO
+    // CORREÇÃO: Usar selectionBounds
+    currentProject.selectionBounds = state.selectionBounds;
     console.log(
       "Salvando estado completo do projeto '",
       currentProject.name,
@@ -328,7 +333,8 @@ function createProjectFromHome() {
       currentProject.originX = state.originX;
       currentProject.originY = state.originY;
       currentProject.selectionDataURL = state.selectionDataURL;
-      currentProject.selectionOffset = state.selectionOffset; // NOVO
+      // CORREÇÃO: Usar selectionBounds
+      currentProject.selectionBounds = state.selectionBounds;
       console.log(
         "Salvando layers e viewport do projeto '",
         currentProject.name,
@@ -353,7 +359,7 @@ function createProjectFromHome() {
         proj.layers,
         viewportState,
         proj.selectionDataURL,
-        proj.selectionOffset // NOVO
+        proj.selectionBounds // <-- CORREÇÃO: Mude de proj.selectionOffset para proj.selectionBounds
       );
       // ------------------------------------
       projectsTabs.querySelectorAll("button").forEach((b) => {
@@ -401,7 +407,8 @@ function createProjectFromHome() {
     originX: initialState.originX,
     originY: initialState.originY,
     selectionDataURL: initialState.selectionDataURL,
-    selectionOffset: initialState.selectionOffset, // NOVO
+    // CORREÇÃO: Usar selectionBounds
+    selectionBounds: initialState.selectionBounds,
   });
   // --------------------------------------------------------
 
@@ -689,6 +696,10 @@ function updateSelectedToolUI() {
     document.querySelectorAll(".select-mode-button").forEach((btn) => {
       btn.addEventListener("click", () => {
         const mode = btn.id.replace("select-mode-", "");
+
+        // NOVO: Atualiza a nossa variável com a escolha explícita do usuário
+        lastUserSelectMode = mode;
+
         window.ImageEngine.setToolOption("selectTool", "mode", mode);
         updateSelectedToolUI();
       });
@@ -860,6 +871,56 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+/**
+ * NOVO: Atualiza o modo da ferramenta de seleção com base nas teclas modificadoras (Shift/Alt).
+ */
+function updateSelectionModeFromKeys(e) {
+  // Só executa se a ferramenta de seleção estiver ativa
+  if (window.ImageEngine.getActiveToolId() !== "selectTool") return;
+
+  // Não muda o modo se o usuário já estiver no meio de um arrasto de seleção
+  if (window.ImageEngine.isSelecting()) return;
+
+  let newMode;
+
+  // Define o modo com base na combinação de teclas
+  if (e.shiftKey && e.altKey) {
+    newMode = "intersect";
+  } else if (e.shiftKey) {
+    newMode = "unite";
+  } else if (e.altKey) {
+    newMode = "subtract";
+  } else {
+    // Se nenhuma tecla estiver pressionada, volta ao último modo que o usuário clicou
+    newMode = lastUserSelectMode;
+  }
+
+  // Pega o modo atual para evitar atualizações desnecessárias
+  const currentMode = window.ImageEngine.getToolState("selectTool").mode;
+
+  if (newMode !== currentMode) {
+    window.ImageEngine.setToolOption("selectTool", "mode", newMode);
+    updateSelectedToolUI(); // Atualiza a UI para mostrar o botão ativo correto
+  }
+}
+
+// NOVO: Adiciona os listeners para keydown e keyup
+document.addEventListener("keydown", (e) => {
+  // Previne disparos repetidos se a tecla for mantida pressionada
+  if (e.repeat) return;
+  // Filtra para só chamar a função se Shift ou Alt forem pressionadas
+  if (e.key === "Shift" || e.key === "Alt") {
+    updateSelectionModeFromKeys(e);
+  }
+});
+
+document.addEventListener("keyup", (e) => {
+  // Filtra para só chamar a função se Shift ou Alt forem soltas
+  if (e.key === "Shift" || e.key === "Alt") {
+    updateSelectionModeFromKeys(e);
+  }
+});
+
 // --- NOVO: LÓGICA DE PRÉ-VISUALIZAÇÃO DO PINCEL ---
 
 function updateBrushPreview(e) {
@@ -970,10 +1031,19 @@ canvasContainer.addEventListener("mousemove", (e) => {
   if (activeToolId === "selectTool") {
     const rect = canvasContainer.getBoundingClientRect();
     const canvasX = e.clientX - rect.left;
-    const canvasY = e.clientY - rect.top;
+    const canvasY = e.clientY - rect.top - projectsTabs.offsetHeight;
     if (window.ImageEngine.screenToProject) {
       const projCoords = window.ImageEngine.screenToProject(canvasX, canvasY);
-      if (window.ImageEngine.isPointInSelection(projCoords.x, projCoords.y)) {
+
+      // CORREÇÃO: Apenas mostra o cursor de movimento se o modo permitir
+      const toolState = window.ImageEngine.getToolState("selectTool");
+      const canMoveSelection =
+        toolState.mode === "replace" || toolState.mode === "unite";
+
+      if (
+        canMoveSelection &&
+        window.ImageEngine.isPointInSelection(projCoords.x, projCoords.y)
+      ) {
         mainCanvas.style.cursor = "move";
       } else {
         mainCanvas.style.cursor = "crosshair";

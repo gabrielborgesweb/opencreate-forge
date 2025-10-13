@@ -226,21 +226,25 @@ function draw() {
     ctx.setLineDash([dashLength, dashLength]);
     const pixelFix = 0.5 / scale;
 
+    // MODIFICADO: Remova o pixelFix das coordenadas x e y
     const drawSegments = (segments, offset) => {
       ctx.lineDashOffset = offset;
       ctx.beginPath();
       for (const seg of segments.horizontal) {
-        const y = seg.y + pixelFix;
+        const y = seg.y; // SEM pixelFix
         ctx.moveTo(seg.x, y);
         ctx.lineTo(seg.x + seg.length, y);
       }
       for (const seg of segments.vertical) {
-        const x = seg.x + pixelFix;
+        const x = seg.x; // SEM pixelFix
         ctx.moveTo(x, seg.y);
         ctx.lineTo(x, seg.y + seg.length);
       }
       ctx.stroke();
     };
+
+    // NOVO: Aplica a translação de meio pixel para linhas nítidas
+    ctx.translate(0.5 / scale, 0.5 / scale);
 
     ctx.strokeStyle = "white";
     drawSegments(selectionEdges, lineDashOffset / scale);
@@ -1471,8 +1475,13 @@ canvas.addEventListener("mousedown", (e) => {
   // Lógica da ferramenta de seleção
   if (activeToolId === "selectTool" && e.button === 0) {
     const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
+    const toolOptions = tools.selectTool; // Pega as opções da ferramenta
 
-    if (hasSelection && isPointInSelection(px, py)) {
+    // CORREÇÃO: Permite mover a seleção apenas nos modos 'replace' e 'unite'
+    const canMoveSelection =
+      toolOptions.mode === "replace" || toolOptions.mode === "unite";
+
+    if (hasSelection && canMoveSelection && isPointInSelection(px, py)) {
       isMovingSelection = true;
       selectionMoveStart = { x: px, y: py };
       selectionMoveStartBounds = { ...selectionBounds }; // Salva os bounds iniciais
@@ -1484,8 +1493,7 @@ canvas.addEventListener("mousedown", (e) => {
     selectionStartX = Math.floor(px);
     selectionStartY = Math.floor(py);
 
-    const toolOptions = tools.selectTool;
-    if (toolOptions.mode === "replace") {
+    if (toolOptions.mode === "replace" && !isMovingSelection) {
       // Limpa a seleção visualmente ao começar a arrastar,
       // mas a limpeza final ocorre no mouseup.
       clearSelection();
@@ -1542,8 +1550,11 @@ canvas.addEventListener("mousemove", (e) => {
   // Desenhar retângulo de seleção
   if (isSelecting) {
     const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
-    const currentX = Math.floor(px);
-    const currentY = Math.floor(py);
+
+    // CORREÇÃO: Use Math.round() para uma seleção mais responsiva
+    const currentX = Math.round(px);
+    const currentY = Math.round(py);
+
     const x = Math.min(selectionStartX, currentX);
     const y = Math.min(selectionStartY, currentY);
     const width = Math.abs(currentX - selectionStartX);
@@ -2014,9 +2025,12 @@ window.ImageEngine = {
 
   copySelection,
   pasteFromClipboard,
-  cutSelection, // <-- ADICIONE ESTA
-  deleteSelectionContent, // <-- ADICIONE ESTA
+  cutSelection,
+  deleteSelectionContent,
   createLayerFromBlob,
+
+  // NOVO: Adicione esta linha para expor o estado
+  isSelecting: () => isSelecting,
 
   setActiveTool: (toolId) => {
     if (tools[toolId]) {

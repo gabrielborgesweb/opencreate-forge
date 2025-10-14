@@ -545,53 +545,92 @@ function setupNumericSlider(containerId, toolId, option, config) {
   );
 }
 
-// MODIFICADO: Modificar a função updateSelectedToolUI()
+// SUBSTITUA a função updateSelectedToolUI inteira por esta:
 function updateSelectedToolUI() {
-  const activeToolButton = document.querySelector(".tool-button[active]");
+  const activeToolId = window.ImageEngine.getActiveToolId();
+  const toolState = window.ImageEngine.getToolState(activeToolId);
+  const activeToolButton = document.getElementById(activeToolId);
+
+  // Limpa a div de opções se nenhuma ferramenta estiver ativa
   if (!activeToolButton) {
     selectedToolDiv.innerHTML = "";
     return;
   }
 
-  const activeToolId = activeToolButton.id;
-  const toolState = window.ImageEngine.getToolState(activeToolId);
   const toolName = activeToolButton.getAttribute("title").split(" (")[0];
 
-  let toolOptionsHTML = "";
-
+  // --- LÓGICA OTIMIZADA PARA A FERRAMENTA DE SELEÇÃO ---
   if (activeToolId === "selectTool") {
-    const modes = ["replace", "unite", "subtract", "intersect"];
-    const modeNames = {
-      replace: "New",
-      unite: "Add",
-      subtract: "Sub",
-      intersect: "Int",
-    };
-    const modeTitles = {
-      replace: "New Selection",
-      unite: "Add to Selection",
-      subtract: "Subtract from Selection",
-      intersect: "Intersect with Selection",
-    };
-    const modeButtonsHTML = modes
-      .map(
-        (mode) => `
-        <button 
-            class="select-mode-button ${
-              toolState.mode === mode ? "active" : ""
-            }" 
-            id="select-mode-${mode}" 
-            title="${modeTitles[mode]}">
-            ${modeNames[mode]}
-        </button>
-    `
-      )
-      .join("");
+    // Verifica se a UI da ferramenta de seleção já foi renderizada.
+    // Usamos um ID ou uma classe específica para a verificação.
+    let selectToolUI = selectedToolDiv.querySelector("#selectToolOptions");
 
-    toolOptionsHTML = `<div class="select-modes">${modeButtonsHTML}</div>`;
+    // Se a UI não existir, cria-a pela primeira vez.
+    if (!selectToolUI) {
+      const modes = ["replace", "unite", "subtract", "intersect"];
+      const modeIcons = {
+        replace: "assets/svg/SelectTool_Replace.svg",
+        unite: "assets/svg/SelectTool_Union.svg",
+        subtract: "assets/svg/SelectTool_Subtract.svg",
+        intersect: "assets/svg/SelectTool_Intersect.svg",
+      };
+      const modeTitles = {
+        replace: "New Selection",
+        unite: "Add to Selection",
+        subtract: "Subtract from Selection",
+        intersect: "Intersect with Selection",
+      };
+
+      const modeButtonsHTML = modes
+        .map(
+          (mode) => `
+          <button 
+              class="select-mode-button" 
+              id="select-mode-${mode}" 
+              title="${modeTitles[mode]}">
+              <svg-src src="${modeIcons[mode]}"></svg-src>
+          </button>
+      `
+        )
+        .join("");
+
+      // Monta o HTML completo e o insere no DOM
+      selectedToolDiv.innerHTML = `
+        <span style="margin-left: 10px">${toolName}</span>
+        <div id="selectToolOptions" class="select-modes">
+            <div class="select-modes">${modeButtonsHTML}</div>
+        </div>
+      `;
+
+      // Adiciona os listeners de clique UMA ÚNICA VEZ.
+      document.querySelectorAll(".select-mode-button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const mode = btn.id.replace("select-mode-", "");
+          lastUserSelectMode = mode;
+          window.ImageEngine.setToolOption("selectTool", "mode", mode);
+          // Chama a função novamente para atualizar a classe 'active',
+          // mas desta vez ela não vai recriar o HTML.
+          updateSelectedToolUI();
+        });
+      });
+    }
+
+    // --- ATUALIZAÇÃO DE CLASSE (executa sempre para a ferramenta de seleção) ---
+    // Garante que o botão correto tenha a classe 'active'.
+    const currentMode = toolState.mode;
+    document.querySelectorAll(".select-mode-button").forEach((btn) => {
+      const buttonMode = btn.id.replace("select-mode-", "");
+      // O método toggle com o segundo argumento booleano é perfeito para isso.
+      btn.classList.toggle("active", buttonMode === currentMode);
+    });
+    return; // Finaliza a função aqui para não processar outras ferramentas
   }
 
-  // Gera as opções de UI para ferramentas de desenho (pincel, lápis, borracha)
+  // --- LÓGICA PARA AS OUTRAS FERRAMENTAS (permanece a mesma) ---
+  // Se a ferramenta ativa não for a de seleção, limpa o conteúdo e
+  // reconstrói a UI para a ferramenta correspondente.
+  let toolOptionsHTML = "";
+
   if (
     activeToolId === "brushTool" ||
     activeToolId === "eraserTool" ||
@@ -687,33 +726,18 @@ function updateSelectedToolUI() {
     }
   }
 
+  // Define o HTML para as outras ferramentas.
   selectedToolDiv.innerHTML = `
     <span style="margin-left: 10px">${toolName}</span>
     ${toolOptionsHTML}
   `;
 
-  if (activeToolId === "selectTool") {
-    document.querySelectorAll(".select-mode-button").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const mode = btn.id.replace("select-mode-", "");
-
-        // NOVO: Atualiza a nossa variável com a escolha explícita do usuário
-        lastUserSelectMode = mode;
-
-        window.ImageEngine.setToolOption("selectTool", "mode", mode);
-        updateSelectedToolUI();
-      });
-    });
-  }
-
-  // Adiciona listeners para as opções
+  // Adiciona listeners para as opções das outras ferramentas (código existente).
   if (document.getElementById("toolColor")) {
     document.getElementById("toolColor").addEventListener("input", (e) => {
       window.ImageEngine.setToolOption(activeToolId, "color", e.target.value);
     });
   }
-
-  // NOVO: Setup para os numeric sliders
   if (document.getElementById("size-container")) {
     const isPencilLike =
       activeToolId === "pencilTool" ||
@@ -732,7 +756,6 @@ function updateSelectedToolUI() {
       isPercentage: true,
     });
   }
-
   if (document.getElementById("toolShape")) {
     document.getElementById("toolShape").addEventListener("change", (e) => {
       window.ImageEngine.setToolOption(activeToolId, "shape", e.target.value);
@@ -741,11 +764,10 @@ function updateSelectedToolUI() {
       }
     });
   }
-
   if (document.getElementById("toolMode")) {
     document.getElementById("toolMode").addEventListener("change", (e) => {
       window.ImageEngine.setToolOption(activeToolId, "mode", e.target.value);
-      updateSelectedToolUI(); // Re-render options for the new mode
+      updateSelectedToolUI();
     });
   }
 }

@@ -27,7 +27,7 @@ body {
 }
 
 svg-src {
-  display: inline-block;
+  display: inherit;
 
   svg {
     width: 1rem;
@@ -84,30 +84,37 @@ button {
 .select-modes {
   display: flex;
   align-items: center;
-  border: 1px solid #333;
   border-radius: 4px;
   overflow: hidden;
-  margin-left: 10px;
-  font-family: monospace;
 }
 
 .select-mode-button {
   all: unset;
-  padding: 6px;
-  background: #5a5a5a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* padding: 6px; */
+  /* background: #5a5a5a; */
+  fill: #c6c6c6;
   cursor: pointer;
-  border-right: 1px solid #333;
-  font-size: 10px;
+  width: 1.75rem;
+  height: 1.75rem;
+  /* border-right: 1px solid #333; */
+  /* font-size: 10px; */
 }
 .select-mode-button:last-child {
-  border-right: none;
+  /* border-right: none; */
 }
 .select-mode-button:hover {
-  background: #6e6e6e;
+  background: #555;
 }
 .select-mode-button.active {
   background: var(--accent-color);
-  color: white;
+  /* fill: var(--accent-color); */
+  fill: white;
+}
+.select-mode-button:focus {
+  outline: none;
 }
 
 /* NOVO: Estilos para o componente numeric-slider */
@@ -436,7 +443,7 @@ canvas {
   all: unset;
   padding: 0.3rem 0.75rem;
   /* margin-right: 0.25rem; */
-  background: #444;
+  background: #555;
   color: #fff;
   border-bottom: 2px solid transparent;
   cursor: pointer;
@@ -448,7 +455,7 @@ canvas {
   gap: 0.5rem;
 
   &.active {
-    background: #444;
+    background: #555;
     border-bottom: 2px solid var(--accent-color);
     /* pointer-events: none; */
   }
@@ -503,7 +510,7 @@ canvas {
 }
 
 .layer-item:hover {
-  background: #444;
+  background: #555;
 }
 
 #brushPreview {

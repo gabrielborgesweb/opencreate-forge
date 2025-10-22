@@ -102,9 +102,6 @@ button {
   /* border-right: 1px solid #333; */
   /* font-size: 10px; */
 }
-.select-mode-button:last-child {
-  /* border-right: none; */
-}
 .select-mode-button:hover {
   background: #555;
 }

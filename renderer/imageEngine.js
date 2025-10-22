@@ -26,7 +26,7 @@ const Debug = {
   },
 };
 
-const ZOOM_SENSITIVITY = 0.01; // 0.01 = 1% por scroll (aumente ou diminua)
+const ZOOM_SENSITIVITY = 0.05; // 0.05 = 5% por scroll (aumente ou diminua)
 let currentScale = 1;
 let targetScale = 1;
 const ZOOM_SMOOTHING = 0.15; // Controls how smooth the zoom animation is

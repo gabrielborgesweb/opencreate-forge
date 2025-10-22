@@ -1,4 +1,31 @@
 // renderer/imageEngine.js
+
+// NOVO: Objeto Debug
+const Debug = {
+  // Flags padrão
+  transformShowHandles: false,
+  // Obter a flag de Debug
+  get: (key) => {
+    if (!(key in Debug)) return undefined; // Verificar se a chave existe
+    return Debug[key];
+  },
+  // Definir a flag de Debug
+  set: (key, value) => {
+    if (typeof value !== "boolean") return undefined; // Garantir que o valor seja booleano
+    if (!(key in Debug)) return undefined; // Verificar se a chave existe
+    Debug[key] = value;
+    draw();
+    return Debug[key];
+  },
+  // Alternar a flag de Debug
+  toggle: (key) => {
+    if (!(key in Debug)) return undefined; // Verificar se a chave existe
+    Debug[key] = !Debug[key];
+    draw();
+    return Debug[key];
+  },
+};
+
 const ZOOM_SENSITIVITY = 0.01; // 0.01 = 1% por scroll (aumente ou diminua)
 let currentScale = 1;
 let targetScale = 1;
@@ -16,6 +43,12 @@ let isPanning = false;
 let startX = 0,
   startY = 0;
 
+// --- NOVO: Estado de Transformação ---
+let isTransforming = false;
+let transformState = null; // { originalLayer, currentTransform, activeHandle, dragStartCoords, dragStartTransform }
+const TRANSFORM_HANDLE_SIZE_PROJ = 8; // Tamanho do controle em pixels do projeto (a 100% zoom)
+let lastUsedToolId = "moveTool"; // Guarda a ferramenta anterior
+
 // --- SELEÇÃO: ARQUITETURA REFEITA COM BOUNDS DINÂMICOS ---
 let selectionCanvas = null;
 let selectionCtx = null;
@@ -27,9 +60,6 @@ let isMovingSelection = false;
 let selectionMoveStart = { x: 0, y: 0 };
 let selectionMoveStartBounds = null; // Guarda os bounds no início do movimento
 let selectionEdges = null; // Cache para as bordas da seleção
-
-// NOVO: Clipboard interno para copiar e colar
-// let internalClipboard = null;
 
 let lineDashOffset = 0;
 let animationFrameId = null;
@@ -74,6 +104,13 @@ function uid() {
   return Date.now() + "-" + Math.floor(Math.random() * 10000);
 }
 
+// --- Helper para atualizar a UI do app.js ---
+function notifyTransformUI() {
+  if (typeof window.updateTransformUI === "function") {
+    window.updateTransformUI();
+  }
+}
+
 let checkerPattern = null;
 function getCheckerPattern() {
   if (!checkerPattern) {
@@ -95,7 +132,6 @@ function getCheckerPattern() {
   return checkerPattern;
 }
 
-// --- NOVO: Animação para a seleção "marching ants" ---
 function animate(currentTime) {
   animationFrameId = requestAnimationFrame(animate);
 
@@ -142,7 +178,7 @@ function resizeViewport() {
 window.addEventListener("resize", resizeViewport);
 resizeViewport(); // inicializa
 
-// --- NOVO: Função para calcular e armazenar em cache as bordas da seleção ---
+// --- Função para calcular e armazenar em cache as bordas da seleção ---
 function cacheSelectionEdges() {
   if (!hasSelection) {
     selectionEdges = null;
@@ -185,14 +221,33 @@ function draw() {
   for (let layer of layers) {
     if (!layer.visible) continue;
     // Não desenha a camada ativa se estivermos no meio de um traço,
-    // pois o strokeCanvas a substituirá visualmente.
     if (layer === activeLayer && isDrawing) {
       continue;
     }
-    ctx.drawImage(layer.image, layer.x, layer.y);
+
+    // --- NOVO: Lógica de Desenho para Transformação ---
+    if (isTransforming && layer === activeLayer && transformState) {
+      ctx.save();
+      const t = transformState.currentTransform;
+
+      // 1. Vai para o ponto da âncora
+      ctx.translate(t.x, t.y);
+      // 2. Rotaciona
+      ctx.rotate((t.rotation * Math.PI) / 180);
+      // 3. Escala
+      ctx.scale(t.scaleX, t.scaleY);
+      // 4. Desenha a imagem, deslocada pela sua âncora
+      // (ex: âncora central {0.5, 0.5} desenha em [-width/2, -height/2])
+      ctx.drawImage(layer.image, -t.width * t.anchor.x, -t.height * t.anchor.y);
+      ctx.restore();
+    } else {
+      // Desenho normal da camada
+      ctx.drawImage(layer.image, layer.x, layer.y);
+    }
+    // --- FIM DA MODIFICAÇÃO ---
   }
 
-  // NOVO: Desenha o canvas do traço em andamento sobre tudo
+  // Desenha o canvas do traço em andamento sobre tudo
   if (isDrawing && strokeCanvas) {
     // AQUI ESTÁ A MUDANÇA: desenha o canvas na sua posição de origem correta
     ctx.drawImage(strokeCanvas, strokeOriginX, strokeOriginY);
@@ -204,7 +259,7 @@ function draw() {
   ctx.strokeRect(0, 0, projectWidth, projectHeight);
 
   // Desenha a borda de seleção da camada ativa
-  if (activeLayer) {
+  if (activeLayer && activeLayer.visible && !isTransforming) {
     ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
     ctx.lineWidth = 2 / Math.max(scale, 1);
     ctx.strokeRect(
@@ -213,6 +268,16 @@ function draw() {
       activeLayer.image.width,
       activeLayer.image.height
     );
+  }
+
+  // --- NOVO: Desenha os controles de transformação ---
+  if (isTransforming && transformState) {
+    drawTransformControls();
+
+    // NOVO: Desenha hitboxes de Debug
+    if (Debug.get("transformShowHandles")) {
+      drawDebugHitboxes();
+    }
   }
 
   // MODIFICADO: Usa selectionBounds para o translate
@@ -243,7 +308,7 @@ function draw() {
       ctx.stroke();
     };
 
-    // NOVO: Aplica a translação de meio pixel para linhas nítidas
+    // Aplica a translação de meio pixel para linhas nítidas
     ctx.translate(0.5 / scale, 0.5 / scale);
 
     ctx.strokeStyle = "white";
@@ -465,7 +530,7 @@ function addLayer(img, name = "Layer") {
   draw();
 }
 
-// --- NOVO: ADD FILL LAYER ---
+// --- ADD FILL LAYER ---
 function addFillLayer(color, name = "Fill Layer") {
   if (!projectWidth || !projectHeight) return;
 
@@ -1224,13 +1289,881 @@ canvas.addEventListener(
   { passive: false }
 );
 
-// REMOVA OS LISTENERS ANTIGOS (mousedown, mousemove, mouseup, mouseleave) DO CANVAS E SUBSTITUA POR ESTE BLOCO
+/**
+ * Desenha a caixa delimitadora, âncora e controles de transformação no canvas.
+ * Chamada por draw().
+ *
+ * CORREÇÃO:
+ * - Tarefa 2: Altera o visual da âncora de uma cruz para um losango preenchido.
+ */
+function drawTransformControls() {
+  const t = transformState.currentTransform;
+
+  ctx.save();
+  // 1. Vai para o ponto da âncora (já em coords do projeto)
+  ctx.translate(t.x, t.y);
+  // 2. Rotaciona
+  ctx.rotate((t.rotation * Math.PI) / 180);
+
+  // Calcula os limites da caixa (relativos à âncora rotacionada)
+  const left = -t.width * t.anchor.x * t.scaleX;
+  const top = -t.height * t.anchor.y * t.scaleY;
+  const width = t.width * t.scaleX;
+  const height = t.height * t.scaleY;
+
+  // Desenha a caixa delimitadora
+  ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
+  ctx.lineWidth = 1 / scale;
+  ctx.setLineDash([]);
+  ctx.strokeRect(left, top, width, height);
+
+  // Prepara para desenhar os controles
+  const handleSize = TRANSFORM_HANDLE_SIZE_PROJ / scale;
+  ctx.fillStyle = "white";
+  ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
+  ctx.lineWidth = 1 / scale;
+
+  // --- INÍCIO DA CORREÇÃO (Tarefa 2: Mudar âncora para losango) ---
+  // Substitui a cruz azul por um losango azul
+  // ctx.fillStyle = "rgba(0, 0, 0, 0)";
+  ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
+  ctx.lineWidth = 1 / scale;
+  ctx.beginPath();
+  ctx.moveTo(0, -(handleSize * 1.25) / 1.5); // Ponto de cima (um pouco menor)
+  ctx.lineTo((handleSize * 1.25) / 1.5, 0); // Ponto da direita
+  ctx.lineTo(0, (handleSize * 1.25) / 1.5); // Ponto de baixo
+  ctx.lineTo(-(handleSize * 1.25) / 1.5, 0); // Ponto da esquerda
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Desenha os controles de escala (lista agora é filtrada por getTransformHandles)
+  getTransformHandles(true).forEach((handle) => {
+    if (handle.name === "rotate") return;
+    // Coordenadas já estão em espaço local rotacionado
+    ctx.fillRect(
+      handle.x - handleSize / 2,
+      handle.y - handleSize / 2,
+      handleSize,
+      handleSize
+    );
+    ctx.strokeRect(
+      handle.x - handleSize / 2,
+      handle.y - handleSize / 2,
+      handleSize,
+      handleSize
+    );
+  });
+
+  // Desenha o controle de rotação
+  // (também é filtrado se estiver muito perto, mas a lógica de 'top' o mantém)
+  const rotHandle = getTransformHandles(true).find((h) => h.name === "rotate");
+  if (rotHandle) {
+    ctx.beginPath();
+    ctx.moveTo(rotHandle.x, rotHandle.y + handleSize / 2);
+    ctx.lineTo(rotHandle.x, rotHandle.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(rotHandle.x, rotHandle.y, handleSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // --- FIM DA CORREÇÃO ---
+
+  ctx.restore();
+}
+
+/**
+ * NOVO: Desenha as hitboxes de Debug para a transformação.
+ */
+function drawDebugHitboxes() {
+  if (!isTransforming || !transformState) return;
+
+  const handleSize = TRANSFORM_HANDLE_SIZE_PROJ / scale;
+  const debugHitboxSize = handleSize * 1.5; // Tamanho da área de clique
+
+  ctx.save();
+  ctx.setTransform(scale, 0, 0, scale, originX, originY); // Coords do Projeto
+  ctx.fillStyle = "rgba(255, 0, 0, 0.3)"; // Vermelho 30%
+
+  const handles = getTransformHandles(false); // Coords do MUNDO (projeto)
+  handles.forEach((h) => {
+    ctx.fillRect(
+      h.x - debugHitboxSize / 2,
+      h.y - debugHitboxSize / 2,
+      debugHitboxSize,
+      debugHitboxSize
+    );
+  });
+  ctx.restore(); // Restaura para coords de tela
+
+  // Agora desenha a caixa de "move"
+  ctx.save();
+  const t = transformState.currentTransform;
+  ctx.setTransform(scale, 0, 0, scale, originX, originY); // Coords do Projeto
+  ctx.translate(t.x, t.y);
+  ctx.rotate((t.rotation * Math.PI) / 180);
+
+  const left = -t.width * t.anchor.x * t.scaleX;
+  const top = -t.height * t.anchor.y * t.scaleY;
+  const width = t.width * t.scaleX;
+  const height = t.height * t.scaleY;
+
+  ctx.fillStyle = "rgba(255, 0, 0, 0.1)"; // Vermelho 10%
+  ctx.fillRect(left, top, width, height);
+
+  ctx.restore();
+}
+
+/**
+ * Converte coordenadas do projeto (mundo) para o espaço local (rotacionado/escalado) da camada.
+ * CORREÇÃO: Esta função agora retorna coordenadas LOCAIS ESCALADAS,
+ * pois é assim que os limites são definidos em getHandleAtPoint.
+ * @returns {{x: number, y: number}} Coordenadas locais ESCALADAS.
+ */
+function worldToLocal(px, py) {
+  if (!transformState) return { x: 0, y: 0 };
+  const t = transformState.currentTransform;
+
+  // 1. Remove a translação da âncora
+  let x = px - t.x;
+  let y = py - t.y;
+
+  // 2. Remove a rotação (rotaciona no sentido oposto)
+  const rot = (-t.rotation * Math.PI) / 180;
+  const cos = Math.cos(rot);
+  const sin = Math.sin(rot);
+  let x_rot = x * cos - y * sin;
+  let y_rot = x * sin + y * cos;
+
+  // 3. REMOVIDO: A escala não é removida, pois getHandleAtPoint compara com valores escalados.
+  // let x_scaled = x_rot / t.scaleX;
+  // let y_scaled = y_rot / t.scaleY;
+
+  return { x: x_rot, y: y_rot }; // Retorna as coords rotacionadas (que são locais e escaladas)
+}
+
+/**
+ * Converte coordenadas locais (rotacionadas/escaladas) para o espaço do projeto (mundo).
+ * CORREÇÃO: Esta função agora assume que lx e ly já estão ESCALADOS,
+ * pois é assim que os handles são calculados em getTransformHandles.
+ * @returns {{x: number, y: number}} Coordenadas do projeto.
+ */
+function localToWorld(lx, ly) {
+  // lx e ly são coords locais JÁ ESCALADAS
+  if (!transformState) return { x: 0, y: 0 };
+  const t = transformState.currentTransform;
+
+  // 1. REMOVIDO: A escala não é aplicada, pois lx/ly já estão escalados
+  // let x = lx * t.scaleX;
+  // let y = ly * t.scaleY;
+  let x = lx; // Usa os valores escalados diretamente
+  let y = ly;
+
+  // 2. Aplica rotação
+  const rot = (t.rotation * Math.PI) / 180;
+  const cos = Math.cos(rot);
+  const sin = Math.sin(rot);
+  let x_rot = x * cos - y * sin;
+  let y_rot = x * sin + y * cos;
+
+  // 3. Aplica translação da âncora
+  let x_trans = x_rot + t.x;
+  let y_trans = y_rot + t.y;
+
+  return { x: x_trans, y: y_trans };
+}
+
+/**
+ * Retorna uma lista de todos os controles de transformação e suas posições.
+ * @param {boolean} local - Se true, retorna coordenadas locais (relativas à âncora rotacionada).
+ * Se false, retorna coordenadas do projeto (mundo).
+ *
+ * CORREÇÃO:
+ * - Tarefa 1: Oculta handles de aresta se o objeto estiver muito pequeno na tela.
+ * - Tarefa 3: Remove o handle "anchor" da lista para desativar sua interatividade.
+ */
+function getTransformHandles(local = false) {
+  if (!transformState) return [];
+  const t = transformState.currentTransform;
+
+  // --- NOVO: Lógica de Ocultação de Handles ---
+  // Se o tamanho na tela for menor que 4x o tamanho do handle, oculta as arestas.
+  const HIDE_THRESHOLD = TRANSFORM_HANDLE_SIZE_PROJ * 4;
+  // 'scale' é a variável global de zoom da viewport
+  const width_screen = Math.abs(t.width * t.scaleX * scale);
+  const height_screen = Math.abs(t.height * t.scaleY * scale);
+
+  const hideVerticalEdges = height_screen < HIDE_THRESHOLD;
+  const hideHorizontalEdges = width_screen < HIDE_THRESHOLD;
+  // --- FIM DA LÓGICA NOVA ---
+
+  // Coordenadas locais (antes da rotação/translação)
+  const left = -t.width * t.anchor.x * t.scaleX;
+  const top = -t.height * t.anchor.y * t.scaleY;
+  const width = t.width * t.scaleX;
+  const height = t.height * t.scaleY;
+  const midX = left + width / 2;
+  const midY = top + height / 2;
+
+  const handleSize = TRANSFORM_HANDLE_SIZE_PROJ / scale;
+
+  const allHandles = [
+    { name: "top-left", x: left, y: top, cursor: "nwse-resize" },
+    { name: "top-middle", x: midX, y: top, cursor: "ns-resize" },
+    { name: "top-right", x: left + width, y: top, cursor: "nesw-resize" },
+    { name: "center-left", x: left, y: midY, cursor: "ew-resize" },
+    { name: "center-right", x: left + width, y: midY, cursor: "ew-resize" },
+    { name: "bottom-left", x: left, y: top + height, cursor: "nesw-resize" },
+    { name: "bottom-middle", x: midX, y: top + height, cursor: "ns-resize" },
+    {
+      name: "bottom-right",
+      x: left + width,
+      y: top + height,
+      cursor: "nwse-resize",
+    },
+    { name: "rotate", x: midX, y: top - 20 / scale, cursor: "crosshair" },
+    // O handle da âncora foi movido para o filtro abaixo
+  ];
+
+  // NOVO: Filtrar os handles com base nas condições
+  const handles = allHandles.filter((h) => {
+    // Tarefa 3: Remover interatividade da âncora
+    if (h.name === "anchor") {
+      return false;
+    }
+    // Tarefa 1: Ocultar handles de aresta
+    if (h.name === "top-middle" || h.name === "bottom-middle") {
+      return !hideHorizontalEdges;
+    }
+    if (h.name === "center-left" || h.name === "center-right") {
+      return !hideVerticalEdges;
+    }
+    return true; // Manter cantos e rotação
+  });
+
+  if (local) return handles;
+
+  // Converte para coordenadas do mundo
+  return handles.map((h) => {
+    const worldPos = localToWorld(h.x, h.y);
+    return { ...h, ...worldPos };
+  });
+}
+
+/**
+ * Encontra qual controle de transformação está em um determinado ponto (coords do projeto).
+ */
+function getHandleAtPoint(px, py) {
+  const handles = getTransformHandles(false); // Pega coords do mundo
+  const handleSize = TRANSFORM_HANDLE_SIZE_PROJ / scale;
+  const checkRadius = (handleSize / 2) * 1.5; // Área de clique 50% maior
+  const rotation = transformState.currentTransform.rotation;
+
+  // Muda o cursor com base na rotação atual
+  function getRotatedCursor(handleName, originalCursor, rotation) {
+    const directions = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]; // Sentidos em ordem horária
+
+    // Apenas rotaciona cursores de resize
+    if (!originalCursor.endsWith("-resize")) {
+      return originalCursor;
+    }
+
+    // Determina a direção base do cursor a partir do nome do handle
+    let baseDir = "";
+    if (handleName.includes("top")) baseDir += "n";
+    else if (handleName.includes("bottom")) baseDir += "s";
+
+    if (handleName.includes("left")) baseDir += "w";
+    else if (handleName.includes("right")) baseDir += "e";
+
+    // Garante a ordem correta para diagonais (n/s antes de e/w)
+    if (baseDir === "wn") baseDir = "nw";
+    if (baseDir === "en") baseDir = "ne";
+    if (baseDir === "ws") baseDir = "sw";
+    if (baseDir === "es") baseDir = "se";
+
+    const index = directions.indexOf(baseDir);
+    if (index === -1) {
+      return originalCursor; // Fallback
+    }
+
+    // Calcula o novo índice com base na rotação
+    const steps = Math.round(rotation / 45); // Cada 45 graus é um passo
+    const newIndex = (index + steps + directions.length) % directions.length;
+    return directions[newIndex] + "-resize";
+  }
+
+  // Atualiza os cursores dos handles com base na rotação
+  handles.forEach((h) => {
+    h.cursor = getRotatedCursor(h.name, h.cursor, rotation);
+  });
+
+  // Itera de trás para frente (controles ficam por cima da caixa)
+  for (let i = handles.length - 1; i >= 0; i--) {
+    const h = handles[i];
+    const dist = Math.hypot(px - h.x, py - h.y);
+    if (dist <= checkRadius) {
+      return h;
+    }
+  }
+
+  // Se nenhum controle, verifica se está dentro da caixa (para mover)
+  const localPos = worldToLocal(px, py);
+  const t = transformState.currentTransform;
+  const left = -t.width * t.anchor.x * t.scaleX;
+  const top = -t.height * t.anchor.y * t.scaleY;
+  const width = t.width * t.scaleX;
+  const height = t.height * t.scaleY;
+
+  if (
+    localPos.x >= left &&
+    localPos.x <= left + width &&
+    localPos.y >= top &&
+    localPos.y <= top + height
+  ) {
+    return { name: "move", cursor: "move" };
+  }
+
+  return null;
+}
+
+/**
+ * Entra no modo de transformação para a camada ativa.
+ */
+function enterTransformMode() {
+  if (isTransforming || !activeLayer) return;
+
+  console.log("Entrando no modo de transformação:", activeLayer.id);
+  isTransforming = true;
+  isSelecting = false; // Garante que não estamos selecionando
+  lastUsedToolId = activeToolId; // Salva a ferramenta atual
+  activeToolId = "transformTool"; // "Ferramenta" virtual
+  document.body.classList.add("transforming");
+
+  // Limpa a seleção, pois não é compatível com a transformação
+  clearSelection();
+
+  // Esconde o Brush Preview durante a transformação
+  brushPreview.style.display = "none";
+
+  // Armazena o estado original
+  transformState = {
+    originalLayer: {
+      ...activeLayer,
+      image: activeLayer.image,
+    },
+    currentTransform: {
+      // Âncora começa no centro da camada
+      x: activeLayer.x + activeLayer.image.width / 2,
+      y: activeLayer.y + activeLayer.image.height / 2,
+      width: activeLayer.image.width,
+      height: activeLayer.image.height,
+      scaleX: 1,
+      scaleY: 1,
+      rotation: 0,
+      anchorString: "center-middle", // Para a UI
+      anchor: { x: 0.5, y: 0.5 }, // 0-1 normalizado
+    },
+    activeHandle: null,
+    dragStartCoords: { x: 0, y: 0 },
+    dragStartTransform: null,
+  };
+
+  draw();
+  // A UI será atualizada pelo app.js
+}
+
+/**
+ * Cancela a transformação e restaura o estado original.
+ * @param {boolean} isApplying - Se true, não restaura o estado (usado por applyTransform).
+ */
+function cancelTransform(isApplying = false) {
+  if (!isTransforming) return;
+
+  if (!isApplying) {
+    // Restaura a camada
+    const original = transformState.originalLayer;
+    activeLayer.image = original.image;
+    activeLayer.x = original.x;
+    activeLayer.y = original.y;
+    console.log("Transformação cancelada.");
+  }
+
+  isTransforming = false;
+  transformState = null;
+  activeToolId = lastUsedToolId; // Restaura a ferramenta anterior
+  document.body.classList.remove("transforming");
+
+  draw();
+  updateLayersPanel();
+  // A UI será atualizada pelo app.js
+}
+
+/**
+ * [ASSÍNCRONO] Aplica a transformação, criando uma nova imagem de camada.
+ */
+async function applyTransform() {
+  if (!isTransforming) return;
+
+  const t = transformState.currentTransform;
+  const originalImg = transformState.originalLayer.image;
+
+  // 1. Calcula a nova caixa delimitadora no espaço do projeto
+  const corners = [
+    { x: -t.width * t.anchor.x, y: -t.height * t.anchor.y }, // top-left
+    { x: t.width * (1 - t.anchor.x), y: -t.height * t.anchor.y }, // top-right
+    { x: t.width * (1 - t.anchor.x), y: t.height * (1 - t.anchor.y) }, // bottom-right
+    { x: -t.width * t.anchor.x, y: t.height * (1 - t.anchor.y) }, // bottom-left
+  ];
+
+  const rot = (t.rotation * Math.PI) / 180;
+  const cos = Math.cos(rot);
+  const sin = Math.sin(rot);
+
+  const transformedCorners = corners.map((c) => {
+    // Aplica escala
+    const scaledX = c.x * t.scaleX;
+    const scaledY = c.y * t.scaleY;
+    // Aplica rotação e translação da âncora
+    return {
+      x: scaledX * cos - scaledY * sin + t.x,
+      y: scaledX * sin + scaledY * cos + t.y,
+    };
+  });
+
+  const minX = Math.min(...transformedCorners.map((c) => c.x));
+  const minY = Math.min(...transformedCorners.map((c) => c.y));
+  const maxX = Math.max(...transformedCorners.map((c) => c.x));
+  const maxY = Math.max(...transformedCorners.map((c) => c.y));
+
+  const newWidth = Math.ceil(maxX - minX);
+  const newHeight = Math.ceil(maxY - minY);
+  const newX = Math.floor(minX);
+  const newY = Math.floor(minY);
+
+  if (newWidth < 1 || newHeight < 1) {
+    // A camada desapareceu, trata como vazia
+    createEmptyLayer(activeLayer.name); // (Isso pode precisar de refinamento)
+    layers = layers.filter((l) => l.id !== transformState.originalLayer.id);
+  } else {
+    // 2. Cria um novo canvas e desenha a imagem transformada nele
+    const newLayerCanvas = document.createElement("canvas");
+    newLayerCanvas.width = newWidth;
+    newLayerCanvas.height = newHeight;
+    const newCtx = newLayerCanvas.getContext("2d");
+
+    // 3. Desenha a imagem
+    // Move o canvas para que (newX, newY) do projeto seja (0, 0)
+    newCtx.translate(-newX, -newY);
+    // Aplica a mesma transformação de renderização
+    newCtx.translate(t.x, t.y);
+    newCtx.rotate(rot);
+    newCtx.scale(t.scaleX, t.scaleY);
+    newCtx.drawImage(
+      originalImg,
+      -t.width * t.anchor.x,
+      -t.height * t.anchor.y
+    );
+
+    // 4. Cria a nova imagem e atualiza a camada
+    const img = new Image();
+    await new Promise((resolve) => {
+      img.onload = resolve;
+      img.src = newLayerCanvas.toDataURL();
+    });
+
+    activeLayer.image = img;
+    activeLayer.x = newX;
+    activeLayer.y = newY;
+  }
+
+  console.log("Transformação aplicada.");
+
+  // 5. Sai do modo de transformação e salva no histórico
+  cancelTransform(true); // Sai sem reverter
+  saveState(); // Salva o novo estado
+  draw();
+  updateLayersPanel();
+  document.body.classList.remove("transforming");
+}
+
+/**
+ * Atualiza o estado da transformação com base em um novo valor numérico da UI.
+ */
+function setTransformNumeric(option, value) {
+  if (!isTransforming || isNaN(value)) return;
+  transformState.currentTransform[option] = value;
+  draw();
+  // A UI já foi atualizada pelo input, não precisa notificar de volta
+}
+
+/**
+ * Define um novo ponto de âncora e recalcula a posição X, Y
+ * para que a camada não se mova visualmente.
+ */
+function setTransformAnchor(anchorString) {
+  if (!isTransforming) return;
+
+  const t = transformState.currentTransform;
+  const oldAnchor = t.anchor;
+  const newAnchor = { ...oldAnchor };
+
+  if (anchorString.includes("top")) newAnchor.y = 0;
+  if (anchorString.includes("center-")) newAnchor.y = 0.5;
+  if (anchorString.includes("bottom")) newAnchor.y = 1;
+
+  if (anchorString.includes("left")) newAnchor.x = 0;
+  if (anchorString.endsWith("-middle")) newAnchor.x = 0.5;
+  if (anchorString === "center") newAnchor.x = 0.5;
+  if (anchorString.includes("right")) newAnchor.x = 1;
+
+  const width = t.width * t.scaleX;
+  const height = t.height * t.scaleY;
+
+  // Calcula o deslocamento da âncora no espaço local (escalado, não rotacionado)
+  const dx_local = (newAnchor.x - oldAnchor.x) * width;
+  const dy_local = (newAnchor.y - oldAnchor.y) * height;
+
+  // Rotaciona o deslocamento para o espaço do mundo
+  const rot = (t.rotation * Math.PI) / 180;
+  const cos = Math.cos(rot);
+  const sin = Math.sin(rot);
+
+  const dx_world = dx_local * cos - dy_local * sin;
+  const dy_world = dx_local * sin + dy_local * cos;
+
+  // Atualiza a posição X, Y para compensar o deslocamento da âncora
+  t.x = t.x + dx_world;
+  t.y = t.y + dy_world;
+
+  t.anchor = newAnchor;
+  t.anchorString = anchorString;
+
+  draw();
+  notifyTransformUI(); // Notifica a UI sobre a mudança em X, Y
+}
+
+/**
+ * Mastro de eventos para mousedown durante a transformação.
+ * CORREÇÃO: Lógica para encontrar 'oppositeHandleName' foi reescrita
+ * para evitar o bug de substituição encadeada.
+ * * CORREÇÃO 2: Adicionado Pixel Snapping.
+ * - Armazena as coordenadas iniciais com snap se não for rotação.
+ */
+function handleTransformMouseDown(e) {
+  const { x: px, y: py } = screenToProject(e.offsetX, e.offsetY);
+  const handle = getHandleAtPoint(px, py);
+
+  if (!handle) return;
+
+  transformState.activeHandle = handle;
+
+  // --- INÍCIO DA CORREÇÃO (Pixel Snapping) ---
+  // Armazena as coordenadas iniciais, com snap se não for rotação
+  if (handle.name !== "rotate") {
+    transformState.dragStartCoords = { x: Math.round(px), y: Math.round(py) };
+  } else {
+    transformState.dragStartCoords = { x: px, y: py };
+  }
+  // --- FIM DA CORREÇÃO ---
+
+  transformState.dragStartTransform = JSON.parse(
+    JSON.stringify(transformState.currentTransform)
+  );
+
+  // Prepara dados extras para escalonamento
+  if (
+    handle.name !== "move" &&
+    handle.name !== "rotate" &&
+    handle.name !== "anchor"
+  ) {
+    // --- INÍCIO DA CORREÇÃO ---
+    // A lógica de replace encadeado estava errada.
+    // ex: "top-left".replace("top", "bottom").replace("bottom", "top") -> "top-left"
+    let oppositeHandleName = handle.name;
+    if (oppositeHandleName.includes("top")) {
+      oppositeHandleName = oppositeHandleName.replace("top", "bottom");
+    } else if (oppositeHandleName.includes("bottom")) {
+      oppositeHandleName = oppositeHandleName.replace("bottom", "top");
+    }
+
+    if (oppositeHandleName.includes("left")) {
+      oppositeHandleName = oppositeHandleName.replace("left", "right");
+    } else if (oppositeHandleName.includes("right")) {
+      oppositeHandleName = oppositeHandleName.replace("right", "left");
+    }
+    // --- FIM DA CORREÇÃO ---
+
+    // A âncora de escalonamento é o controle oposto
+    const oppositeHandle = getTransformHandles(true).find(
+      (h) => h.name === oppositeHandleName
+    );
+    if (oppositeHandle) {
+      transformState.scaleAnchor = localToWorld(
+        oppositeHandle.x,
+        oppositeHandle.y
+      );
+    } else {
+      // Fallback (não deve acontecer)
+      transformState.scaleAnchor = transformState.currentTransform;
+    }
+  }
+}
+
+/**
+ * Mastro de eventos para mousemove durante a transformação.
+ * CORREÇÃO: Removido Math.abs() da lógica de 'keepAspect' (Shift).
+ *
+ * CORREÇÃO 2: Adicionado Pixel Snapping (Move/Scale) e Rotation Snapping (Shift+Rotate).
+ * - Pixel Snapping: Usa coordenadas arredondadas para move/scale.
+ * - Rotation Snapping: Trava a rotação em incrementos de 15 graus com Shift.
+ */
+function handleTransformMouseMove(e) {
+  // --- INÍCIO DA CORREÇÃO (Pixel Snapping) ---
+  // Pega as coordenadas "raw" (float)
+  const { x: raw_px, y: raw_py } = screenToProject(e.offsetX, e.offsetY);
+  // --- FIM DA CORREÇÃO ---
+
+  const t = transformState.currentTransform;
+  const startT = transformState.dragStartTransform;
+  const handle = transformState.activeHandle;
+
+  if (!handle) {
+    // Atualiza o cursor ao pairar (usa coordenadas raw para detecção suave)
+    const hoverHandle = getHandleAtPoint(raw_px, raw_py);
+    // console.log("Hover handle:", hoverHandle);
+    document.body.style.cursor = hoverHandle?.cursor || "default";
+    return;
+  }
+
+  // --- INÍCIO DA CORREÇÃO (Pixel Snapping) ---
+  // Decide se deve usar coordenadas com snap
+  let px, py;
+  if (handle.name === "rotate") {
+    px = raw_px; // Sem snap para rotação
+    py = raw_py;
+  } else {
+    px = Math.round(raw_px); // Com snap para move e scale
+    py = Math.round(raw_py);
+  }
+  // --- FIM DA CORREÇÃO ---
+
+  // O dx/dy agora é (snapped_pos - snapped_start_pos) para move/scale
+  const dx = px - transformState.dragStartCoords.x;
+  const dy = py - transformState.dragStartCoords.y;
+
+  switch (handle.name) {
+    case "move":
+    case "anchor":
+      // --- INÍCIO DA CORREÇÃO (Pixel Snapping Pós-Escala) ---
+
+      // 1. Posição-alvo do anchor (baseado no mouse snap)
+      const targetX = startT.x + dx;
+      const targetY = startT.y + dy;
+
+      // 2. Calcula o offset do "canto 0,0" da camada
+      //    em relação à âncora, no espaço do MUNDO.
+      const rot = (t.rotation * Math.PI) / 180;
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+
+      // 3. Coords locais do canto (já escaladas)
+      //    (t.width é a largura original da imagem)
+      const local_left = -t.width * t.anchor.x * t.scaleX;
+      const local_top = -t.height * t.anchor.y * t.scaleY;
+
+      // 4. Rotaciona esse offset para o espaço do mundo
+      const world_offset_x = local_left * cos - local_top * sin;
+      const world_offset_y = local_left * sin + local_top * cos;
+
+      // 5. Posição-alvo do canto (visual)
+      const target_visual_left = targetX + world_offset_x;
+      const target_visual_top = targetY + world_offset_y;
+
+      // 6. Arredonda o canto visual para o pixel mais próximo
+      const snapped_visual_left = Math.round(target_visual_left);
+      const snapped_visual_top = Math.round(target_visual_top);
+
+      // 7. Calcula a *correção* (o 'erro' do snap)
+      const correction_x = snapped_visual_left - target_visual_left;
+      const correction_y = snapped_visual_top - target_visual_top;
+
+      // 8. Aplica a correção à posição-alvo do *anchor*
+      //    A âncora (t.x, t.y) pode agora ficar em um "meio-pixel" (ex: 9.5),
+      //    o que é CORRETO para centralizar um objeto de dimensão ímpar (ex: 15px).
+      t.x = targetX + correction_x;
+      t.y = targetY + correction_y;
+
+      // --- FIM DA CORREÇÃO ---
+      break;
+
+    case "rotate": {
+      // Girar o objeto
+      const startAngle = Math.atan2(
+        transformState.dragStartCoords.y - startT.y,
+        transformState.dragStartCoords.x - startT.x
+      );
+      const currentAngle = Math.atan2(py - startT.y, px - startT.x); // Usa px/py (sem snap)
+      const deltaAngle = currentAngle - startAngle;
+
+      // --- INÍCIO DA CORREÇÃO (Rotation 15deg Snapping) ---
+      let newRotation = startT.rotation + (deltaAngle * 180) / Math.PI;
+
+      if (e.shiftKey) {
+        const snapAngle = 15; // Trava em 15 graus
+        newRotation = Math.round(newRotation / snapAngle) * snapAngle;
+      }
+
+      t.rotation = newRotation % 360;
+      // --- FIM DA CORREÇÃO ---
+      break;
+    }
+
+    // --- LÓGICA DE ESCALA ---
+    // Todos os 8 controles de escalonamento
+    default: {
+      if (!transformState.scaleAnchor) break; // Segurança
+      const scaleAnchor = transformState.scaleAnchor; // O ponto oposto (fixo)
+      const keepAspect = e.shiftKey;
+
+      // 1. Eixos do objeto no espaço do mundo (baseado na rotação inicial)
+      const rot = (startT.rotation * Math.PI) / 180;
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+      const world_axis_x = { x: cos, y: sin };
+      const world_axis_y = { x: -sin, y: cos };
+
+      // 2. Vetor do anchor ao handle original (no mousedown)
+      //    (Usa dragStartCoords, que já está com snap)
+      const vec_start = {
+        x: transformState.dragStartCoords.x - scaleAnchor.x,
+        y: transformState.dragStartCoords.y - scaleAnchor.y,
+      };
+      // Vetor do anchor ao mouse atual
+      //    (Usa px/py, que também está com snap)
+      const vec_current = {
+        x: px - scaleAnchor.x,
+        y: py - scaleAnchor.y,
+      };
+
+      // 3. Projeta os vetores nos eixos rotacionados do objeto
+      // Projeção do vetor original
+      const start_proj_x =
+        vec_start.x * world_axis_x.x + vec_start.y * world_axis_x.y;
+      const start_proj_y =
+        vec_start.x * world_axis_y.x + vec_start.y * world_axis_y.y;
+      // Projeção do vetor atual
+      const current_proj_x =
+        vec_current.x * world_axis_x.x + vec_current.y * world_axis_x.y;
+      const current_proj_y =
+        vec_current.x * world_axis_y.x + vec_current.y * world_axis_y.y;
+
+      // 4. Calcula os fatores de escala (proporção do vetor atual vs. original)
+      // Evita divisão por zero se o handle estiver alinhado com o anchor
+      let scaleFactorX = start_proj_x === 0 ? 1 : current_proj_x / start_proj_x;
+      let scaleFactorY = start_proj_y === 0 ? 1 : current_proj_y / start_proj_y;
+
+      // 5. Aplica constrangimentos do handle e 'Shift'
+      let applyScaleX =
+        handle.name.includes("left") || handle.name.includes("right");
+      let applyScaleY =
+        handle.name.includes("top") || handle.name.includes("bottom");
+      const isCorner = applyScaleX && applyScaleY;
+
+      if (keepAspect) {
+        if (isCorner) {
+          // Para travar a proporção em um canto, usamos a projeção no vetor do próprio handle
+          const start_mag = Math.hypot(start_proj_x, start_proj_y);
+          if (start_mag > 0) {
+            const proj_axis = {
+              x: start_proj_x / start_mag,
+              y: start_proj_y / start_mag,
+            };
+            const current_proj =
+              current_proj_x * proj_axis.x + current_proj_y * proj_axis.y;
+            const globalScaleFactor = current_proj / start_mag;
+            scaleFactorX = globalScaleFactor;
+            scaleFactorY = globalScaleFactor;
+          }
+        } else if (applyScaleX) {
+          // Trava proporção em handle horizontal
+          // *** ESTA É A CORREÇÃO ***
+          scaleFactorY = scaleFactorX; // Removido Math.abs()
+          applyScaleY = true;
+        } else if (applyScaleY) {
+          // Trava proporção em handle vertical
+          // *** ESTA É A CORREÇÃO ***
+          scaleFactorX = scaleFactorY; // Removido Math.abs()
+          applyScaleX = true;
+        }
+      }
+
+      // 6. Define as escalas finais
+      if (applyScaleX) t.scaleX = startT.scaleX * scaleFactorX;
+      if (applyScaleY) t.scaleY = startT.scaleY * scaleFactorY;
+
+      // 7. Recalcula a posição da âncora central para que o 'scaleAnchor' permaneça fixo
+      const vec_anchor_to_center = {
+        x: startT.x - scaleAnchor.x,
+        y: startT.y - scaleAnchor.y,
+      };
+
+      // Projeta o vetor do centro nos eixos
+      const center_proj_x =
+        vec_anchor_to_center.x * world_axis_x.x +
+        vec_anchor_to_center.y * world_axis_x.y;
+      const center_proj_y =
+        vec_anchor_to_center.x * world_axis_y.x +
+        vec_anchor_to_center.y * world_axis_y.y;
+
+      // Escala os vetores do centro APENAS pelos fatores que foram aplicados
+      const new_center_proj_x =
+        center_proj_x * (applyScaleX ? scaleFactorX : 1);
+      const new_center_proj_y =
+        center_proj_y * (applyScaleY ? scaleFactorY : 1);
+
+      // Reconstrói o vetor do centro em coordenadas do mundo
+      // (new_proj_x * eixo_x_mundo) + (new_proj_y * eixo_y_mundo)
+      const new_world_vec = {
+        x:
+          new_center_proj_x * world_axis_x.x +
+          new_center_proj_y * world_axis_y.x,
+        y:
+          new_center_proj_x * world_axis_x.y +
+          new_center_proj_y * world_axis_y.y,
+      };
+
+      // A nova posição da âncora é o ponto fixo (scaleAnchor) + o novo vetor escalado
+      t.x = scaleAnchor.x + new_world_vec.x;
+      t.y = scaleAnchor.y + new_world_vec.y;
+
+      break;
+    }
+    // --- FIM DA CORREÇÃO ---
+  }
+
+  draw();
+  notifyTransformUI(); // Atualiza os inputs X, Y, W, H, A
+}
+
+/**
+ * Mastro de eventos para mouseup durante a transformação.
+ */
+function handleTransformMouseUp(e) {
+  if (!transformState.activeHandle) return;
+  transformState.activeHandle = null;
+  transformState.dragStartTransform = null;
+  // Não salva no histórico aqui, apenas ao clicar em "Apply"
+}
 
 // --- Novas funções de manipulação de eventos de desenho ---
 
 function startDrawing(e) {
-  // const isBrushActive = document.getElementById("brushTool").hasAttribute("active"); // <-- REMOVER
-  // const isEraserActive = document.getElementById("eraserTool").hasAttribute("active"); // <-- REMOVER
+  if (isTransforming) return; // Bloqueia se estiver transformando
+  // const isBrushActive = document.getElementById("brushTool").hasAttribute("active"); <-- REMOVER
+  // const isEraserActive = document.getElementById("eraserTool").hasAttribute("active"); <-- REMOVER
 
   const isDrawableTool =
     activeToolId === "brushTool" ||
@@ -1255,7 +2188,7 @@ function startDrawing(e) {
   strokeCanvas.height = strokeHeight;
   const strokeCtx = strokeCanvas.getContext("2d");
 
-  // NOVO: Desabilita anti-aliasing para o lápis
+  // Desabilita anti-aliasing para o lápis
   const toolOptions = tools[activeToolId];
   const isPencilMode =
     activeToolId === "pencilTool" ||
@@ -1306,7 +2239,7 @@ function processDrawing(e) {
 
   const { x: px, y: py } = screenToProject(canvasX, canvasY);
 
-  // NOVO: Apenas desenha se o mouse se moveu o suficiente
+  // Apenas desenha se o mouse se moveu o suficiente
   const dist = Math.hypot(px - lastX, py - lastY);
   if (dist < MIN_BRUSH_MOVE_DISTANCE) {
     return;
@@ -1462,6 +2395,12 @@ const draggingLayerState = {
 };
 
 canvas.addEventListener("mousedown", (e) => {
+  // NOVO: Prioridade para transformação
+  if (isTransforming) {
+    handleTransformMouseDown(e);
+    return;
+  }
+
   // Pan com o botão do meio
   if (e.button === 1) {
     isPanning = true;
@@ -1525,6 +2464,13 @@ canvas.addEventListener("mousedown", (e) => {
 });
 
 canvas.addEventListener("mousemove", (e) => {
+  // NOVO: Prioridade para transformação
+  if (isTransforming) {
+    handleTransformMouseMove(e);
+    draw(); // Garante redesenho durante o movimento
+    return;
+  }
+
   // Pan com o botão do meio
   if (isPanning) {
     originX = e.clientX - startX;
@@ -1575,6 +2521,12 @@ canvas.addEventListener("mousemove", (e) => {
 });
 
 canvas.addEventListener("mouseup", (e) => {
+  // NOVO: Prioridade para transformação
+  if (isTransforming) {
+    handleTransformMouseUp(e);
+    return;
+  }
+
   if (e.button === 1) {
     isPanning = false;
   }
@@ -1648,7 +2600,7 @@ function fitToScreen() {
 // fitToScreen();
 
 // ensure canvas is transparent so checkerboard of container shows through
-canvas.style.background = "transparent";
+// canvas.style.background = "transparent";
 draw();
 
 // -------- RESETAR VIEWPORT PARA HOMEPAGE-TAB ---------
@@ -1995,6 +2947,8 @@ function drawBrushStroke(x, y) {
 
 // expose API to global (app.js will call these)
 window.ImageEngine = {
+  Debug, // NOVO: Expor o objeto Debug
+
   loadImage,
   addLayer,
   createNewProject,
@@ -2029,8 +2983,17 @@ window.ImageEngine = {
   deleteSelectionContent,
   createLayerFromBlob,
 
-  // NOVO: Adicione esta linha para expor o estado
   isSelecting: () => isSelecting,
+
+  // --- NOVO: Funções de Transformação Expostas ---
+  isTransforming: () => isTransforming,
+  enterTransformMode,
+  applyTransform,
+  cancelTransform,
+  getTransformState: () =>
+    isTransforming ? transformState.currentTransform : null,
+  setTransformNumeric,
+  setTransformAnchor,
 
   setActiveTool: (toolId) => {
     if (tools[toolId]) {

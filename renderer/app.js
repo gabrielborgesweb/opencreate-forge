@@ -59,6 +59,145 @@ const presetsData = {
   // Adicionar mais categorias conforme necessário
 };
 
+// NOVO: Adicionar este callback global
+// O imageEngine chamará esta função para atualizar os inputs (X, Y, W, H, A)
+// enquanto o usuário arrasta os controles.
+window.updateTransformUI = () => {
+  if (!window.ImageEngine || !window.ImageEngine.isTransforming()) return;
+
+  const state = window.ImageEngine.getTransformState();
+  if (!state) return;
+
+  // Garante que os elementos existem antes de tentar definir o valor
+  const xInput = document.getElementById("transformPositionXNumber");
+  const yInput = document.getElementById("transformPositionYNumber");
+  const wInput = document.getElementById("transformSizeWidthNumber");
+  const hInput = document.getElementById("transformSizeHeightNumber");
+  const aInput = document.getElementById("transformAngleNumber");
+  const anchorSelect = document.getElementById("transformAnchorSelect");
+
+  if (xInput) xInput.value = state.x.toFixed(2);
+  if (yInput) yInput.value = state.y.toFixed(2);
+  if (wInput) wInput.value = (state.scaleX * 100).toFixed(2);
+  if (hInput) hInput.value = (state.scaleY * 100).toFixed(2);
+  if (aInput) aInput.value = state.rotation.toFixed(2);
+  if (anchorSelect) anchorSelect.value = state.anchorString;
+};
+
+function showTransformUI() {
+  const transformState = window.ImageEngine.getTransformState();
+  if (!transformState) return;
+
+  // 1. Injeta o HTML da barra de ferramentas de transformação
+  selectedToolDiv.innerHTML = `
+    <span style="margin-left: 10px; font-weight: 600;">Transform</span>
+
+    <div id="anchor-container" class="numeric-slider">
+      <label for="transformAnchorSelect" style="margin-left: 10px">Anchor:</label>
+      <select id="transformAnchorSelect" style="background: #333; border: 1px solid #555; border-radius: 4px; color: #fff; padding: 2px;">
+        <option value="top-left">Top Left</option>
+        <option value="top-middle">Top Middle</option>
+        <option value="top-right">Top Right</option>
+        <option value="center-left">Center Left</option>
+        <option value="center-middle">Center</option>
+        <option value="center-right">Center Right</option>
+        <option value="bottom-left">Bottom Left</option>
+        <option value="bottom-middle">Bottom Middle</option>
+        <option value="bottom-right">Bottom Right</option>
+      </select>
+    </div>
+
+    <div id="position-x-container" class="numeric-slider">
+      <label for="transformPositionXNumber" style="margin-left: 10px">X:</label>
+      <input type="number" step="0.1" id="transformPositionXNumber" class="value-input" style="width: 50px;" />
+      <span class="unit">px</span>
+    </div>
+    <div id="position-y-container" class="numeric-slider">
+      <label for="transformPositionYNumber" style="margin-left: 0px">Y:</label>
+      <input type="number" step="0.1" id="transformPositionYNumber" class="value-input" style="width: 50px;" />
+      <span class="unit">px</span>
+    </div>
+
+    <div id="size-w-container" class="numeric-slider">
+      <label for="transformSizeWidthNumber" style="margin-left: 10px">W:</label>
+      <input type="number" step="0.1" id="transformSizeWidthNumber" class="value-input" style="width: 50px;" />
+      <span class="unit">%</span>
+    </div>
+    <div id="size-h-container" class="numeric-slider">
+      <label for="transformSizeHeightNumber" style="margin-left: 0px">H:</label>
+      <input type="number" step="0.1" id="transformSizeHeightNumber" class="value-input" style="width: 50px;" />
+      <span class="unit">%</span>
+    </div>
+
+    <div id="angle-container" class="numeric-slider">
+      <label for="transformAngleNumber" style="margin-left: 10px">A:</label>
+      <input type="number" step="0.1" id="transformAngleNumber" class="value-input" style="width: 50px;" />
+      <span class="unit">deg</span>
+    </div>
+
+    <div id="actions-container" style="margin-left: 10px; display: flex; gap: 8px;">
+      <button id="btnCancelTransform">Cancel</button>
+      <button id="btnApplyTransform" style="background: var(--accent-color); color: white;">Apply</button>
+    </div>
+  `;
+
+  // 2. Popula os valores iniciais
+  window.updateTransformUI(); // Usa a função global para preencher os valores
+
+  // 3. Adiciona listeners para os botões e inputs
+  const xInput = document.getElementById("transformPositionXNumber");
+  const yInput = document.getElementById("transformPositionYNumber");
+  const wInput = document.getElementById("transformSizeWidthNumber");
+  const hInput = document.getElementById("transformSizeHeightNumber");
+  const aInput = document.getElementById("transformAngleNumber");
+  const anchorSelect = document.getElementById("transformAnchorSelect");
+
+  // Botões de Ação
+  document
+    .getElementById("btnCancelTransform")
+    .addEventListener("click", () => {
+      window.ImageEngine.cancelTransform();
+      updateSelectedToolUI(); // Restaura a UI da ferramenta anterior
+    });
+
+  document.getElementById("btnApplyTransform").addEventListener("click", () => {
+    window.ImageEngine.applyTransform().then(() => {
+      updateSelectedToolUI(); // Restaura a UI da ferramenta anterior
+    });
+  });
+
+  // Inputs Numéricos
+  xInput.addEventListener("change", (e) =>
+    window.ImageEngine.setTransformNumeric("x", parseFloat(e.target.value))
+  );
+  yInput.addEventListener("change", (e) =>
+    window.ImageEngine.setTransformNumeric("y", parseFloat(e.target.value))
+  );
+  wInput.addEventListener("change", (e) =>
+    window.ImageEngine.setTransformNumeric(
+      "scaleX",
+      parseFloat(e.target.value) / 100
+    )
+  );
+  hInput.addEventListener("change", (e) =>
+    window.ImageEngine.setTransformNumeric(
+      "scaleY",
+      parseFloat(e.target.value) / 100
+    )
+  );
+  aInput.addEventListener("change", (e) =>
+    window.ImageEngine.setTransformNumeric(
+      "rotation",
+      parseFloat(e.target.value)
+    )
+  );
+
+  // Seletor de Âncora
+  anchorSelect.addEventListener("change", (e) =>
+    window.ImageEngine.setTransformAnchor(e.target.value)
+  );
+}
+
 function getActiveProject() {
   const activeTab = projectsTabs.querySelector("button.active:not(#homeTab)");
   if (!activeTab) return null;
@@ -229,6 +368,13 @@ homeTab.addEventListener("click", () => {
     alert("ImageEngine não está disponível");
     return;
   }
+  // Verifica se está transformando
+  if (window.ImageEngine.isTransforming()) {
+    alert(
+      "Finish or cancel the current transformation before switching projects."
+    );
+    return;
+  }
 
   // --- SALVAR ESTADO ANTES DE TROCAR PARA HOME ---
   const currentProject = getActiveProject();
@@ -323,6 +469,18 @@ function createProjectFromHome() {
 
   // ao clicar na aba, trocar para o projeto
   tab.addEventListener("click", () => {
+    if (typeof window.ImageEngine === "undefined") {
+      alert("ImageEngine não está disponível");
+      return;
+    }
+    // Verifica se está transformando
+    if (window.ImageEngine.isTransforming()) {
+      alert(
+        "Finish or cancel the current transformation before switching projects."
+      );
+      return;
+    }
+
     // --- SALVAR ESTADO ANTES DE TROCAR ---
     const currentProject = getActiveProject();
     if (currentProject) {
@@ -545,8 +703,14 @@ function setupNumericSlider(containerId, toolId, option, config) {
   );
 }
 
-// SUBSTITUA a função updateSelectedToolUI inteira por esta:
+// Atualiza a UI da ferramenta selecionada
 function updateSelectedToolUI() {
+  // NOVO: Verifica o modo de transformação primeiro
+  if (window.ImageEngine.isTransforming()) {
+    showTransformUI(); // Renderiza a UI de transformação
+    return;
+  }
+
   const activeToolId = window.ImageEngine.getActiveToolId();
   const toolState = window.ImageEngine.getToolState(activeToolId);
   const activeToolButton = document.getElementById(activeToolId);
@@ -802,7 +966,36 @@ btnAddEmptyLayer.addEventListener("click", () => {
 
 // MODIFICADO: Adicionar atalhos de teclado
 document.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "INPUT") return;
+  if (e.target.tagName === "INPUT") {
+    // NOVO: Permite Enter/Escape mesmo focado nos inputs de transformação
+    if (window.ImageEngine.isTransforming()) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        // Remove o foco do input para aplicar o valor para transformação
+        e.target.blur();
+        // document.getElementById("btnApplyTransform").click();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.target.blur();
+        // document.getElementById("btnCancelTransform").click();
+      }
+    }
+    return; // Ignora outros atalhos se estiver em um input
+  }
+
+  // NOVO: Atalhos de Transformação (Enter/Escape)
+  if (window.ImageEngine.isTransforming()) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      document.getElementById("btnApplyTransform").click();
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      document.getElementById("btnCancelTransform").click();
+      return;
+    }
+  }
 
   if (!e.ctrlKey && !e.metaKey && !e.altKey) {
     switch (e.key.toLowerCase()) {
@@ -832,6 +1025,15 @@ document.addEventListener("keydown", (e) => {
   // Common shortcuts
   if (e.ctrlKey || e.metaKey) {
     switch (e.key.toLowerCase()) {
+      // NOVO: Atalho de Transformação (Ctrl/Cmd+T)
+      case "t":
+        e.preventDefault();
+        const _activeProject = getActiveProject();
+        if (_activeProject) {
+          window.ImageEngine.enterTransformMode();
+          updateSelectedToolUI(); // Atualiza a UI para mostrar a barra de transformação
+        }
+        break;
       case "a":
         e.preventDefault();
         window.ImageEngine.selectAll();
@@ -883,6 +1085,7 @@ document.addEventListener("keydown", (e) => {
         break;
       case "z":
         e.preventDefault();
+        if (isTransforming) return; // Não faz undo/redo durante transformação
         if (e.shiftKey) {
           window.ImageEngine.redo();
         } else {
@@ -1066,9 +1269,9 @@ canvasContainer.addEventListener("mousemove", (e) => {
         canMoveSelection &&
         window.ImageEngine.isPointInSelection(projCoords.x, projCoords.y)
       ) {
-        mainCanvas.style.cursor = "move";
+        mainCanvas.style.cursor = isTransforming ? "" : "move";
       } else {
-        mainCanvas.style.cursor = "crosshair";
+        mainCanvas.style.cursor = isTransforming ? "" : "crosshair";
       }
     }
   } else {

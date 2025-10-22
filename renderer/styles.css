@@ -528,15 +528,15 @@ body:has(#homeTab.active) #brushPreview {
   display: none !important;
 }
 
-body:has(#selectTool[active]) #mainCanvas {
+body:not(.transforming):has(#selectTool[active]) #mainCanvas {
   cursor: crosshair;
 }
 
-body:has(
+body:not(.transforming):has(
     #brushTool[active="true"],
     #eraserTool[active="true"],
     #pencilTool[active="true"]
   )
   #mainCanvas {
-  cursor: none; /* Esconde o cursor padrão quando a ferramenta de pincel está ativa */
+  cursor: crosshair;
 }

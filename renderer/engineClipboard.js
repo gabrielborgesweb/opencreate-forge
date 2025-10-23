@@ -252,11 +252,11 @@ export function createLayerFromBlob(
     finalImage.onload = () => {
       let layerX, layerY;
       if (isCenterPosition) {
-        layerX = position.x - finalImage.width / 2;
-        layerY = position.y - finalImage.height / 2;
+        layerX = Math.round(position.x - finalImage.width / 2);
+        layerY = Math.round(position.y - finalImage.height / 2);
       } else {
-        layerX = position.x;
-        layerY = position.y;
+        layerX = Math.round(position.x);
+        layerY = Math.round(position.y);
       }
 
       const newLayer = {

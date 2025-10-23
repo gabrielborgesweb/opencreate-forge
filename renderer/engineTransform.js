@@ -243,8 +243,8 @@ export async function applyTransform(context) {
     const scaledX = c.x * t.scaleX;
     const scaledY = c.y * t.scaleY;
     return {
-      x: scaledX * cos - scaledY * sin + t.x,
-      y: scaledX * sin + scaledY * cos + t.y,
+      x: t.x + (scaledX * cos - scaledY * sin),
+      y: t.y + (scaledX * sin + scaledY * cos),
     };
   });
 
@@ -253,15 +253,16 @@ export async function applyTransform(context) {
   const maxX = Math.max(...transformedCorners.map((c) => c.x));
   const maxY = Math.max(...transformedCorners.map((c) => c.y));
 
-  const newWidth = Math.ceil(maxX - minX);
-  const newHeight = Math.ceil(maxY - minY);
-  const newX = Math.floor(minX);
-  const newY = Math.floor(minY);
+  const newWidth = parseInt(Math.ceil(maxX - minX));
+  const newHeight = parseInt(Math.ceil(maxY - minY));
+  const newX = parseInt(Math.round(minX));
+  const newY = parseInt(Math.round(minY));
 
   if (newWidth < 1 || newHeight < 1) {
-    context.createEmptyLayer(activeLayer.name);
-    context.layers = context.layers.filter(
-      (l) => l.id !== transformState.originalLayer.id
+    // A camada desapareceu, remove-a
+    context.layers = context.layers.filter((l) => l.id !== activeLayer.id);
+    context.setActiveLayer(
+      context.layers.length > 0 ? context.layers[0].id : null
     );
   } else {
     const newLayerCanvas = document.createElement("canvas");

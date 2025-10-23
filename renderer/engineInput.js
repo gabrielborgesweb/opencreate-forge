@@ -58,8 +58,8 @@ export function handleTransformMouseDown(context, e) {
 
   if (handle.name !== "rotate") {
     context.transformState.dragStartCoords = {
-      x: Math.round(px),
-      y: Math.round(py),
+      x: parseInt(px),
+      y: parseInt(py),
     };
   } else {
     context.transformState.dragStartCoords = { x: px, y: py };
@@ -125,8 +125,8 @@ export function handleTransformMouseMove(context, e) {
     px = raw_px;
     py = raw_py;
   } else {
-    px = Math.round(raw_px);
-    py = Math.round(raw_py);
+    px = parseInt(raw_px);
+    py = parseInt(raw_py);
   }
 
   const dx = px - transformState.dragStartCoords.x;
@@ -146,8 +146,8 @@ export function handleTransformMouseMove(context, e) {
       const world_offset_y = local_left * sin + local_top * cos;
       const target_visual_left = targetX + world_offset_x;
       const target_visual_top = targetY + world_offset_y;
-      const snapped_visual_left = Math.round(target_visual_left);
-      const snapped_visual_top = Math.round(target_visual_top);
+      const snapped_visual_left = parseInt(target_visual_left);
+      const snapped_visual_top = parseInt(target_visual_top);
       const correction_x = snapped_visual_left - target_visual_left;
       const correction_y = snapped_visual_top - target_visual_top;
       t.x = targetX + correction_x;
@@ -309,8 +309,8 @@ export function handleMouseDown(context, e) {
     }
 
     context.isSelecting = true;
-    context.selectionStartX = Math.floor(px);
-    context.selectionStartY = Math.floor(py);
+    context.selectionStartX = parseInt(px);
+    context.selectionStartY = parseInt(py);
 
     if (toolOptions.mode === "replace" && !context.isMovingSelection) {
       context.clearSelection();
@@ -359,8 +359,8 @@ export function handleMouseMove(context, e) {
 
   if (context.isMovingSelection) {
     const { x: px, y: py } = context.screenToProject(e.offsetX, e.offsetY);
-    const dx = Math.round(px - context.selectionMoveStart.x);
-    const dy = Math.round(py - context.selectionMoveStart.y);
+    const dx = parseInt(px - context.selectionMoveStart.x);
+    const dy = parseInt(py - context.selectionMoveStart.y);
     context.selectionBounds.x = context.selectionMoveStartBounds.x + dx;
     context.selectionBounds.y = context.selectionMoveStartBounds.y + dy;
     context.draw();
@@ -369,8 +369,8 @@ export function handleMouseMove(context, e) {
 
   if (context.isSelecting) {
     const { x: px, y: py } = context.screenToProject(e.offsetX, e.offsetY);
-    const currentX = Math.round(px);
-    const currentY = Math.round(py);
+    const currentX = parseInt(px);
+    const currentY = parseInt(py);
     const x = Math.min(context.selectionStartX, currentX);
     const y = Math.min(context.selectionStartY, currentY);
     const width = Math.abs(currentX - context.selectionStartX);
@@ -382,8 +382,8 @@ export function handleMouseMove(context, e) {
 
   if (context.draggingLayerState.isDragging && context.activeLayer) {
     const { x: px, y: py } = context.screenToProject(e.offsetX, e.offsetY);
-    context.activeLayer.x = px - context.draggingLayerState.offsetX;
-    context.activeLayer.y = py - context.draggingLayerState.offsetY;
+    context.activeLayer.x = parseInt(px - context.draggingLayerState.offsetX);
+    context.activeLayer.y = parseInt(py - context.draggingLayerState.offsetY);
     context.draw();
     return;
   }

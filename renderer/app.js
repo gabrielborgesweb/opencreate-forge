@@ -60,12 +60,12 @@ const presetsData = {
 };
 
 // NOVO: Adicionar este callback global
-// O imageEngine chamará esta função para atualizar os inputs (X, Y, W, H, A)
+// O engine chamará esta função para atualizar os inputs (X, Y, W, H, A)
 // enquanto o usuário arrasta os controles.
 window.updateTransformUI = () => {
-  if (!window.ImageEngine || !window.ImageEngine.isTransforming()) return;
+  if (!window.Engine || !window.Engine.isTransforming()) return;
 
-  const state = window.ImageEngine.getTransformState();
+  const state = window.Engine.getTransformState();
   if (!state) return;
 
   // Garante que os elementos existem antes de tentar definir o valor
@@ -85,7 +85,7 @@ window.updateTransformUI = () => {
 };
 
 function showTransformUI() {
-  const transformState = window.ImageEngine.getTransformState();
+  const transformState = window.Engine.getTransformState();
   if (!transformState) return;
 
   // 1. Injeta o HTML da barra de ferramentas de transformação
@@ -156,45 +156,42 @@ function showTransformUI() {
   document
     .getElementById("btnCancelTransform")
     .addEventListener("click", () => {
-      window.ImageEngine.cancelTransform();
+      window.Engine.cancelTransform();
       updateSelectedToolUI(); // Restaura a UI da ferramenta anterior
     });
 
   document.getElementById("btnApplyTransform").addEventListener("click", () => {
-    window.ImageEngine.applyTransform().then(() => {
+    window.Engine.applyTransform().then(() => {
       updateSelectedToolUI(); // Restaura a UI da ferramenta anterior
     });
   });
 
   // Inputs Numéricos
   xInput.addEventListener("change", (e) =>
-    window.ImageEngine.setTransformNumeric("x", parseFloat(e.target.value))
+    window.Engine.setTransformNumeric("x", parseFloat(e.target.value))
   );
   yInput.addEventListener("change", (e) =>
-    window.ImageEngine.setTransformNumeric("y", parseFloat(e.target.value))
+    window.Engine.setTransformNumeric("y", parseFloat(e.target.value))
   );
   wInput.addEventListener("change", (e) =>
-    window.ImageEngine.setTransformNumeric(
+    window.Engine.setTransformNumeric(
       "scaleX",
       parseFloat(e.target.value) / 100
     )
   );
   hInput.addEventListener("change", (e) =>
-    window.ImageEngine.setTransformNumeric(
+    window.Engine.setTransformNumeric(
       "scaleY",
       parseFloat(e.target.value) / 100
     )
   );
   aInput.addEventListener("change", (e) =>
-    window.ImageEngine.setTransformNumeric(
-      "rotation",
-      parseFloat(e.target.value)
-    )
+    window.Engine.setTransformNumeric("rotation", parseFloat(e.target.value))
   );
 
   // Seletor de Âncora
   anchorSelect.addEventListener("change", (e) =>
-    window.ImageEngine.setTransformAnchor(e.target.value)
+    window.Engine.setTransformAnchor(e.target.value)
   );
 }
 
@@ -364,12 +361,12 @@ setupHomeScreen();
 
 // ao clicar em Home, resetar viewport
 homeTab.addEventListener("click", () => {
-  if (typeof window.ImageEngine === "undefined") {
-    alert("ImageEngine não está disponível");
+  if (typeof window.Engine === "undefined") {
+    alert("Engine não está disponível");
     return;
   }
   // Verifica se está transformando
-  if (window.ImageEngine.isTransforming()) {
+  if (window.Engine.isTransforming()) {
     alert(
       "Finish or cancel the current transformation before switching projects."
     );
@@ -379,8 +376,8 @@ homeTab.addEventListener("click", () => {
   // --- SALVAR ESTADO ANTES DE TROCAR PARA HOME ---
   const currentProject = getActiveProject();
   if (currentProject) {
-    // Pega o estado atual da ImageEngine
-    const state = window.ImageEngine.getState();
+    // Pega o estado atual da Engine
+    const state = window.Engine.getState();
     // Salva as layers no objeto do projeto
     currentProject.layers = state.layers;
     // Salvar estado do viewport
@@ -399,7 +396,7 @@ homeTab.addEventListener("click", () => {
   }
   // ---------------------------------------------
 
-  window.ImageEngine.resetViewport();
+  window.Engine.resetViewport();
   projectsTabs.querySelectorAll("button").forEach((b) => {
     b.classList.remove("active");
   });
@@ -422,7 +419,7 @@ function createProjectFromHome() {
   // caso estar focado em outro projeto, salvar estado antes de criar novo
   const currentProject = getActiveProject();
   if (currentProject) {
-    const state = window.ImageEngine.getState();
+    const state = window.Engine.getState();
     currentProject.layers = state.layers;
     currentProject.scale = state.scale;
     currentProject.originX = state.originX;
@@ -469,12 +466,12 @@ function createProjectFromHome() {
 
   // ao clicar na aba, trocar para o projeto
   tab.addEventListener("click", () => {
-    if (typeof window.ImageEngine === "undefined") {
-      alert("ImageEngine não está disponível");
+    if (typeof window.Engine === "undefined") {
+      alert("Engine não está disponível");
       return;
     }
     // Verifica se está transformando
-    if (window.ImageEngine.isTransforming()) {
+    if (window.Engine.isTransforming()) {
       alert(
         "Finish or cancel the current transformation before switching projects."
       );
@@ -484,7 +481,7 @@ function createProjectFromHome() {
     // --- SALVAR ESTADO ANTES DE TROCAR ---
     const currentProject = getActiveProject();
     if (currentProject) {
-      const state = window.ImageEngine.getState();
+      const state = window.Engine.getState();
       currentProject.layers = state.layers;
       // Salvar estado do viewport
       currentProject.scale = state.scale;
@@ -511,7 +508,7 @@ function createProjectFromHome() {
         originX: proj.originX,
         originY: proj.originY,
       };
-      window.ImageEngine.setProject(
+      window.Engine.setProject(
         proj.width,
         proj.height,
         proj.layers,
@@ -532,7 +529,7 @@ function createProjectFromHome() {
   projectsTabs.appendChild(tab);
 
   // chama a engine para criar o novo projeto
-  window.ImageEngine.createNewProject(w, h);
+  window.Engine.createNewProject(w, h);
 
   // --- NOVO: Adicionar camada de fundo se necessário ---
   const bgSelect = document.getElementById("home-bg-select");
@@ -546,14 +543,14 @@ function createProjectFromHome() {
     else if (bgType === "custom") color = bgColorPicker.value;
 
     if (color) {
-      window.ImageEngine.addFillLayer(color, "Background");
+      window.Engine.addFillLayer(color, "Background");
     }
   }
   // --------------------------------------------------
 
   // --- INICIALIZAR PROJETO COM O ESTADO ATUAL DO VIEWPORT ---
   // Pega o estado atual após o createNewProject (que chama fitToScreen)
-  const initialState = window.ImageEngine.getState();
+  const initialState = window.Engine.getState();
 
   projects.push({
     id: projectId,
@@ -582,8 +579,8 @@ function createProjectFromHome() {
 
 // Open file (usa API exposta via preload)
 btnOpen.addEventListener("click", async () => {
-  if (typeof window.ImageEngine === "undefined") {
-    alert("ImageEngine não está disponível");
+  if (typeof window.Engine === "undefined") {
+    alert("Engine não está disponível");
     return;
   }
   if (projects.length === 0) {
@@ -594,8 +591,8 @@ btnOpen.addEventListener("click", async () => {
     // abre dialog e retorna caminho do arquivo
     const result = await window.electronAPI.openFile();
     if (result) {
-      // window.ImageEngine.loadImage adiciona como nova camada
-      window.ImageEngine.loadImage(result);
+      // window.Engine.loadImage adiciona como nova camada
+      window.Engine.loadImage(result);
     }
   } catch (error) {
     console.error("Failed to open file:", error);
@@ -603,17 +600,17 @@ btnOpen.addEventListener("click", async () => {
   }
 });
 
-// Save -> export via ImageEngine (exportImage) que retorna dataURL
+// Save -> export via Engine (exportImage) que retorna dataURL
 btnSave.addEventListener("click", async () => {
-  if (typeof window.ImageEngine === "undefined") {
-    alert("ImageEngine não está disponível");
+  if (typeof window.Engine === "undefined") {
+    alert("Engine não está disponível");
     return;
   }
   if (projects.length === 0) {
     alert("Crie um novo projeto antes de salvar uma imagem");
     return;
   }
-  const dataURL = window.ImageEngine.exportImage();
+  const dataURL = window.Engine.exportImage();
   // const defaultName = `{}.png`;
   // get default name from project name
   const currentProject = getActiveProject();
@@ -650,7 +647,7 @@ function setupNumericSlider(containerId, toolId, option, config) {
 
   const updateEngine = (value) => {
     const engineValue = isPercentage ? value / 100 : value;
-    window.ImageEngine.setToolOption(toolId, option, engineValue);
+    window.Engine.setToolOption(toolId, option, engineValue);
     if (lastMouseEvent) {
       updateBrushPreview(lastMouseEvent);
     }
@@ -706,13 +703,13 @@ function setupNumericSlider(containerId, toolId, option, config) {
 // Atualiza a UI da ferramenta selecionada
 function updateSelectedToolUI() {
   // NOVO: Verifica o modo de transformação primeiro
-  if (window.ImageEngine.isTransforming()) {
+  if (window.Engine.isTransforming()) {
     showTransformUI(); // Renderiza a UI de transformação
     return;
   }
 
-  const activeToolId = window.ImageEngine.getActiveToolId();
-  const toolState = window.ImageEngine.getToolState(activeToolId);
+  const activeToolId = window.Engine.getActiveToolId();
+  const toolState = window.Engine.getToolState(activeToolId);
   const activeToolButton = document.getElementById(activeToolId);
 
   // Limpa a div de opções se nenhuma ferramenta estiver ativa
@@ -771,7 +768,7 @@ function updateSelectedToolUI() {
         btn.addEventListener("click", () => {
           const mode = btn.id.replace("select-mode-", "");
           lastUserSelectMode = mode;
-          window.ImageEngine.setToolOption("selectTool", "mode", mode);
+          window.Engine.setToolOption("selectTool", "mode", mode);
           // Chama a função novamente para atualizar a classe 'active',
           // mas desta vez ela não vai recriar o HTML.
           updateSelectedToolUI();
@@ -899,7 +896,7 @@ function updateSelectedToolUI() {
   // Adiciona listeners para as opções das outras ferramentas (código existente).
   if (document.getElementById("toolColor")) {
     document.getElementById("toolColor").addEventListener("input", (e) => {
-      window.ImageEngine.setToolOption(activeToolId, "color", e.target.value);
+      window.Engine.setToolOption(activeToolId, "color", e.target.value);
     });
   }
   if (document.getElementById("size-container")) {
@@ -922,7 +919,7 @@ function updateSelectedToolUI() {
   }
   if (document.getElementById("toolShape")) {
     document.getElementById("toolShape").addEventListener("change", (e) => {
-      window.ImageEngine.setToolOption(activeToolId, "shape", e.target.value);
+      window.Engine.setToolOption(activeToolId, "shape", e.target.value);
       if (lastMouseEvent) {
         updateBrushPreview(lastMouseEvent);
       }
@@ -930,7 +927,7 @@ function updateSelectedToolUI() {
   }
   if (document.getElementById("toolMode")) {
     document.getElementById("toolMode").addEventListener("change", (e) => {
-      window.ImageEngine.setToolOption(activeToolId, "mode", e.target.value);
+      window.Engine.setToolOption(activeToolId, "mode", e.target.value);
       updateSelectedToolUI();
     });
   }
@@ -942,7 +939,7 @@ toolButtons.forEach((btn) => {
     // Recebe o evento 'e'
     toolButtons.forEach((b) => b.removeAttribute("active"));
     btn.setAttribute("active", "true");
-    window.ImageEngine.setActiveTool(btn.id);
+    window.Engine.setActiveTool(btn.id);
     updateSelectedToolUI();
     mainCanvas.style.cursor = ""; // Reset cursor on tool change
 
@@ -961,14 +958,14 @@ btnAddEmptyLayer.addEventListener("click", () => {
     alert("Create a project first");
     return;
   }
-  window.ImageEngine.createEmptyLayer();
+  window.Engine.createEmptyLayer();
 });
 
 // MODIFICADO: Adicionar atalhos de teclado
 document.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT") {
     // NOVO: Permite Enter/Escape mesmo focado nos inputs de transformação
-    if (window.ImageEngine.isTransforming()) {
+    if (window.Engine.isTransforming()) {
       if (e.key === "Enter") {
         e.preventDefault();
         // Remove o foco do input para aplicar o valor para transformação
@@ -984,7 +981,7 @@ document.addEventListener("keydown", (e) => {
   }
 
   // NOVO: Atalhos de Transformação (Enter/Escape)
-  if (window.ImageEngine.isTransforming()) {
+  if (window.Engine.isTransforming()) {
     if (e.key === "Enter") {
       e.preventDefault();
       document.getElementById("btnApplyTransform").click();
@@ -1017,7 +1014,7 @@ document.addEventListener("keydown", (e) => {
       // NOVO: Atalho para a tecla Delete
       case "delete":
         e.preventDefault();
-        window.ImageEngine.deleteSelectionContent();
+        window.Engine.deleteSelectionContent();
         break;
     }
   }
@@ -1030,33 +1027,33 @@ document.addEventListener("keydown", (e) => {
         e.preventDefault();
         const _activeProject = getActiveProject();
         if (_activeProject) {
-          window.ImageEngine.enterTransformMode();
+          window.Engine.enterTransformMode();
           updateSelectedToolUI(); // Atualiza a UI para mostrar a barra de transformação
         }
         break;
       case "a":
         e.preventDefault();
-        window.ImageEngine.selectAll();
+        window.Engine.selectAll();
         break;
       case "d":
         e.preventDefault();
-        window.ImageEngine.clearSelection();
+        window.Engine.clearSelection();
         break;
 
       case "c":
         e.preventDefault();
-        window.ImageEngine.copySelection();
+        window.Engine.copySelection();
         break;
 
       case "v":
         e.preventDefault();
-        window.ImageEngine.pasteFromClipboard();
+        window.Engine.pasteFromClipboard();
         break;
 
       // NOVO: Atalho para Recortar (Cut)
       case "x":
         e.preventDefault();
-        window.ImageEngine.cutSelection();
+        window.Engine.cutSelection();
         break;
 
       case "n":
@@ -1085,11 +1082,11 @@ document.addEventListener("keydown", (e) => {
         break;
       case "z":
         e.preventDefault();
-        if (isTransforming) return; // Não faz undo/redo durante transformação
+        if (window.Engine.isTransforming()) return; // Não faz undo/redo durante transformação
         if (e.shiftKey) {
-          window.ImageEngine.redo();
+          window.Engine.redo();
         } else {
-          window.ImageEngine.undo();
+          window.Engine.undo();
         }
         break;
     }
@@ -1101,10 +1098,10 @@ document.addEventListener("keydown", (e) => {
  */
 function updateSelectionModeFromKeys(e) {
   // Só executa se a ferramenta de seleção estiver ativa
-  if (window.ImageEngine.getActiveToolId() !== "selectTool") return;
+  if (window.Engine.getActiveToolId() !== "selectTool") return;
 
   // Não muda o modo se o usuário já estiver no meio de um arrasto de seleção
-  if (window.ImageEngine.isSelecting()) return;
+  if (window.Engine.isSelecting()) return;
 
   let newMode;
 
@@ -1121,10 +1118,10 @@ function updateSelectionModeFromKeys(e) {
   }
 
   // Pega o modo atual para evitar atualizações desnecessárias
-  const currentMode = window.ImageEngine.getToolState("selectTool").mode;
+  const currentMode = window.Engine.getToolState("selectTool").mode;
 
   if (newMode !== currentMode) {
-    window.ImageEngine.setToolOption("selectTool", "mode", newMode);
+    window.Engine.setToolOption("selectTool", "mode", newMode);
     updateSelectedToolUI(); // Atualiza a UI para mostrar o botão ativo correto
   }
 }
@@ -1149,8 +1146,8 @@ document.addEventListener("keyup", (e) => {
 // --- NOVO: LÓGICA DE PRÉ-VISUALIZAÇÃO DO PINCEL ---
 
 function updateBrushPreview(e) {
-  const activeToolId = window.ImageEngine.getActiveToolId();
-  const toolState = window.ImageEngine.getToolState(activeToolId);
+  const activeToolId = window.Engine.getActiveToolId();
+  const toolState = window.Engine.getToolState(activeToolId);
 
   if (!toolState || typeof toolState.size === "undefined") {
     brushPreview.style.display = "none";
@@ -1158,7 +1155,7 @@ function updateBrushPreview(e) {
   }
 
   // Esconde a pré-visualização se não está no canvas
-  if (e.target !== canvas && !canvas.contains(e.target)) {
+  if (e.target !== mainCanvas && !mainCanvas.contains(e.target)) {
     brushPreview.style.display = "none";
     return;
   }
@@ -1173,7 +1170,7 @@ function updateBrushPreview(e) {
     brushPreview.style.borderRadius = "50%";
   }
 
-  const engineState = window.ImageEngine.getState();
+  const engineState = window.Engine.getState();
   const currentScale = engineState.scale;
 
   let effectiveSize = toolState.size;
@@ -1191,8 +1188,8 @@ function updateBrushPreview(e) {
 
   // Snap preview to pixel grid for pencil tool
   if (isPencilMode) {
-    if (window.ImageEngine.screenToProject) {
-      const projectCoords = window.ImageEngine.screenToProject(x, y);
+    if (window.Engine.screenToProject) {
+      const projectCoords = window.Engine.screenToProject(x, y);
       const snappedProjectX = Math.floor(projectCoords.x);
       const snappedProjectY = Math.floor(projectCoords.y);
 
@@ -1209,7 +1206,7 @@ function updateBrushPreview(e) {
         centerY = snappedProjectY;
       }
 
-      const screenCoords = window.ImageEngine.projectToScreen(centerX, centerY);
+      const screenCoords = window.Engine.projectToScreen(centerX, centerY);
       x = screenCoords.x;
       y = screenCoords.y;
     }
@@ -1233,7 +1230,7 @@ function updateBrushPreview(e) {
 canvasContainer.addEventListener("mouseenter", (e) => {
   // Armazena o evento para o caso de um atalho de teclado ser usado
   lastMouseEvent = e;
-  const activeToolId = window.ImageEngine.getActiveToolId();
+  const activeToolId = window.Engine.getActiveToolId();
   if (
     activeToolId === "brushTool" ||
     activeToolId === "eraserTool" ||
@@ -1252,26 +1249,28 @@ canvasContainer.addEventListener("mousemove", (e) => {
   // Armazena continuamente o evento mais recente do mouse
   lastMouseEvent = e;
 
-  const activeToolId = window.ImageEngine.getActiveToolId();
+  const activeToolId = window.Engine.getActiveToolId();
   if (activeToolId === "selectTool") {
     const rect = canvasContainer.getBoundingClientRect();
     const canvasX = e.clientX - rect.left;
     const canvasY = e.clientY - rect.top - projectsTabs.offsetHeight;
-    if (window.ImageEngine.screenToProject) {
-      const projCoords = window.ImageEngine.screenToProject(canvasX, canvasY);
+    if (window.Engine.screenToProject) {
+      const projCoords = window.Engine.screenToProject(canvasX, canvasY);
 
       // CORREÇÃO: Apenas mostra o cursor de movimento se o modo permitir
-      const toolState = window.ImageEngine.getToolState("selectTool");
+      const toolState = window.Engine.getToolState("selectTool");
       const canMoveSelection =
         toolState.mode === "replace" || toolState.mode === "unite";
 
       if (
         canMoveSelection &&
-        window.ImageEngine.isPointInSelection(projCoords.x, projCoords.y)
+        window.Engine.isPointInSelection(projCoords.x, projCoords.y)
       ) {
-        mainCanvas.style.cursor = isTransforming ? "" : "move";
+        mainCanvas.style.cursor = window.Engine.isTransforming() ? "" : "move";
       } else {
-        mainCanvas.style.cursor = isTransforming ? "" : "crosshair";
+        mainCanvas.style.cursor = window.Engine.isTransforming()
+          ? ""
+          : "crosshair";
       }
     }
   } else {
@@ -1326,11 +1325,13 @@ canvasContainer.addEventListener("drop", (e) => {
       // Checa se é um tipo de imagem suportado
       if (file.type.startsWith("image/")) {
         // Usa a mesma lógica do paste externo: calcula o centro e cria a camada
-        const center = window.ImageEngine.screenToProject(
-          canvas.width / 2,
-          canvas.height / 2
+
+        // CORREÇÃO AQUI: Renomeado para window.Engine
+        const center = window.Engine.screenToProject(
+          mainCanvas.width / 2,
+          mainCanvas.height / 2
         );
-        window.ImageEngine.createLayerFromBlob(file, center, true);
+        window.Engine.createLayerFromBlob(file, center, true);
       }
     }
   }

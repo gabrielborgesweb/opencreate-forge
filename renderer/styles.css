@@ -177,6 +177,7 @@ button {
 
 #editor {
   flex: 1;
+  min-height: 0;
 }
 /* checkerboard background for canvas container */
 #canvasContainer {

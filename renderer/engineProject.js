@@ -28,8 +28,8 @@ export function createNewProject(context, w, h) {
       willReadFrequently: true,
     });
   }
-  context.selectionCanvas.width = context.projectWidth;
-  context.selectionCanvas.height = context.projectHeight;
+  // context.selectionCanvas.width = context.projectWidth;
+  // context.selectionCanvas.height = context.projectHeight;
 
   context.layers = [];
   context.activeLayer = null;
@@ -37,6 +37,8 @@ export function createNewProject(context, w, h) {
   if (typeof window.Engine.updateLayersPanel === "function") {
     window.Engine.updateLayersPanel();
   }
+
+  // resizeViewport(context);
   context.fitToScreen();
   context.draw();
   context.saveState();

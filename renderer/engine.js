@@ -124,7 +124,9 @@ const context = {
   startDrawing: null,
   processDrawing: null,
   stopDrawing: null,
+  resizeViewport: null,
 };
+window.context = context; // Expor o contexto
 
 // 3. Definir a Função de Renderização Principal (`draw`)
 function draw() {
@@ -315,6 +317,7 @@ context.localToWorld = (x, y) => Transform.localToWorld(context, x, y);
 context.startDrawing = (e) => Drawing.startDrawing(context, e);
 context.processDrawing = (e) => Drawing.processDrawing(context, e);
 context.stopDrawing = (e) => Drawing.stopDrawing(context, e);
+context.resizeViewport = () => Project.resizeViewport(context);
 
 // 5. Inicialização
 Input.attachInputListeners(context);
@@ -325,8 +328,6 @@ window.addEventListener("resize", (e) => {
   Project.resizeViewport(context);
   draw();
 });
-
-window.context = context; // Para depuração
 
 // 6. Expor a API Pública (`window.Engine`)
 window.Engine = {

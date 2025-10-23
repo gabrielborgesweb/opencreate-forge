@@ -569,6 +569,7 @@ function createProjectFromHome() {
 
   document.getElementById("zoomScale").style.display = "block";
   hideHomeScreen(); // Esconde a tela inicial
+  window.context.resizeViewport(window.context);
 }
 
 // New Project button

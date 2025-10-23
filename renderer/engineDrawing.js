@@ -253,15 +253,20 @@ export function processDrawing(context, e) {
     currentStrokeBounds,
   } = context;
 
-  const dist = Math.hypot(px - lastX, py - lastY);
-  if (dist < MIN_BRUSH_MOVE_DISTANCE) {
-    return;
-  }
-
+  // Precisamos saber se é o modo lápis ANTES da verificação de distância.
   const toolOptions = tools[activeToolId];
   const isPencilMode =
     activeToolId === "pencilTool" ||
     (activeToolId === "eraserTool" && toolOptions.mode === "pencil");
+
+  const dist = Math.hypot(px - lastX, py - lastY);
+
+  // Se NÃO for o modo lápis, aplicamos a otimização de distância.
+  // Se FOR o modo lápis, pulamos esta verificação para permitir
+  // que o Bresenham atue em cada pixel.
+  if (!isPencilMode && dist < MIN_BRUSH_MOVE_DISTANCE) {
+    return;
+  }
 
   let effectiveSize;
   if (isPencilMode) {

@@ -1184,13 +1184,28 @@ function updateBrushPreview(e) {
   const previewSize = effectiveSize * currentScale;
 
   const rect = canvasContainer.getBoundingClientRect();
-  let x = e.clientX - rect.left;
-  let y = e.clientY - rect.top;
+  // Coordenadas do mouse relativas ao canvasContainer
+  let mouseX = e.clientX - rect.left;
+  let mouseY = e.clientY - rect.top;
+
+  // 1. Coordenadas do mouse relativas ao #mainCanvas (para a engine)
+  const tabsHeight = projectsTabs ? projectsTabs.offsetHeight : 0;
+  const canvasMouseX = mouseX;
+  const canvasMouseY = mouseY - tabsHeight; // Subtrai a altura das abas
+
+  let finalScreenX = mouseX;
+  let finalScreenY = mouseY;
 
   // Snap preview to pixel grid for pencil tool
   if (isPencilMode) {
-    if (window.Engine.screenToProject) {
-      const projectCoords = window.Engine.screenToProject(x, y);
+    if (window.Engine.screenToProject && window.Engine.projectToScreen) {
+      // 2. Converte a coordenada do mouse (relativa ao #mainCanvas) para o espaço do projeto
+      const projectCoords = window.Engine.screenToProject(
+        canvasMouseX,
+        canvasMouseY
+      );
+
+      // 3. Arredonda para o pixel (top-left)
       const snappedProjectX = Math.floor(projectCoords.x);
       const snappedProjectY = Math.floor(projectCoords.y);
 
@@ -1198,25 +1213,29 @@ function updateBrushPreview(e) {
       let centerX, centerY;
 
       if (size % 2 !== 0) {
-        // Odd size: center of pixel
+        // 4. (Odd) Calcula o centro do pixel: (X + 0.5, Y + 0.5)
         centerX = snappedProjectX + 0.5;
         centerY = snappedProjectY + 0.5;
       } else {
-        // Even size: top-left corner of pixel (matches drawing logic)
+        // 4. (Even) Calcula o centro do bloco NxN: (X, Y)
         centerX = snappedProjectX;
         centerY = snappedProjectY;
       }
 
+      // 5. Converte o centro do pixel/bloco de volta para coordenadas de tela (relativas ao #mainCanvas)
       const screenCoords = window.Engine.projectToScreen(centerX, centerY);
-      x = screenCoords.x;
-      y = screenCoords.y;
+
+      // 6. Define a posição final da preview (relativa ao #canvasContainer)
+      // Adicionamos a altura das abas de volta, pois o preview é posicionado em relação ao container
+      finalScreenX = screenCoords.x;
+      finalScreenY = screenCoords.y + tabsHeight;
     }
   }
 
   brushPreview.style.width = `${previewSize}px`;
   brushPreview.style.height = `${previewSize}px`;
-  brushPreview.style.left = `${x}px`;
-  brushPreview.style.top = `${y}px`;
+  brushPreview.style.left = `${finalScreenX}px`;
+  brushPreview.style.top = `${finalScreenY}px`;
 
   // Garante que a pré-visualização esteja visível se for uma ferramenta de desenho
   if (

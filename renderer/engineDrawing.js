@@ -8,24 +8,27 @@ export function drawDab(context, ctx, x, y, radius, hardness, color) {
   let opaque, mid, transparent;
 
   if (ctx.globalCompositeOperation === "destination-out") {
+    // Para a borracha
     opaque = "rgba(0,0,0,1)";
-    mid = "rgba(0,0,0,0.25)";
     transparent = "rgba(0,0,0,0)";
   } else {
+    // Para o pincel
     opaque = context.hexToRgba(color, 1);
-    mid = context.hexToRgba(color, 0.25);
     transparent = context.hexToRgba(color, 0);
   }
 
+  // --- CORREÇÃO (Parte 1) ---
+  // O centro (0) é sempre opaco.
   gradient.addColorStop(0, opaque);
+
+  // O núcleo opaco se estende até 'innerStop'.
+  // (Para hardness 0%, innerStop é 0, então este passo não faz nada, o que é correto)
   gradient.addColorStop(innerStop, opaque);
 
-  if (innerStop < 1.0) {
-    const midStop = innerStop + (1.0 - innerStop) * 0.5;
-    gradient.addColorStop(midStop, mid);
-  }
-
+  // O restante (de innerStop até 1.0) é uma queda LINEAR para transparente.
+  // Isso cria o "blur" suave da imagem azul, em vez do "hotspot" da imagem vermelha.
   gradient.addColorStop(1, transparent);
+  // --- FIM DA CORREÇÃO ---
 
   ctx.fillStyle = gradient;
   ctx.beginPath();
@@ -170,9 +173,22 @@ export function drawBrushStroke(context, x, y) {
       const color = toolOptions.color || "#000000";
       const dist = Math.hypot(localX - localLastX, localY - localLastY);
       const angle = Math.atan2(localY - localLastY, localX - localLastX);
+
+      // --- CORREÇÃO (Parte 2) ---
+      // (Esta é a correção da nossa conversa anterior, que DEVE ser mantida)
+
+      // O raio é baseado no 'size', não no 'effectiveSize'.
+      const radius = size;
+
+      // O espaçamento é baseado no raio real (25% do raio).
+      const spacing = Math.max(1, radius * 0.25);
+
+      /* CÓDIGO ANTIGO REMOVIDO:
       const effectiveSize = size * (1 + (1 - hardness) * 0.5);
       const radius = effectiveSize / 2;
       const spacing = Math.max(1, (size / 2) * 0.25);
+      */
+      // --- FIM DA CORREÇÃO ---
 
       for (let i = 0; i < dist; i += spacing) {
         const px = localLastX + Math.cos(angle) * i;

@@ -1,5 +1,5 @@
-const { app, BrowserWindow, dialog, ipcMain } = require("electron");
-const fs = require("fs");
+const { app, BrowserWindow, dialog, ipcMain, Menu } = require("electron");
+const fs = require("fs").promises;
 const path = require("path");
 
 function createWindow() {
@@ -32,13 +32,104 @@ function createWindow() {
         "--forced-compositing-mode",
         "--disable-raf-throttling",
         "--in-process-gpu",
-        // "--disable-frame-rate-limit",
+        "--disable-frame-rate-limit",
         "--enable-logging",
       ],
     },
   });
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
   win.maximize();
+
+  const isMac = process.platform === "darwin";
+
+  // const template = [
+  //   // { role: 'appMenu' } (Menu padrão do Mac)
+  //   ...(isMac
+  //     ? [
+  //         {
+  //           label: app.name,
+  //           submenu: [
+  //             { role: "about" },
+  //             { type: "separator" },
+  //             { role: "services" },
+  //             { type: "separator" },
+  //             { role: "hide" },
+  //             { role: "hideOthers" },
+  //             { role: "unhide" },
+  //             { type: "separator" },
+  //             { role: "quit" },
+  //           ],
+  //         },
+  //       ]
+  //     : []),
+  //   // { role: 'fileMenu' }
+  //   {
+  //     label: "File",
+  //     submenu: [
+  //       // Você pode conectar estes itens a IPC handlers se quiser
+  //       // { label: 'New Project', accelerator: 'CmdOrCtrl+N', click: () => { win.webContents.send('menu-action', 'new-project'); } },
+  //       // { label: 'Open Image...', accelerator: 'CmdOrCtrl+O', click: () => { win.webContents.send('menu-action', 'open-image'); } },
+  //       // { label: 'Save Image...', accelerator: 'CmdOrCtrl+S', click: () => { win.webContents.send('menu-action', 'save-image'); } },
+  //       { type: "separator" },
+  //       isMac ? { role: "close" } : { role: "quit" }, // 'close' é Cmd+W, 'quit' é Alt+F4
+  //     ],
+  //   },
+  //   // { role: 'viewMenu' } (ESSENCIAL PARA DEBUG)
+  //   {
+  //     label: "View",
+  //     submenu: [
+  //       { role: "reload" },
+  //       { role: "forceReload" },
+  //       { role: "toggleDevTools" },
+  //       { type: "separator" },
+  //       { role: "resetZoom" },
+  //       { role: "zoomIn" },
+  //       { role: "zoomOut" },
+  //       { type: "separator" },
+  //       { role: "togglefullscreen" },
+  //     ],
+  //   },
+  //   // { role: 'windowMenu' }
+  //   {
+  //     label: "Window",
+  //     submenu: [
+  //       { role: "minimize" },
+  //       ...(isMac
+  //         ? [
+  //             { type: "separator" },
+  //             { role: "front" },
+  //             { type: "separator" },
+  //             { role: "window" },
+  //           ]
+  //         : [{ role: "close" }]),
+  //     ],
+  //   },
+  // ];
+
+  // const template = [
+  //   ...(isMac
+  //     ? [
+  //         {
+  //           label: app.name,
+  //           submenu: [
+  //             { role: "about" },
+  //             { type: "separator" },
+  //             { role: "services" },
+  //             { type: "separator" },
+  //             { role: "hide" },
+  //             { role: "hideOthers" },
+  //             { role: "unhide" },
+  //             { type: "separator" },
+  //             { role: "quit" },
+  //           ],
+  //         },
+  //       ]
+  //     : []),
+  // ]; // Menu simples
+
+  // const menu = Menu.buildFromTemplate(template);
+  // Menu.setApplicationMenu(menu);
+
   win.setMenu(null);
 }
 
@@ -80,7 +171,7 @@ app.whenReady().then(() => {
     const base64Data = matches[2];
     const buffer = Buffer.from(base64Data, "base64");
     try {
-      fs.writeFileSync(filePath, buffer);
+      await fs.writeFile(filePath, buffer); // Previne congelamento da aplicação enquanto escreve o arquivo
       return { success: true, filePath };
     } catch (err) {
       return { success: false, error: err.message };
@@ -101,4 +192,17 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   app.quit();
+});
+
+// Limita a criação de novas janelas e navegação
+app.on("web-contents-created", (event, contents) => {
+  contents.on("will-navigate", (event, navigationUrl) => {
+    // Previne navegação. Sua app só deve carregar 'index.html'
+    event.preventDefault();
+  });
+
+  contents.setWindowOpenHandler(({ url }) => {
+    // Previne que 'window.open()' funcione
+    return { action: "deny" };
+  });
 });

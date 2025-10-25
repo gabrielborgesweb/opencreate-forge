@@ -103,16 +103,33 @@ export function drawBrushStroke(context, x, y) {
             ctx.fillRect(x0 - dx, y0 + dy, 2 * dx + 1, 1);
           }
         } else {
+          // Lógica de scanline O(N) para tamanhos pares
           const radius = size / 2;
           const topLeftX = x0 - radius;
           const topLeftY = y0 - radius;
+
+          // Iteramos 'size' vezes (O(N)), e não 'size*size'
           for (let y = 0; y < size; y++) {
-            for (let x = 0; x < size; x++) {
-              const dist_x = x + 0.5 - radius;
-              const dist_y = y + 0.5 - radius;
-              if (dist_x * dist_x + dist_y * dist_y <= radius * radius) {
-                ctx.fillRect(topLeftX + x, topLeftY + y, 1, 1);
-              }
+            // 1. Encontra a distância y do centro
+            const dist_y = y + 0.5 - radius;
+
+            // 2. Calcula o 'dx' máximo (largura do scanline) usando a equação do círculo
+            const max_dist_x_sq = radius * radius - dist_y * dist_y;
+
+            // Se negativo, a linha está fora do círculo
+            if (max_dist_x_sq < 0) continue;
+
+            const max_dist_x = Math.sqrt(max_dist_x_sq);
+
+            // 3. Encontra os pixels x inicial e final para este scanline
+            // Resolvemos a equação: -max_dist_x <= x + 0.5 - radius <= max_dist_x
+            const x_min = Math.ceil(-max_dist_x + radius - 0.5);
+            const x_max = Math.floor(max_dist_x + radius - 0.5);
+
+            // 4. Desenha o scanline de uma só vez
+            const draw_width = x_max - x_min + 1;
+            if (draw_width > 0) {
+              ctx.fillRect(topLeftX + x_min, topLeftY + y, draw_width, 1);
             }
           }
         }

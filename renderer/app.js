@@ -84,6 +84,48 @@ window.updateTransformUI = () => {
   if (anchorSelect) anchorSelect.value = state.anchorString;
 };
 
+// NOVO: Adicionar este callback global para o Corte
+window.updateCropUI = () => {
+  if (!window.Engine || !window.Engine.isCropping()) return;
+
+  const state = window.Engine.getCropState();
+  if (!state) return;
+
+  const xInput = document.getElementById("cropPositionXNumber");
+  const yInput = document.getElementById("cropPositionYNumber");
+  const wInput = document.getElementById("cropSizeWidthNumber");
+  const hInput = document.getElementById("cropSizeHeightNumber");
+  const aInput = document.getElementById("cropAngleNumber");
+  const anchorSelect = document.getElementById("cropAnchorSelect");
+
+  if (xInput) xInput.value = state.x.toFixed(2);
+  if (yInput) yInput.value = state.y.toFixed(2);
+  if (wInput) wInput.value = (state.scaleX * 100).toFixed(2);
+  if (hInput) hInput.value = (state.scaleY * 100).toFixed(2);
+  if (aInput) aInput.value = state.rotation.toFixed(2);
+  if (anchorSelect) anchorSelect.value = state.anchorString;
+};
+
+// --- INÍCIO DA CORREÇÃO (BUG 3) ---
+// Adicione esta função em algum lugar no escopo global do app.js
+/** Encontra o Maior Divisor Comum para simplificar proporções */
+function gcd(a, b) {
+  a = Math.abs(Math.round(a));
+  b = Math.abs(Math.round(b));
+  if (b > a) {
+    let temp = a;
+    a = b;
+    b = temp;
+  }
+  while (true) {
+    if (b == 0) return a;
+    a %= b;
+    if (a == 0) return b;
+    b %= a;
+  }
+}
+// --- FIM DA CORREÇÃO (BUG 3) ---
+
 function showTransformUI() {
   const transformState = window.Engine.getTransformState();
   if (!transformState) return;
@@ -193,6 +235,210 @@ function showTransformUI() {
   anchorSelect.addEventListener("change", (e) =>
     window.Engine.setTransformAnchor(e.target.value)
   );
+}
+
+function showCropUI() {
+  const cropState = window.Engine.getCropState();
+  if (!cropState) return;
+  const toolState = window.Engine.getToolState("cropTool");
+
+  selectedToolDiv.innerHTML = `
+    <span style="margin-left: 10px; font-weight: 600;">Crop Tool</span>
+
+    <div class="form-group flex" style="margin-left: 10px; flex-direction: row; align-items: center; gap: 4px;">
+      <label for="cropModeSelect">Mode:</label>
+      <select id="cropModeSelect" style="background: #333; border: 1px solid #555; border-radius: 4px; color: #fff; padding: 2px;"> <option value="Free" ${
+        toolState.mode === "Free" ? "selected" : ""
+      }>Free</option>
+        <option value="Fixed Ratio" ${
+          toolState.mode === "Fixed Ratio" ? "selected" : ""
+        }>Fixed Ratio</option>
+      </select>
+      <input type="number" id="cropRatioW" class="value-input" style="width: 3.5rem;" value="${
+        toolState.ratioW
+      }">
+      <span>:</span>
+      <input type="number" id="cropRatioH" class="value-input" style="width: 3.5rem;" value="${
+        toolState.ratioH
+      }">
+    </div>
+
+    <div id="anchor-container" class="numeric-slider">
+      <label for="cropAnchorSelect" style="margin-left: 10px">Anchor:</label>
+      <select id="cropAnchorSelect" style="background: #333; border: 1px solid #555; border-radius: 4px; color: #fff; padding: 2px;">
+        <option value="top-left">Top Left</option>
+        <option value="top-middle">Top Middle</option>
+        <option value="top-right">Top Right</option>
+        <option value="center-left">Center Left</option>
+        <option value="center-middle">Center</option>
+        <option value="center-right">Center Right</option>
+        <option value="bottom-left">Bottom Left</option>
+        <option value="bottom-middle">Bottom Middle</option>
+        <option value="bottom-right">Bottom Right</option>
+      </select>
+    </div>
+
+    <div id="position-x-container" class="numeric-slider">
+      <label for="cropPositionXNumber" style="margin-left: 10px">X:</label>
+      <input type="number" step="0.1" id="cropPositionXNumber" class="value-input" style="width: 50px;" />
+      <span class="unit">px</span>
+    </div>
+    <div id="position-y-container" class="numeric-slider">
+      <label for="cropPositionYNumber" style="margin-left: 0px">Y:</label>
+      <input type="number" step="0.1" id="cropPositionYNumber" class="value-input" style="width: 50px;" />
+      <span class="unit">px</span>
+    </div>
+
+    <div id="size-w-container" class="numeric-slider">
+      <label for="cropSizeWidthNumber" style="margin-left: 10px">W:</label>
+      <input type="number" step="0.1" id="cropSizeWidthNumber" class="value-input" style="width: 50px;" />
+      <span class="unit">%</span>
+    </div>
+    <div id="size-h-container" class="numeric-slider">
+      <label for="cropSizeHeightNumber" style="margin-left: 0px">H:</label>
+      <input type="number" step="0.1" id="cropSizeHeightNumber" class="value-input" style="width: 50px;" />
+      <span class="unit">%</span>
+    </div>
+
+    <div id="angle-container" class="numeric-slider">
+      <label for="cropAngleNumber" style="margin-left: 10px">A:</label>
+      <input type="number" step="0.1" id="cropAngleNumber" class="value-input" style="width: 50px;" />
+      <span class="unit">deg</span>
+    </div>
+
+    <div class="form-group flex" style="margin-left: 10px; flex-direction: row; align-items: center; gap: 4px;">
+       <input type="checkbox" id="cropDeletePixels" ${
+         toolState.deleteCropped ? "checked" : ""
+       } />
+       <label for="cropDeletePixels">Delete Cropped Pixels</label>
+    </div>
+
+    <div id="actions-container" style="margin-left: 10px; display: flex; gap: 8px; padding-right: 10px;">
+      <button id="btnCancelCrop">Cancel</button>
+      <button id="btnApplyCrop" style="background: var(--accent-color); color: white;">Apply</button>
+    </div>
+  `;
+
+  // 2. Popula os valores iniciais
+  window.updateCropUI(); // Usa a função global para preencher os valores
+
+  // 3. Adiciona listeners
+  const xInput = document.getElementById("cropPositionXNumber");
+  const yInput = document.getElementById("cropPositionYNumber");
+  const wInput = document.getElementById("cropSizeWidthNumber");
+  const hInput = document.getElementById("cropSizeHeightNumber");
+  const aInput = document.getElementById("cropAngleNumber");
+  const anchorSelect = document.getElementById("cropAnchorSelect");
+  const modeSelect = document.getElementById("cropModeSelect");
+  const ratioWInput = document.getElementById("cropRatioW");
+  const ratioHInput = document.getElementById("cropRatioH");
+  const deleteCheck = document.getElementById("cropDeletePixels");
+
+  // Funções helper para UI
+  const updateRatioInputsVisibility = () => {
+    const show = modeSelect.value === "Fixed Ratio";
+    ratioWInput.style.display = show ? "block" : "none";
+    ratioHInput.style.display = show ? "block" : "none";
+    // Correção: Encontrar o elemento ':' de forma mais segura
+    const colon = ratioWInput.nextElementSibling;
+    if (colon && colon.tagName === "SPAN") {
+      colon.style.display = show ? "block" : "none";
+    }
+  };
+  updateRatioInputsVisibility();
+
+  // Botões de Ação
+  document.getElementById("btnCancelCrop").addEventListener("click", () => {
+    window.Engine.cancelCrop();
+    updateSelectedToolUI();
+  });
+
+  document.getElementById("btnApplyCrop").addEventListener("click", () => {
+    window.Engine.applyCrop().then(() => {
+      updateSelectedToolUI();
+    });
+  });
+
+  // Inputs
+  xInput.addEventListener("change", (e) =>
+    window.Engine.setCropNumeric("x", parseFloat(e.target.value))
+  );
+  yInput.addEventListener("change", (e) =>
+    window.Engine.setCropNumeric("y", parseFloat(e.target.value))
+  );
+  wInput.addEventListener("change", (e) =>
+    window.Engine.setCropNumeric("scaleX", parseFloat(e.target.value) / 100)
+  );
+  hInput.addEventListener("change", (e) =>
+    window.Engine.setCropNumeric("scaleY", parseFloat(e.target.value) / 100)
+  );
+  aInput.addEventListener("change", (e) =>
+    window.Engine.setCropNumeric("rotation", parseFloat(e.target.value))
+  );
+  anchorSelect.addEventListener("change", (e) =>
+    window.Engine.setCropAnchor(e.target.value)
+  );
+
+  // Opções da Ferramenta
+  modeSelect.addEventListener("change", (e) => {
+    const newMode = e.target.value;
+    window.Engine.setToolOption("cropTool", "mode", newMode);
+
+    // --- INÍCIO DA CORREÇÃO (BUG 3) ---
+    if (newMode === "Fixed Ratio") {
+      // Pega o estado *atual* do crop
+      const currentState = window.Engine.getCropState();
+      if (currentState) {
+        const currentW = currentState.width * currentState.scaleX;
+        const currentH = currentState.height * currentState.scaleY;
+
+        // Encontra o GCD para simplificar (ex: 400x300 -> 4:3)
+        const commonDivisor = gcd(currentW, currentH);
+        let newRatioW = commonDivisor === 0 ? 1 : currentW / commonDivisor;
+        let newRatioH = commonDivisor === 0 ? 1 : currentH / commonDivisor;
+
+        // Evita proporção 0 ou negativa
+        if (newRatioW <= 0) newRatioW = 1;
+        if (newRatioH <= 0) newRatioH = 1;
+
+        // Define as novas proporções na engine
+        window.Engine.setToolOption("cropTool", "ratioW", newRatioW);
+        window.Engine.setToolOption("cropTool", "ratioH", newRatioH);
+
+        // Atualiza os inputs na UI
+        ratioWInput.value = newRatioW;
+        ratioHInput.value = newRatioH;
+      }
+    }
+    // --- FIM DA CORREÇÃO (BUG 3) ---
+
+    updateRatioInputsVisibility();
+  });
+  ratioWInput.addEventListener("change", (e) => {
+    window.Engine.setToolOption(
+      "cropTool",
+      "ratioW",
+      parseFloat(e.target.value) || 1
+    );
+    // ADICIONAR ESTA LINHA:
+    // "basedOn: 'width'" diz ao motor para manter a largura atual
+    // e ajustar a altura de acordo com a nova proporção.
+    window.Engine.applyCropRatio("width");
+  });
+  ratioHInput.addEventListener("change", (e) => {
+    window.Engine.setToolOption(
+      "cropTool",
+      "ratioH",
+      parseFloat(e.target.value) || 1
+    );
+    // ADICIONAR ESTA LINHA:
+    // "basedOn: 'height'" diz ao motor para manter a altura atual
+    // e ajustar a largura de acordo com a nova proporção.
+    window.Engine.applyCropRatio("height");
+  });
+  deleteCheck.addEventListener("change", (e) => {
+    window.Engine.setToolOption("cropTool", "deleteCropped", e.target.checked);
+  });
 }
 
 function getActiveProject() {
@@ -372,6 +618,11 @@ homeTab.addEventListener("click", () => {
     );
     return;
   }
+  // Verifica se está cortando
+  if (window.Engine.isCropping()) {
+    alert("Finish or cancel the current cropping before switching projects.");
+    return;
+  }
 
   // --- SALVAR ESTADO ANTES DE TROCAR PARA HOME ---
   const currentProject = getActiveProject();
@@ -475,6 +726,11 @@ function createProjectFromHome() {
       alert(
         "Finish or cancel the current transformation before switching projects."
       );
+      return;
+    }
+    // Verifica se está cortando
+    if (window.Engine.isCropping()) {
+      alert("Finish or cancel the current cropping before switching projects.");
       return;
     }
 
@@ -709,8 +965,24 @@ function updateSelectedToolUI() {
     return;
   }
 
+  if (window.Engine.isCropping()) {
+    showCropUI();
+    return;
+  }
+
   const activeToolId = window.Engine.getActiveToolId();
   const toolState = window.Engine.getToolState(activeToolId);
+
+  // Sincroniza o botão "active" na barra de ferramentas da esquerda
+  // com o estado atual da engine.
+  toolButtons.forEach((btn) => {
+    if (btn.id === activeToolId) {
+      btn.setAttribute("active", "true");
+    } else {
+      btn.removeAttribute("active");
+    }
+  });
+
   const activeToolButton = document.getElementById(activeToolId);
 
   // Limpa a div de opções se nenhuma ferramenta estiver ativa
@@ -787,6 +1059,87 @@ function updateSelectedToolUI() {
     });
     return; // Finaliza a função aqui para não processar outras ferramentas
   }
+
+  // --- INÍCIO DA CORREÇÃO (RECURSO 2): UI Ociosa para Crop Tool ---
+  else if (activeToolId === "cropTool") {
+    // Esta é a UI para quando a ferramenta está selecionada,
+    // mas o modo de corte (isCropping) ainda não está ativo.
+    selectedToolDiv.innerHTML = `
+      <span style="margin-left: 10px;">${toolName}</span>
+
+      <div class="form-group flex" style="margin-left: 10px; flex-direction: row; align-items: center; gap: 4px;">
+        <label for="cropModeSelect">Mode:</label>
+        <select id="cropModeSelect" style="background: #333; border: 1px solid #555; border-radius: 4px; color: #fff; padding: 2px;"> <option value="Free" ${
+          toolState.mode === "Free" ? "selected" : ""
+        }>Free</option>
+          <option value="Fixed Ratio" ${
+            toolState.mode === "Fixed Ratio" ? "selected" : ""
+          }>Fixed Ratio</option>
+        </select>
+        <input type="number" id="cropRatioW" class="value-input" style="width: 3.5rem;" value="${
+          toolState.ratioW
+        }">
+        <span>:</span>
+        <input type="number" id="cropRatioH" class="value-input" style="width: 3.5rem;" value="${
+          toolState.ratioH
+        }">
+      </div>
+      
+      <div class="form-group flex" style="margin-left: 10px; flex-direction: row; align-items: center; gap: 4px;">
+         <input type="checkbox" id="cropDeletePixels" ${
+           toolState.deleteCropped ? "checked" : ""
+         } />
+         <label for="cropDeletePixels">Delete Cropped Pixels</label>
+      </div>
+    `;
+
+    // Adiciona listeners para estes controles
+    const modeSelect = document.getElementById("cropModeSelect");
+    const ratioWInput = document.getElementById("cropRatioW");
+    const ratioHInput = document.getElementById("cropRatioH");
+    const deleteCheck = document.getElementById("cropDeletePixels");
+
+    const updateRatioInputsVisibility = () => {
+      const show = modeSelect.value === "Fixed Ratio";
+      ratioWInput.style.display = show ? "block" : "none";
+      ratioHInput.style.display = show ? "block" : "none";
+      // Correção: Encontrar o elemento ':' de forma mais segura
+      const colon = ratioWInput.nextElementSibling;
+      if (colon && colon.tagName === "SPAN") {
+        colon.style.display = show ? "block" : "none";
+      }
+    };
+    updateRatioInputsVisibility();
+
+    modeSelect.addEventListener("change", (e) => {
+      window.Engine.setToolOption("cropTool", "mode", e.target.value);
+      updateRatioInputsVisibility();
+    });
+    ratioWInput.addEventListener("change", (e) => {
+      window.Engine.setToolOption(
+        "cropTool",
+        "ratioW",
+        parseFloat(e.target.value) || 1
+      );
+    });
+    ratioHInput.addEventListener("change", (e) => {
+      window.Engine.setToolOption(
+        "cropTool",
+        "ratioH",
+        parseFloat(e.target.value) || 1
+      );
+    });
+    deleteCheck.addEventListener("change", (e) => {
+      window.Engine.setToolOption(
+        "cropTool",
+        "deleteCropped",
+        e.target.checked
+      );
+    });
+
+    return; // Finaliza a função
+  }
+  // --- FIM DA CORREÇÃO ---
 
   // --- LÓGICA PARA AS OUTRAS FERRAMENTAS (permanece a mesma) ---
   // Se a ferramenta ativa não for a de seleção, limpa o conteúdo e
@@ -938,9 +1291,34 @@ function updateSelectedToolUI() {
 toolButtons.forEach((btn) => {
   btn.addEventListener("click", (e) => {
     // Recebe o evento 'e'
+    if (window.Engine.isTransforming()) {
+      alert("Apply or Cancel the current transformation first.");
+      e.stopImmediatePropagation(); // Impede que a ferramenta seja trocada
+      return;
+    }
+    if (window.Engine.isCropping()) {
+      alert("Apply or Cancel the current crop first.");
+      e.stopImmediatePropagation();
+      return;
+    }
+
     toolButtons.forEach((b) => b.removeAttribute("active"));
     btn.setAttribute("active", "true");
+
+    // --- CORREÇÃO (RECURSO 2) ---
+    // Apenas seleciona a ferramenta. A engine (via input)
+    // decidirá quando entrar no modo de corte.
     window.Engine.setActiveTool(btn.id);
+    // --- FIM DA CORREÇÃO ---
+
+    /* --- CÓDIGO ANTIGO QUE VOCÊ TINHA ---
+    if (btn.id === "cropTool") {
+      window.Engine.enterCropMode();
+    } else {
+      window.Engine.setActiveTool(btn.id);
+    }
+    */
+
     updateSelectedToolUI();
     mainCanvas.style.cursor = ""; // Reset cursor on tool change
 
@@ -995,6 +1373,19 @@ document.addEventListener("keydown", (e) => {
     }
   }
 
+  if (window.Engine.isCropping()) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      document.getElementById("btnApplyCrop").click();
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      document.getElementById("btnCancelCrop").click();
+      return;
+    }
+  }
+
   if (!e.ctrlKey && !e.metaKey && !e.altKey) {
     switch (e.key.toLowerCase()) {
       case "v":
@@ -1002,6 +1393,9 @@ document.addEventListener("keydown", (e) => {
         break;
       case "m":
         document.getElementById("selectTool").click();
+        break;
+      case "c": // <-- ADICIONAR ATALHO DE CORTE
+        document.getElementById("cropTool").click();
         break;
       case "b":
         document.getElementById("brushTool").click();
@@ -1084,6 +1478,7 @@ document.addEventListener("keydown", (e) => {
       case "z":
         e.preventDefault();
         if (window.Engine.isTransforming()) return; // Não faz undo/redo durante transformação
+        if (window.Engine.isCropping()) return; // Não faz undo/redo durante corte
         if (e.shiftKey) {
           window.Engine.redo();
         } else {

@@ -4,7 +4,7 @@
 export function getCheckerPattern(context) {
   const { ctx } = context;
   if (!context.checkerPattern) {
-    const size = 10;
+    const size = 8;
     const patternCanvas = document.createElement("canvas");
     patternCanvas.width = size * 2;
     patternCanvas.height = size * 2;
@@ -95,11 +95,13 @@ export function drawTransformControls(context) {
   const width = t.width * t.scaleX;
   const height = t.height * t.scaleY;
 
+  // Borda externa
   ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
   ctx.lineWidth = 1 / scale;
   ctx.setLineDash([]);
   ctx.strokeRect(left, top, width, height);
 
+  // Alça
   const handleSize = TRANSFOM_HANDLE_SIZE_PROJ / scale;
   ctx.fillStyle = "white";
   ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
@@ -118,6 +120,96 @@ export function drawTransformControls(context) {
   ctx.stroke();
 
   const handles = context.getTransformHandles(true); // Pede handles locais
+
+  // Controles de escala
+  handles.forEach((handle) => {
+    if (handle.name === "rotate") return;
+    ctx.fillRect(
+      handle.x - handleSize / 2,
+      handle.y - handleSize / 2,
+      handleSize,
+      handleSize
+    );
+    ctx.strokeRect(
+      handle.x - handleSize / 2,
+      handle.y - handleSize / 2,
+      handleSize,
+      handleSize
+    );
+  });
+
+  // Controle de rotação
+  const rotHandle = handles.find((h) => h.name === "rotate");
+  if (rotHandle) {
+    ctx.beginPath();
+    ctx.moveTo(rotHandle.x, rotHandle.y + handleSize / 2);
+    ctx.lineTo(rotHandle.x, rotHandle.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(rotHandle.x, rotHandle.y, handleSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/** ADICIONAR: Desenha os controles de corte */
+export function drawCropControls(context) {
+  const { cropState, ctx, scale, TRANSFOM_HANDLE_SIZE_PROJ } = context;
+  const t = cropState.currentCrop;
+
+  ctx.save();
+  ctx.translate(t.x, t.y);
+  ctx.rotate((t.rotation * Math.PI) / 180);
+
+  const left = -t.width * t.anchor.x * t.scaleX;
+  const top = -t.height * t.anchor.y * t.scaleY;
+  const width = t.width * t.scaleX;
+  const height = t.height * t.scaleY;
+
+  // Borda externa
+  ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
+  ctx.lineWidth = 1 / scale;
+  ctx.setLineDash([]);
+  ctx.strokeRect(left, top, width, height);
+
+  // --- Guia de Terços ---
+  ctx.strokeStyle = "rgba(0, 120, 255, 0.4)";
+  ctx.lineWidth = 1 / scale;
+  ctx.beginPath();
+  // Verticais
+  ctx.moveTo(left + width / 3, top);
+  ctx.lineTo(left + width / 3, top + height);
+  ctx.moveTo(left + (2 * width) / 3, top);
+  ctx.lineTo(left + (2 * width) / 3, top + height);
+  // Horizontais
+  ctx.moveTo(left, top + height / 3);
+  ctx.lineTo(left + width, top + height / 3);
+  ctx.moveTo(left, top + (2 * height) / 3);
+  ctx.lineTo(left + width, top + (2 * height) / 3);
+  ctx.stroke();
+  // --- Fim da Guia de Terços ---
+
+  // Alça
+  const handleSize = TRANSFOM_HANDLE_SIZE_PROJ / scale;
+  ctx.fillStyle = "white";
+  ctx.strokeStyle = "rgba(0, 120, 255, 0.9)"; // (Pode trocar para branco se preferir)
+  ctx.lineWidth = 1 / scale;
+
+  // Âncora (Losango)
+  ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
+  ctx.lineWidth = 1 / scale;
+  ctx.beginPath();
+  ctx.moveTo(0, -(handleSize * 1.25) / 1.5);
+  ctx.lineTo((handleSize * 1.25) / 1.5, 0);
+  ctx.lineTo(0, (handleSize * 1.25) / 1.5);
+  ctx.lineTo(-(handleSize * 1.25) / 1.5, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  const handles = context.getCropHandles(true); // Pede handles locais
 
   // Controles de escala
   handles.forEach((handle) => {

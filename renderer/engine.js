@@ -11,6 +11,7 @@ import * as Clipboard from "./engineClipboard.js";
 import * as Drawing from "./engineDrawing.js";
 import * as Transform from "./engineTransform.js";
 import * as Input from "./engineInput.js";
+import * as Crop from "./engineCrop.js";
 
 // 2. Definir o Objeto de Contexto (Estado Central)
 const context = {
@@ -61,6 +62,12 @@ const context = {
     },
     moveTool: {},
     selectTool: { mode: "replace" },
+    cropTool: {
+      mode: "Free", // 'Free' or 'Fixed Ratio'
+      ratioW: 1,
+      ratioH: 1,
+      deleteCropped: true, // Checkbox
+    },
   },
 
   // --- Estado da Seleção ---
@@ -74,6 +81,7 @@ const context = {
   selectionMoveStart: { x: 0, y: 0 },
   selectionMoveStartBounds: null,
   selectionEdges: null,
+  selectionRestoreData: null, // <-- ADICIONAR ESTA LINHA
   lineDashOffset: 0,
   animationFrameId: null,
   lastFrameTime: 0,
@@ -81,6 +89,10 @@ const context = {
   // --- Estado da Transformação ---
   isTransforming: false,
   transformState: null,
+
+  // --- Estado de Corte ---
+  isCropping: false,
+  cropState: null,
 
   // --- Estado do Desenho ---
   isDrawing: false,
@@ -112,6 +124,7 @@ const context = {
   screenToProject: null,
   projectToScreen: null,
   notifyTransformUI: null,
+  notifyCropUI: null,
   isPointInSelection: null,
   updateSelectionWithRect: null,
   selectAll: null,
@@ -119,8 +132,11 @@ const context = {
   setActiveLayer: null,
   fitToScreen: null,
   getTransformHandles: null,
+  getCropHandles: null,
   getHandleAtPoint: null,
+  getCropHandleAtPoint: null,
   localToWorld: null,
+  cropLocalToWorld: null,
   startDrawing: null,
   processDrawing: null,
   stopDrawing: null,
@@ -146,6 +162,8 @@ function draw() {
     strokeOriginY,
     isTransforming,
     transformState,
+    isCropping, // <-- ADICIONAR
+    cropState, // <-- ADICIONAR
     hasSelection,
     selectionEdges,
     selectionBounds,
@@ -155,6 +173,9 @@ function draw() {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (!projectWidth || !projectHeight) return;
+
+  ctx.save();
+  ctx.setTransform(scale, 0, 0, scale, originX, originY);
 
   // Checkerboard
   ctx.save();
@@ -172,14 +193,8 @@ function draw() {
   );
   ctx.restore();
 
-  // Camadas
-  ctx.save();
-  ctx.setTransform(scale, 0, 0, scale, originX, originY);
-
-  for (let layer of layers) {
-    if (!layer.visible) continue;
-    if (layer === activeLayer && isDrawing) continue;
-
+  // Helper function para desenhar uma camada (para evitar repetição)
+  function drawLayer(ctx, layer, activeLayer, isTransforming, transformState) {
     if (isTransforming && layer === activeLayer && transformState) {
       ctx.save();
       const t = transformState.currentTransform;
@@ -193,20 +208,111 @@ function draw() {
     }
   }
 
-  // Traço em andamento
-  if (isDrawing && strokeCanvas) {
-    ctx.drawImage(strokeCanvas, strokeOriginX, strokeOriginY);
+  // Camadas
+
+  // for (let layer of layers) {
+  //   if (!layer.visible) continue;
+  //   if (layer === activeLayer && isDrawing) continue;
+
+  //   if (isTransforming && layer === activeLayer && transformState) {
+  //     ctx.save();
+  //     const t = transformState.currentTransform;
+  //     ctx.translate(t.x, t.y);
+  //     ctx.rotate((t.rotation * Math.PI) / 180);
+  //     ctx.scale(t.scaleX, t.scaleY);
+  //     ctx.drawImage(layer.image, -t.width * t.anchor.x, -t.height * t.anchor.y);
+  //     ctx.restore();
+  //   } else {
+  //     ctx.drawImage(layer.image, layer.x, layer.y);
+  //   }
+  // }
+
+  // Salva o estado ANTES de aplicar o clip
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, projectWidth, projectHeight);
+  ctx.clip();
+
+  const projectBounds = {
+    x: 0,
+    y: 0,
+    width: projectWidth,
+    height: projectHeight,
+  };
+
+  // Loop 1: Desenha camadas que INTERSECTAM (e serão clipadas)
+  for (let layer of layers) {
+    if (!layer.visible) continue;
+    if (layer === activeLayer && isDrawing) continue;
+
+    const layerBounds = {
+      x: layer.x,
+      y: layer.y,
+      width: layer.image.width,
+      height: layer.image.height,
+    };
+    const intersects = !(
+      layerBounds.x > projectBounds.width ||
+      layerBounds.x + layerBounds.width < projectBounds.x ||
+      layerBounds.y > projectBounds.height ||
+      layerBounds.y + layerBounds.height < projectBounds.y
+    );
+
+    if (intersects) {
+      drawLayer(ctx, layer, activeLayer, isTransforming, transformState);
+    }
   }
+
+  // Restaura o estado (remove o clip)
+  ctx.restore();
+
+  // Loop 2: Desenha camadas que NÃO INTERSECTAM (para referência)
+  for (let layer of layers) {
+    if (!layer.visible) continue;
+    if (layer === activeLayer && isDrawing) continue;
+
+    const layerBounds = {
+      x: layer.x,
+      y: layer.y,
+      width: layer.image.width,
+      height: layer.image.height,
+    };
+    const intersects = !(
+      layerBounds.x > projectBounds.width ||
+      layerBounds.x + layerBounds.width < projectBounds.x ||
+      layerBounds.y > projectBounds.height ||
+      layerBounds.y + layerBounds.height < projectBounds.y
+    );
+
+    if (!intersects) {
+      drawLayer(ctx, layer, activeLayer, isTransforming, transformState);
+    }
+  }
+
+  // Traço em andamento (deve ser clipado)
+  if (isDrawing && strokeCanvas) {
+    ctx.save(); // Clip o traço
+    ctx.beginPath();
+    ctx.rect(0, 0, projectWidth, projectHeight);
+    ctx.clip();
+    ctx.drawImage(strokeCanvas, strokeOriginX, strokeOriginY);
+    ctx.restore(); // Fim do clip do traço
+  }
+
+  // // Traço em andamento
+  // if (isDrawing && strokeCanvas) {
+  //   ctx.drawImage(strokeCanvas, strokeOriginX, strokeOriginY);
+  // }
 
   // Borda do projeto
   ctx.strokeStyle = "rgba(0,0,0,0.5)";
-  ctx.lineWidth = 2 / Math.max(scale, 1);
+  ctx.lineWidth = 1 / scale;
   ctx.strokeRect(0, 0, projectWidth, projectHeight);
 
   // Borda da camada ativa
   if (activeLayer && activeLayer.visible && !isTransforming) {
     ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
-    ctx.lineWidth = 2 / Math.max(scale, 1);
+    ctx.lineWidth = 1 / scale;
     ctx.strokeRect(
       activeLayer.x,
       activeLayer.y,
@@ -215,12 +321,59 @@ function draw() {
     );
   }
 
+  if (isCropping && cropState) {
+    ctx.save();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.beginPath();
+
+    // Path 1: O projeto inteiro (coords do mundo)
+    ctx.moveTo(0, 0);
+    ctx.lineTo(projectWidth, 0);
+    ctx.lineTo(projectWidth, projectHeight);
+    ctx.lineTo(0, projectHeight);
+    ctx.closePath();
+
+    // Path 2: O buraco (caixa de corte)
+    const t = cropState.currentCrop;
+    const left = -t.width * t.anchor.x * t.scaleX;
+    const top = -t.height * t.anchor.y * t.scaleY;
+    const width = t.width * t.scaleX;
+    const height = t.height * t.scaleY;
+
+    // Pega os 4 cantos locais e converte para o mundo
+    const localCorners = [
+      { x: left, y: top }, // top-left
+      { x: left + width, y: top }, // top-right
+      { x: left + width, y: top + height }, // bottom-right
+      { x: left, y: top + height }, // bottom-left
+    ];
+    // context.cropLocalToWorld está disponível via bind
+    const worldCorners = localCorners.map((c) =>
+      context.cropLocalToWorld(c.x, c.y)
+    );
+
+    ctx.moveTo(worldCorners[0].x, worldCorners[0].y);
+    ctx.lineTo(worldCorners[1].x, worldCorners[1].y);
+    ctx.lineTo(worldCorners[2].x, worldCorners[2].y);
+    ctx.lineTo(worldCorners[3].x, worldCorners[3].y);
+    ctx.closePath();
+
+    // Preenche a área entre os dois paths
+    ctx.fill("evenodd");
+    ctx.restore();
+  }
+
   // Controles de transformação
   if (isTransforming && transformState) {
     Renderer.drawTransformControls(context);
     if (Utils.DebugGet("transformShowHandles")) {
       Renderer.drawDebugHitboxes(context);
     }
+  }
+
+  // Controles de corte
+  if (isCropping && cropState) {
+    Renderer.drawCropControls(context);
   }
 
   // Seleção (marching ants)
@@ -284,11 +437,34 @@ function draw() {
   }
 }
 
+// --- NOVO: Adicionar esta função em algum lugar antes do "4. Ligar (Bind)") ---
+/** Restaura a seleção a partir de dados salvos (bounds e dataURL) */
+function restoreSelection(context, restoreData) {
+  if (!restoreData || !restoreData.bounds || !restoreData.dataURL) {
+    context.clearSelection(); // Limpa por via das dúvidas
+    return;
+  }
+
+  const img = new Image();
+  img.onload = () => {
+    context.selectionBounds = { ...restoreData.bounds };
+    context.selectionCanvas.width = restoreData.bounds.width;
+    context.selectionCanvas.height = restoreData.bounds.height;
+    context.selectionCtx.drawImage(img, 0, 0);
+    context.hasSelection = true;
+    context.cacheSelectionEdges();
+    context.startAnimation();
+    context.draw();
+  };
+  img.src = restoreData.dataURL;
+}
+
 // 4. Ligar (Bind) todas as funções ao Contexto
 // Isso permite que os módulos chamem funções uns dos outros (ex: History.js chama Selection.js)
 context.draw = draw;
 context.saveState = () => History.saveState(context);
 context.restoreState = (state) => History.restoreState(context, state);
+context.restoreSelection = (data) => restoreSelection(context, data); // <-- ADICIONAR ESTA LINHA
 context.clearSelection = () => Selection.clearSelection(context);
 context.cacheSelectionEdges = () => Selection.cacheSelectionEdges(context);
 context.startAnimation = () => Renderer.startAnimation(context);
@@ -302,6 +478,7 @@ context.hexToRgba = Utils.hexToRgba;
 context.screenToProject = (x, y) => Utils.screenToProject(context, x, y);
 context.projectToScreen = (x, y) => Utils.projectToScreen(context, x, y);
 context.notifyTransformUI = Utils.notifyTransformUI;
+context.notifyCropUI = Utils.notifyCropUI; // <-- ADICIONAR
 context.isPointInSelection = (x, y) =>
   Selection.isPointInSelection(context, x, y);
 context.updateSelectionWithRect = (rect, mode) =>
@@ -314,10 +491,16 @@ context.getTransformHandles = (local) =>
   Transform.getTransformHandles(context, local);
 context.getHandleAtPoint = (x, y) => Transform.getHandleAtPoint(context, x, y);
 context.localToWorld = (x, y) => Transform.localToWorld(context, x, y);
+context.getCropHandles = (local) => Crop.getCropHandles(context, local);
+context.getCropHandleAtPoint = (x, y) => Crop.getHandleAtPoint(context, x, y);
+context.cropLocalToWorld = (x, y) => Crop.localToWorld(context, x, y);
 context.startDrawing = (e) => Drawing.startDrawing(context, e);
 context.processDrawing = (e) => Drawing.processDrawing(context, e);
 context.stopDrawing = (e) => Drawing.stopDrawing(context, e);
 context.resizeViewport = () => Project.resizeViewport(context);
+context.handleCropMouseDown = (ctx, e) => Crop.handleCropMouseDown(ctx, e);
+context.handleCropMouseMove = (ctx, e) => Crop.handleCropMouseMove(ctx, e);
+context.handleCropMouseUp = (ctx, e) => Crop.handleCropMouseUp(ctx, e);
 
 // 5. Inicialização
 Input.attachInputListeners(context);
@@ -400,12 +583,48 @@ window.Engine = {
     Transform.setTransformNumeric(context, opt, val),
   setTransformAnchor: (anchor) => Transform.setTransformAnchor(context, anchor),
 
+  // Corte
+  isCropping: () => context.isCropping,
+  enterCropMode: (rect) => Crop.enterCropMode(context, rect),
+  applyCrop: () => Crop.applyCrop(context),
+  cancelCrop: () => Crop.cancelCrop(context),
+  getCropState: () =>
+    context.isCropping ? context.cropState.currentCrop : null,
+  setCropNumeric: (opt, val) => Crop.setCropNumeric(context, opt, val),
+  setCropAnchor: (anchor) => Crop.setCropAnchor(context, anchor),
+  applyCropRatio: (basedOn) => Crop.applyCropRatio(context, basedOn), // <-- ADICIONE ESTA LINHA
+
   // Ferramentas
   setActiveTool: (toolId) => {
     if (context.tools[toolId]) {
-      context.activeToolId = toolId;
+      // --- INÍCIO DA CORREÇÃO (UX de Corte) ---
+
+      if (toolId === "cropTool") {
+        // Se já está cortando, não faz nada
+        if (context.isCropping) {
+          return;
+        }
+
+        // NOVO: Se há uma seleção, entra no modo de corte usando-a
+        if (context.hasSelection && context.selectionBounds) {
+          // Passa os bounds da seleção para enterCropMode.
+          // enterCropMode irá definir context.isCropping = true
+          // e context.activeToolId = 'cropTool'
+          // A função enterCropMode (em engineCrop.js) já limpa
+          // a seleção, o que é o comportamento esperado.
+          Crop.enterCropMode(context, context.selectionBounds);
+        } else {
+          // Se não há seleção, apenas define a ferramenta como ativa (modo ocioso)
+          context.activeToolId = toolId;
+        }
+      } else {
+        // Para qualquer outra ferramenta, apenas define como ativa
+        context.activeToolId = toolId;
+      }
+      // --- FIM DA CORREÇÃO ---
     }
   },
+
   setToolOption: (toolId, option, value) => {
     if (context.tools[toolId]) {
       context.tools[toolId][option] = value;

@@ -282,6 +282,12 @@ export function handleMouseDown(context, e) {
     return;
   }
 
+  if (context.isCropping) {
+    // A função agora está em engineCrop.js, mas é chamada via context
+    context.handleCropMouseDown(context, e);
+    return;
+  }
+
   if (e.button === 1) {
     // Pan
     context.isPanning = true;
@@ -318,6 +324,17 @@ export function handleMouseDown(context, e) {
     return;
   }
 
+  if (context.activeToolId === "cropTool" && e.button === 0) {
+    // Ferramenta de corte está ativa, mas não estamos em "modo de corte"
+    // Inicia o "arraste" para definir a área de corte
+    const { x: px, y: py } = context.screenToProject(e.offsetX, e.offsetY);
+    context.isSelecting = true; // Reutiliza o estado de 'isSelecting' para desenhar o retângulo
+    context.selectionStartX = parseInt(px);
+    context.selectionStartY = parseInt(py);
+    context.newSelectionRect = null; // Usará isso para desenhar
+    return;
+  }
+
   // Iniciar Desenho
   context.startDrawing(e);
 
@@ -350,6 +367,12 @@ export function handleMouseMove(context, e) {
     return;
   }
 
+  if (context.isCropping) {
+    context.handleCropMouseMove(context, e);
+    context.draw();
+    return;
+  }
+
   if (context.isPanning) {
     context.originX = e.clientX - context.startX;
     context.originY = e.clientY - context.startY;
@@ -368,9 +391,34 @@ export function handleMouseMove(context, e) {
   }
 
   if (context.isSelecting) {
+    // Esta lógica agora serve tanto para 'selectTool' quanto para 'cropTool'
     const { x: px, y: py } = context.screenToProject(e.offsetX, e.offsetY);
     const currentX = parseInt(px);
-    const currentY = parseInt(py);
+    let currentY = parseInt(py); // <-- MUDADO PARA 'let'
+
+    // --- INÍCIO DA CORREÇÃO (BUG 1) ---
+    const toolState = context.tools.cropTool;
+    if (
+      context.activeToolId === "cropTool" &&
+      toolState.mode === "Fixed Ratio"
+    ) {
+      const dx = currentX - context.selectionStartX;
+      const dy_original = currentY - context.selectionStartY;
+      const ratio = toolState.ratioW / toolState.ratioH;
+
+      if (ratio > 0 && dx !== 0) {
+        // Evita divisão por zero e mantém 0,0
+        const constrainedHeight = Math.abs(dx) / ratio;
+        // Arredonda o Y para o pixel mais próximo
+        currentY = parseInt(
+          context.selectionStartY +
+            constrainedHeight * Math.sign(dy_original || 1) // (|| 1) para evitar Math.sign(0)
+        );
+      } else if (dx === 0) {
+        currentY = context.selectionStartY; // Trava o Y se o X for 0
+      }
+    }
+    // --- FIM DA CORREÇÃO (BUG 1) ---
     const x = Math.min(context.selectionStartX, currentX);
     const y = Math.min(context.selectionStartY, currentY);
     const width = Math.abs(currentX - context.selectionStartX);
@@ -396,6 +444,11 @@ export function handleMouseUp(context, e) {
     return;
   }
 
+  if (context.isCropping) {
+    context.handleCropMouseUp(context, e);
+    return;
+  }
+
   if (e.button === 1) {
     context.isPanning = false;
   }
@@ -412,14 +465,35 @@ export function handleMouseUp(context, e) {
     const finalRect = context.newSelectionRect;
     context.newSelectionRect = null;
 
-    if (!finalRect || finalRect.width < 1 || finalRect.height < 1) {
-      if (context.tools.selectTool.mode === "replace") {
-        context.clearSelection();
+    // --- INÍCIO DA CORREÇÃO (RECURSO 2) ---
+    if (context.activeToolId === "cropTool") {
+      if (!finalRect || finalRect.width < 1 || finalRect.height < 1) {
+        // O clique foi inválido ou muito pequeno,
+        // entra no modo de corte com a tela cheia (comportamento padrão)
+        window.Engine.enterCropMode(null);
+      } else {
+        // Entra no modo de corte usando o retângulo definido
+        window.Engine.enterCropMode(finalRect);
       }
-      context.draw();
-      return;
+      // Atualiza a UI do app.js para mostrar a barra completa (Apply/Cancel)
+      if (typeof window.updateSelectedToolUI === "function") {
+        window.updateSelectedToolUI();
+      }
+      return; // Finaliza
     }
-    context.updateSelectionWithRect(finalRect, context.tools.selectTool.mode);
+    // --- FIM DA CORREÇÃO ---
+
+    // Lógica existente da 'selectTool'
+    if (context.activeToolId === "selectTool") {
+      if (!finalRect || finalRect.width < 1 || finalRect.height < 1) {
+        if (context.tools.selectTool.mode === "replace") {
+          context.clearSelection();
+        }
+        context.draw();
+        return;
+      }
+      context.updateSelectionWithRect(finalRect, context.tools.selectTool.mode);
+    }
   }
 
   if (context.draggingLayerState.isDragging) {

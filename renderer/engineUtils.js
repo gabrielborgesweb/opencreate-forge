@@ -123,3 +123,10 @@ export function projectToScreen(context, projectX, projectY) {
   const sy = projectY * scale + originY;
   return { x: sx, y: sy };
 }
+
+/** ATUALIZAR: engineUtils.js não foi fornecido, então adicione esta função de notificação aqui */
+export function notifyCropUI(context) {
+  if (typeof window.updateCropUI === "function") {
+    window.updateCropUI();
+  }
+}

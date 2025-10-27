@@ -24,6 +24,10 @@ body {
     outline: 1px dashed var(--accent-color);
     outline-offset: 2px;
   }
+
+  input {
+    accent-color: var(--accent-color);
+  }
 }
 
 svg-src {
@@ -79,6 +83,9 @@ button {
   flex-direction: row;
   align-items: center;
   gap: 1rem;
+  text-wrap: nowrap;
+  overflow: hidden;
+  overflow-x: scroll;
 }
 
 .select-modes {

@@ -10,10 +10,14 @@ export function saveState(context) {
     selectionBounds,
     undoStack,
     redoStack,
+    projectWidth,
+    projectHeight,
     MAX_HISTORY,
   } = context;
 
   const state = {
+    projectWidth: projectWidth,
+    projectHeight: projectHeight,
     layers: layers.map((l) => ({ ...l, image: l.image.src })),
     activeLayer: activeLayer ? activeLayer.id : null,
     hasSelection: hasSelection,
@@ -29,6 +33,15 @@ export function saveState(context) {
 
 /** Restaura um estado salvo */
 export function restoreState(context, state) {
+  // Restaura dimensões do projeto
+  context.projectWidth = state.projectWidth;
+  context.projectHeight = state.projectHeight;
+  if (context.selectionCanvas) {
+    // Atualiza o tamanho do canvas de seleção para o tamanho do projeto
+    context.selectionCanvas.width = context.projectWidth;
+    context.selectionCanvas.height = context.projectHeight;
+  }
+
   const promises = state.layers.map(
     (l) =>
       new Promise((resolve) => {

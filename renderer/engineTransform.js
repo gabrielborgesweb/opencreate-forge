@@ -170,6 +170,16 @@ export function enterTransformMode(context) {
   context.activeToolId = "transformTool";
   document.body.classList.add("transforming");
 
+  // Salva a seleção atual antes de limpá-la
+  if (context.hasSelection) {
+    context.selectionRestoreData = {
+      bounds: { ...context.selectionBounds },
+      dataURL: context.selectionCanvas.toDataURL(),
+    };
+  } else {
+    context.selectionRestoreData = null; // Garante que esteja limpa
+  }
+
   context.clearSelection();
   brushPreview.style.display = "none";
 
@@ -207,6 +217,12 @@ export function cancelTransform(context, isApplying = false) {
     context.activeLayer.x = original.x;
     context.activeLayer.y = original.y;
     console.log("Transformação cancelada.");
+
+    // Restaura a seleção, se houver uma salva
+    const restoreData = context.selectionRestoreData;
+    if (restoreData) {
+      context.restoreSelection(restoreData); // A restauração fará o draw()
+    }
   }
 
   context.isTransforming = false;
@@ -223,6 +239,9 @@ export function cancelTransform(context, isApplying = false) {
 /** Aplica a transformação, criando uma nova imagem de camada */
 export async function applyTransform(context) {
   if (!context.isTransforming) return;
+
+  // A seleção será invalidada, então limpa o backup
+  context.selectionRestoreData = null;
 
   const { transformState, activeLayer } = context;
   const t = transformState.currentTransform;

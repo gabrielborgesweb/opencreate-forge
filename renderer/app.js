@@ -178,8 +178,12 @@ function showTransformUI() {
     </div>
 
     <div id="actions-container" style="margin-left: 10px; display: flex; gap: 8px;">
-      <button id="btnCancelTransform">Cancel</button>
-      <button id="btnApplyTransform" style="background: var(--accent-color); color: white;">Apply</button>
+      <button title="Cancel" class="action-button" id="btnCancelTransform">
+        <svg-src src="assets/svg/X.svg"></svg-src>
+      </button>
+      <button title="Apply" class="action-button" id="btnApplyTransform" style="background: var(--accent-color);">
+        <svg-src src="assets/svg/Check.svg"></svg-src>
+      </button>
     </div>
   `;
 
@@ -254,11 +258,11 @@ function showCropUI() {
           toolState.mode === "Fixed Ratio" ? "selected" : ""
         }>Fixed Ratio</option>
       </select>
-      <input type="number" id="cropRatioW" class="value-input" style="width: 3.5rem;" value="${
+      <input type="number" id="cropRatioW" class="value-input" style="width: 3.5rem; padding: 2px 4px; background: #333; border: 1px solid #555; border-radius: 4px; color: #fff; text-align: right;" value="${
         toolState.ratioW
       }">
       <span>:</span>
-      <input type="number" id="cropRatioH" class="value-input" style="width: 3.5rem;" value="${
+      <input type="number" id="cropRatioH" class="value-input" style="width: 3.5rem; padding: 2px 4px; background: #333; border: 1px solid #555; border-radius: 4px; color: #fff; text-align: right;" value="${
         toolState.ratioH
       }">
     </div>
@@ -314,8 +318,12 @@ function showCropUI() {
     </div>
 
     <div id="actions-container" style="margin-left: 10px; display: flex; gap: 8px; padding-right: 10px;">
-      <button id="btnCancelCrop">Cancel</button>
-      <button id="btnApplyCrop" style="background: var(--accent-color); color: white;">Apply</button>
+      <button title="Cancel" class="action-button" id="btnCancelCrop">
+        <svg-src src="assets/svg/X.svg"></svg-src>
+      </button>
+      <button title="Apply" class="action-button" id="btnApplyCrop" style="background: var(--accent-color);">
+        <svg-src src="assets/svg/Check.svg"></svg-src>
+      </button>
     </div>
   `;
 
@@ -1076,11 +1084,11 @@ function updateSelectedToolUI() {
             toolState.mode === "Fixed Ratio" ? "selected" : ""
           }>Fixed Ratio</option>
         </select>
-        <input type="number" id="cropRatioW" class="value-input" style="width: 3.5rem;" value="${
+        <input type="number" id="cropRatioW" class="value-input" style="width: 3.5rem; padding: 2px 4px; background: #333; border: 1px solid #555; border-radius: 4px; color: #fff; text-align: right;" value="${
           toolState.ratioW
         }">
         <span>:</span>
-        <input type="number" id="cropRatioH" class="value-input" style="width: 3.5rem;" value="${
+        <input type="number" id="cropRatioH" class="value-input" style="width: 3.5rem; padding: 2px 4px; background: #333; border: 1px solid #555; border-radius: 4px; color: #fff; text-align: right;" value="${
           toolState.ratioH
         }">
       </div>

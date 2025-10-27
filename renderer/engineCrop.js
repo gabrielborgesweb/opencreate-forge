@@ -274,7 +274,15 @@ export function handleCropMouseMove(context, e) {
     default: {
       // Escala
       if (!cropState.scaleAnchor) break;
-      const scaleAnchor = cropState.scaleAnchor;
+
+      // --- INÍCIO DA MODIFICAÇÃO (ALT KEY) ---
+      // O scaleAnchor padrão (definido no mousedown) é o handle oposto.
+      // Se Alt estiver pressionado, usamos o centro do corte como âncora.
+      const scaleFromCenter = e.altKey;
+      const scaleAnchor = scaleFromCenter
+        ? { x: startT.x, y: startT.y } // Usa o centro do corte (no início do drag)
+        : cropState.scaleAnchor; // Usa o handle oposto (definido no mousedown)
+      // --- FIM DA MODIFICAÇÃO ---
 
       // REQUISITO: "Fixed Ratio" ou Shift
       const toolOptions = context.tools.cropTool;

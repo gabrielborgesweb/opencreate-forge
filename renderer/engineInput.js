@@ -174,7 +174,16 @@ export function handleTransformMouseMove(context, e) {
     default: {
       // Escala
       if (!transformState.scaleAnchor) break;
-      const scaleAnchor = transformState.scaleAnchor;
+
+      // --- INÍCIO DA MODIFICAÇÃO (ALT KEY) ---
+      // O scaleAnchor padrão (definido no mousedown) é o handle oposto.
+      // Se Alt estiver pressionado, usamos o centro da transformação como âncora.
+      const scaleFromCenter = e.altKey;
+      const scaleAnchor = scaleFromCenter
+        ? { x: startT.x, y: startT.y } // Usa o centro da transformação (no início do drag)
+        : transformState.scaleAnchor; // Usa o handle oposto (definido no mousedown)
+      // --- FIM DA MODIFICAÇÃO ---
+
       const keepAspect = e.shiftKey;
 
       const rot = (startT.rotation * Math.PI) / 180;
@@ -236,6 +245,11 @@ export function handleTransformMouseMove(context, e) {
       if (applyScaleX) t.scaleX = startT.scaleX * scaleFactorX;
       if (applyScaleY) t.scaleY = startT.scaleY * scaleFactorY;
 
+      // A lógica de reposicionamento abaixo funciona automaticamente
+      // com a âncora central. Se a âncora for o centro (startT.x/y),
+      // vec_anchor_to_center será {0,0}, e t.x/t.y não serão alterados.
+      // Se a âncora for o handle oposto, t.x/t.y serão ajustados
+      // para compensar a escala.
       const vec_anchor_to_center = {
         x: startT.x - scaleAnchor.x,
         y: startT.y - scaleAnchor.y,
@@ -393,36 +407,84 @@ export function handleMouseMove(context, e) {
   if (context.isSelecting) {
     // Esta lógica agora serve tanto para 'selectTool' quanto para 'cropTool'
     const { x: px, y: py } = context.screenToProject(e.offsetX, e.offsetY);
-    const currentX = parseInt(px);
-    let currentY = parseInt(py); // <-- MUDADO PARA 'let'
 
-    // --- INÍCIO DA CORREÇÃO (BUG 1) ---
-    const toolState = context.tools.cropTool;
-    if (
-      context.activeToolId === "cropTool" &&
-      toolState.mode === "Fixed Ratio"
-    ) {
-      const dx = currentX - context.selectionStartX;
-      const dy_original = currentY - context.selectionStartY;
-      const ratio = toolState.ratioW / toolState.ratioH;
+    // Armazena a posição original do mouse
+    const originalCurrentX = parseInt(px);
+    const originalCurrentY = parseInt(py);
 
-      if (ratio > 0 && dx !== 0) {
-        // Evita divisão por zero e mantém 0,0
-        const constrainedHeight = Math.abs(dx) / ratio;
-        // Arredonda o Y para o pixel mais próximo
-        currentY = parseInt(
-          context.selectionStartY +
-            constrainedHeight * Math.sign(dy_original || 1) // (|| 1) para evitar Math.sign(0)
-        );
-      } else if (dx === 0) {
-        currentY = context.selectionStartY; // Trava o Y se o X for 0
+    // Define os pontos de início e fim para o cálculo do retângulo
+    // Estes podem ser modificados pelos modificadores (Shift/Alt)
+    let startX = context.selectionStartX;
+    let startY = context.selectionStartY;
+    let currentX = originalCurrentX;
+    let currentY = originalCurrentY;
+
+    if (context.activeToolId === "selectTool") {
+      // --- INÍCIO DA NOVA LÓGICA (Select Tool: Shift/Alt) ---
+
+      // 1. Modificador Shift (Proporção 1:1)
+      if (e.shiftKey) {
+        const dx = currentX - startX;
+        const dy = currentY - startY;
+
+        // Trava a proporção 1:1 baseada no maior delta (em magnitude)
+        if (Math.abs(dx) > Math.abs(dy)) {
+          currentY = startY + Math.abs(dx) * Math.sign(dy);
+        } else {
+          currentX = startX + Math.abs(dy) * Math.sign(dx);
+        }
       }
+
+      // 2. Modificador Alt (Desenhar do centro)
+      // Isso é calculado *depois* do Shift, para que possam ser combinados
+      if (e.altKey) {
+        const dx = currentX - startX; // Delta (possivelmente corrigido pelo Shift)
+        const dy = currentY - startY; // Delta (possivelmente corrigido pelo Shift)
+
+        // O ponto inicial (clique) vira o centro
+        // O novo startX/Y é espelhado
+        startX = context.selectionStartX - dx;
+        startY = context.selectionStartY - dy;
+        // O novo currentX/Y é o ponto original + delta
+        currentX = context.selectionStartX + dx;
+        currentY = context.selectionStartY + dy;
+      }
+      // --- FIM DA NOVA LÓGICA ---
+    } else if (context.activeToolId === "cropTool") {
+      // --- LÓGICA EXISTENTE (BUG 1) ---
+      // Nota: A lógica do Crop Tool usa as coordenadas originais do mouse
+      // Reseta currentY para o original, pois a lógica do Shift (acima) pode tê-lo modificado
+      currentY = originalCurrentY;
+
+      const toolState = context.tools.cropTool;
+      if (toolState.mode === "Fixed Ratio") {
+        // Usa as coordenadas *originais* do mouse para o cálculo do crop
+        const dx = originalCurrentX - context.selectionStartX;
+        const dy_original = originalCurrentY - context.selectionStartY;
+        const ratio = toolState.ratioW / toolState.ratioH;
+
+        if (ratio > 0 && dx !== 0) {
+          // Evita divisão por zero e mantém 0,0
+          const constrainedHeight = Math.abs(dx) / ratio;
+          // Arredonda o Y para o pixel mais próximo
+          // Atualiza 'currentY' que será usado no cálculo final do retângulo
+          currentY = parseInt(
+            context.selectionStartY +
+              constrainedHeight * Math.sign(dy_original || 1) // (|| 1) para evitar Math.sign(0)
+          );
+        } else if (dx === 0) {
+          currentY = context.selectionStartY; // Trava o Y se o X for 0
+        }
+      }
+      // --- FIM DA LÓGICA EXISTENTE ---
     }
-    // --- FIM DA CORREÇÃO (BUG 1) ---
-    const x = Math.min(context.selectionStartX, currentX);
-    const y = Math.min(context.selectionStartY, currentY);
-    const width = Math.abs(currentX - context.selectionStartX);
-    const height = Math.abs(currentY - context.selectionStartY);
+
+    // Cálculo final do retângulo (agora usa startX/Y e currentX/Y modificados)
+    const x = Math.min(startX, currentX);
+    const y = Math.min(startY, currentY);
+    const width = Math.abs(currentX - startX);
+    const height = Math.abs(currentY - startY);
+
     context.newSelectionRect = { x, y, width, height };
     context.draw();
     return;

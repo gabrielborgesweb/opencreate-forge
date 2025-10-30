@@ -85,6 +85,9 @@ const context = {
   lineDashOffset: 0,
   animationFrameId: null,
   lastFrameTime: 0,
+  // --- NOVOS ESTADOS ---
+  hasFloatingContent: false, // true se houver conteúdo flutuante pós-transformação
+  floatingContent: null, // { image, x, y, width, height }
 
   // --- Estado da Transformação ---
   isTransforming: false,
@@ -169,6 +172,9 @@ function draw() {
     selectionBounds,
     lineDashOffset,
     newSelectionRect,
+    // --- NOVO ---
+    hasFloatingContent,
+    floatingContent,
   } = context;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -195,7 +201,19 @@ function draw() {
 
   // Helper function para desenhar uma camada (para evitar repetição)
   function drawLayer(ctx, layer, activeLayer, isTransforming, transformState) {
-    if (isTransforming && layer === activeLayer && transformState) {
+    // --- MODIFICADO ---
+    // Verifica se a transformação é de uma seleção flutuante
+    const isFloatingTransform =
+      isTransforming && transformState && transformState.isFloating;
+
+    // Só aplica a transformação na camada se NÃO for uma transformação flutuante
+    if (
+      isTransforming &&
+      !isFloatingTransform && // <-- Adicionado
+      layer === activeLayer &&
+      transformState
+    ) {
+      // ... (código de transformação da camada existente)
       ctx.save();
       const t = transformState.currentTransform;
       ctx.translate(t.x, t.y);
@@ -297,6 +315,23 @@ function draw() {
     ctx.clip();
     ctx.drawImage(strokeCanvas, strokeOriginX, strokeOriginY);
     ctx.restore(); // Fim do clip do traço
+  }
+
+  // --- NOVO: Desenha o conteúdo flutuante (Pós-transformação, pré-mesclagem) ---
+  if (hasFloatingContent && floatingContent) {
+    ctx.drawImage(floatingContent.image, floatingContent.x, floatingContent.y);
+  }
+
+  // --- NOVO: Desenha o conteúdo flutuante (Durante a transformação) ---
+  if (isTransforming && transformState && transformState.isFloating) {
+    ctx.save();
+    const t = transformState.currentTransform;
+    const img = transformState.floatingImage; // Usamos a imagem/canvas flutuante
+    ctx.translate(t.x, t.y);
+    ctx.rotate((t.rotation * Math.PI) / 180);
+    ctx.scale(t.scaleX, t.scaleY);
+    ctx.drawImage(img, -t.width * t.anchor.x, -t.height * t.anchor.y);
+    ctx.restore();
   }
 
   // // Traço em andamento
@@ -484,6 +519,7 @@ context.isPointInSelection = (x, y) =>
 context.updateSelectionWithRect = (rect, mode) =>
   Selection.updateSelectionWithRect(context, rect, mode);
 context.selectAll = () => Selection.selectAll(context);
+context.mergeFloatingContent = () => Selection.mergeFloatingContent(context); // <-- ADICIONAR
 context.addLayer = (img, name) => Layers.addLayer(context, img, name);
 context.setActiveLayer = (id) => Layers.setActiveLayer(context, id);
 context.fitToScreen = () => Project.fitToScreen(context);

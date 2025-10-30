@@ -76,20 +76,122 @@ export function findSelectionEdges(context) {
   };
 }
 
+/** * NOVO: Mescla o conteúdo flutuante (se houver) na camada ativa.
+ * Retorna true se uma mesclagem ocorreu.
+ */
+export function mergeFloatingContent(context) {
+  if (
+    !context.hasFloatingContent ||
+    !context.floatingContent ||
+    !context.activeLayer
+  ) {
+    return false; // Nada a fazer
+  }
+
+  // --- INÍCIO DA CORREÇÃO FINAL ---
+
+  const l1 = context.activeLayer; // Camada ativa (com o "buraco")
+  const f = context.floatingContent; // Conteúdo flutuante
+  const fImg = f.image;
+  const fX = f.x;
+  const fY = f.y;
+  const fW = f.image.width;
+  const fH = f.image.height;
+
+  // l_orig é o snapshot da camada original (SEM o buraco)
+  const l_orig = f.originalLayerState;
+
+  if (!l_orig) {
+    console.error("Falha na mesclagem: originalLayerState está ausente.");
+    context.hasFloatingContent = false;
+    context.floatingContent = null;
+    return false;
+  }
+
+  // 1. Encontra os bounds combinados
+  const l_origImg = l_orig.image; // O *canvas* do snapshot
+  const combinedMinX = Math.min(l_orig.x, fX);
+  const combinedMinY = Math.min(l_orig.y, fY);
+  const combinedMaxX = Math.max(l_orig.x + l_origImg.width, fX + fW);
+  const combinedMaxY = Math.max(l_orig.y + l_origImg.height, fY + fH);
+  const combinedWidth = Math.ceil(combinedMaxX - combinedMinX);
+  const combinedHeight = Math.ceil(combinedMaxY - combinedMinY);
+
+  // 2. Cria o novo canvas de mesclagem
+  const mergeCanvas = document.createElement("canvas");
+  mergeCanvas.width = combinedWidth;
+  mergeCanvas.height = combinedHeight;
+  const mergeCtx = mergeCanvas.getContext("2d");
+
+  // 3. Desenha a imagem original (o snapshot)
+  // CORREÇÃO: Para garantir que estamos usando pixels puros e não
+  // uma referência a um canvas que possa ter sido modificado,
+  // nós criamos uma cópia "fresca" do snapshot *aqui*.
+  // Isso é uma medida de segurança contra mutação de estado.
+  const pristineSnapshot = document.createElement("canvas");
+  pristineSnapshot.width = l_origImg.width;
+  pristineSnapshot.height = l_origImg.height;
+  pristineSnapshot.getContext("2d").drawImage(l_origImg, 0, 0);
+
+  // Agora desenhamos a cópia fresca (pristineSnapshot)
+  mergeCtx.drawImage(
+    pristineSnapshot,
+    l_orig.x - combinedMinX,
+    l_orig.y - combinedMinY
+  );
+
+  // 4. Desenha o conteúdo flutuante (transformado)
+  mergeCtx.drawImage(fImg, fX - combinedMinX, fY - combinedMinY);
+
+  // 5. ATUALIZA a camada ativa (l1) com o resultado final.
+  l1.image = mergeCanvas;
+  l1.x = combinedMinX;
+  l1.y = combinedMinY;
+
+  // 6. Limpa o estado flutuante
+  context.hasFloatingContent = false;
+  context.floatingContent = null;
+
+  console.log("Conteúdo flutuante mesclado com sucesso (com cópia).");
+  return true; // Mesclagem ocorreu
+  // --- FIM DA CORREÇÃO FINAL ---
+}
+
 /** Limpa a seleção ativa */
 export function clearSelection(context) {
+  // --- MODIFICADO ---
+  // Se houver conteúdo flutuante, mescla-o ANTES de limpar a seleção.
+  const didMerge = mergeFloatingContent(context);
+  // --- FIM ---
+
   if (context.hasSelection) {
     context.hasSelection = false;
     context.selectionBounds = null;
     context.cacheSelectionEdges();
     context.stopAnimation();
-    context.draw();
-    context.saveState();
+    context.draw(); // O draw é chamado aqui
+    if (!didMerge) {
+      // Só salva se a *única* ação foi deselecionar
+      context.saveState();
+    }
+  }
+
+  if (didMerge) {
+    context.saveState(); // Salva o estado *depois* do merge
+    context.draw(); // Garante o redesenho após o merge
   }
 }
 
 /** Seleciona todo o canvas */
 export function selectAll(context) {
+  // --- MODIFICADO ---
+  // Mescla qualquer conteúdo flutuante antes de criar uma nova seleção
+  const didMerge = mergeFloatingContent(context);
+  if (didMerge) {
+    context.saveState();
+  }
+  // --- FIM ---
+
   const { projectWidth, projectHeight, selectionCanvas, selectionCtx } =
     context;
   if (!projectWidth) return;
@@ -109,7 +211,8 @@ export function selectAll(context) {
   context.cacheSelectionEdges();
   context.startAnimation();
   context.draw();
-  context.saveState();
+
+  context.saveState(); // Salva a nova seleção (e o merge, se houve)
 }
 
 /** Verifica se um ponto (coords do projeto) está dentro da seleção */
@@ -134,7 +237,18 @@ export function isPointInSelection(context, px, py) {
 
 /** Função central para criar ou modificar a seleção com um retângulo */
 export function updateSelectionWithRect(context, rect, mode) {
-  if (!rect || rect.width < 1 || rect.height < 1) return;
+  // --- MODIFICADO ---
+  // Se houver conteúdo flutuante, mescla-o ANTES de criar uma nova seleção.
+  const didMerge = mergeFloatingContent(context);
+  if (didMerge) {
+    context.saveState(); // Salva o merge
+  }
+  // --- FIM ---
+
+  if (!rect || rect.width < 1 || rect.height < 1) {
+    if (didMerge) context.draw(); // Apenas desenha o merge e sai
+    return;
+  }
 
   if (mode === "replace") {
     context.clearSelection();
@@ -236,5 +350,6 @@ export function updateSelectionWithRect(context, rect, mode) {
     context.clearSelection();
   }
   context.draw();
+
   context.saveState();
 }

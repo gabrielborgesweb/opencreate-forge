@@ -98,7 +98,8 @@ export function getTransformHandles(context, local = false) {
 
 /** Encontra qual controle de transformação está em um ponto (coords do projeto) */
 export function getHandleAtPoint(context, px, py) {
-  const { TRANSFOM_HANDLE_SIZE_PROJ, scale, transformState } = context;
+  const { TRANSFOM_HANDLE_SIZE_PROJ, scale, transformState, activeLayer } =
+    context;
   const handles = getTransformHandles(context, false); // Coords do mundo
   const handleSize = TRANSFOM_HANDLE_SIZE_PROJ / scale;
   const checkRadius = (handleSize / 2) * 1.5;
@@ -163,36 +164,121 @@ export function enterTransformMode(context) {
   const { activeLayer, brushPreview } = context;
   if (context.isTransforming || !activeLayer) return;
 
-  console.log("Entrando no modo de transformação:", activeLayer.id);
-  context.isTransforming = true;
-  context.isSelecting = false;
-  context.lastUsedToolId = context.activeToolId;
-  context.activeToolId = "transformTool";
-  document.body.classList.add("transforming");
+  // --- NOVO: Mescla qualquer conteúdo flutuante anterior ---
+  if (context.hasFloatingContent) {
+    context.mergeFloatingContent();
+    context.saveState(); // Salva a mesclagem
+  }
 
-  // Salva a seleção atual antes de limpá-la
+  // Salva a seleção atual (marching ants) ANTES de fazer qualquer coisa
   if (context.hasSelection) {
     context.selectionRestoreData = {
       bounds: { ...context.selectionBounds },
       dataURL: context.selectionCanvas.toDataURL(),
     };
   } else {
-    context.selectionRestoreData = null; // Garante que esteja limpa
+    context.selectionRestoreData = null;
   }
 
-  context.clearSelection();
+  // --- INÍCIO DA CORREÇÃO (Bug de Referência) ---
+  let isFloating = false;
+  let floatingImage = null;
+  let transformWidth, transformHeight, transformX, transformY;
+
+  // CORREÇÃO: Cria um snapshot (cópia de pixels) da camada ativa.
+  // Isso quebra a corrente de referências que estava causando os bugs.
+  const snapshotCanvas = document.createElement("canvas");
+  snapshotCanvas.width = activeLayer.image.width;
+  snapshotCanvas.height = activeLayer.image.height;
+  snapshotCanvas.getContext("2d").drawImage(activeLayer.image, 0, 0);
+
+  // Salva o estado original (agora usando o snapshot) ANTES de fazer o buraco
+  const originalLayerState = { ...activeLayer, image: snapshotCanvas };
+  // --- FIM DA CORREÇÃO ---
+
+  if (context.hasSelection) {
+    isFloating = true;
+    const bounds = context.selectionBounds;
+
+    // 1. Cria o canvas flutuante (CORRIGIDO: usando máscara)
+    const floatCanvas = document.createElement("canvas");
+    floatCanvas.width = bounds.width;
+    floatCanvas.height = bounds.height;
+    const floatCtx = floatCanvas.getContext("2d");
+    // 1a. Desenha o bloco retangular de pixels
+    floatCtx.drawImage(
+      activeLayer.image,
+      bounds.x - activeLayer.x, // sx
+      bounds.y - activeLayer.y, // sy
+      bounds.width, // sWidth
+      bounds.height, // sHeight
+      0, // dx
+      0, // dy
+      bounds.width, // dWidth
+      bounds.height // dHeight
+    );
+    // 1b. Aplica a máscara de seleção
+    floatCtx.globalCompositeOperation = "destination-in";
+    floatCtx.drawImage(context.selectionCanvas, 0, 0);
+    floatCtx.globalCompositeOperation = "source-over"; // Reset
+    floatingImage = floatCanvas; // Salva o canvas (agora não-retangular)
+
+    // 2. Cria a camada com o "buraco" (CORRIGIDO: usando máscara)
+    const holeCanvas = document.createElement("canvas");
+    holeCanvas.width = activeLayer.image.width;
+    holeCanvas.height = activeLayer.image.height;
+    const holeCtx = holeCanvas.getContext("2d");
+    // 2a. Desenha a imagem original
+    holeCtx.drawImage(activeLayer.image, 0, 0);
+    // 2b. Usa a máscara para "cortar" o buraco
+    holeCtx.globalCompositeOperation = "destination-out";
+    holeCtx.drawImage(
+      context.selectionCanvas,
+      bounds.x - activeLayer.x,
+      bounds.y - activeLayer.y
+    );
+    holeCtx.globalCompositeOperation = "source-over"; // Reset
+    activeLayer.image = holeCanvas; // Atualiza a imagem da camada ativa
+
+    // 3. Define os parâmetros de transformação
+    transformWidth = bounds.width;
+    transformHeight = bounds.height;
+    transformX = bounds.x + bounds.width / 2;
+    transformY = bounds.y + bounds.height / 2;
+    console.log("Entrando no modo de transformação de SELEÇÃO.");
+  } else {
+    // Caso 2: Transformação de camada inteira (comportamento antigo)
+    isFloating = false;
+    transformWidth = activeLayer.image.width;
+    transformHeight = activeLayer.image.height;
+    transformX = activeLayer.x + activeLayer.image.width / 2;
+    transformY = activeLayer.y + activeLayer.image.height / 2;
+    console.log("Entrando no modo de transformação de CAMADA:", activeLayer.id);
+  }
+  // --- FIM DA MODIFICAÇÃO ---
+
+  context.isTransforming = true;
+  context.isSelecting = false;
+  context.lastUsedToolId = context.activeToolId;
+  context.activeToolId = "transformTool";
+  document.body.classList.add("transforming");
+
+  context.clearSelection(); // Limpa as "marching ants"
   brushPreview.style.display = "none";
 
+  // --- INÍCIO DA MODIFICAÇÃO (Configuração do transformState) ---
   context.transformState = {
-    originalLayer: {
-      ...activeLayer,
-      image: activeLayer.image,
-    },
+    originalLayer: originalLayerState, // Salva o estado *original* para o 'cancel'
+    isFloating: isFloating, // É uma transformação de seleção?
+    floatingImage: floatingImage, // O canvas flutuante (não-retangular)
+    // 'originalLayer' (no sentido antigo) não é mais necessário
+    // 'originalTargetLayer' não é mais necessário
+
     currentTransform: {
-      x: activeLayer.x + activeLayer.image.width / 2,
-      y: activeLayer.y + activeLayer.image.height / 2,
-      width: activeLayer.image.width,
-      height: activeLayer.image.height,
+      x: transformX,
+      y: transformY,
+      width: transformWidth,
+      height: transformHeight,
       scaleX: 1,
       scaleY: 1,
       rotation: 0,
@@ -203,6 +289,7 @@ export function enterTransformMode(context) {
     dragStartCoords: { x: 0, y: 0 },
     dragStartTransform: null,
   };
+  // --- FIM DA MODIFICAÇÃO ---
 
   context.draw();
 }
@@ -211,17 +298,25 @@ export function enterTransformMode(context) {
 export function cancelTransform(context, isApplying = false) {
   if (!context.isTransforming) return;
 
-  if (!isApplying) {
-    const original = context.transformState.originalLayer;
-    context.activeLayer.image = original.image;
-    context.activeLayer.x = original.x;
-    context.activeLayer.y = original.y;
-    console.log("Transformação cancelada.");
+  const { originalLayer, isFloating } = context.transformState;
 
-    // Restaura a seleção, se houver uma salva
+  if (!isApplying) {
+    // Restaura a camada ativa para seu estado original
+    // Isso funciona para AMBOS os casos (flutuante ou camada inteira)
+    context.activeLayer.image = originalLayer.image;
+    context.activeLayer.x = originalLayer.x;
+    context.activeLayer.y = originalLayer.y;
+
+    if (isFloating) {
+      console.log("Transformação flutuante cancelada.");
+    } else {
+      console.log("Transformação de camada cancelada.");
+    }
+
+    // Restaura a seleção (marching ants), se houver uma salva
     const restoreData = context.selectionRestoreData;
     if (restoreData) {
-      context.restoreSelection(restoreData); // A restauração fará o draw()
+      context.restoreSelection(restoreData);
     }
   }
 
@@ -240,25 +335,30 @@ export function cancelTransform(context, isApplying = false) {
 export async function applyTransform(context) {
   if (!context.isTransforming) return;
 
-  // A seleção será invalidada, então limpa o backup
+  // A seleção original (marching ants) é invalidada
   context.selectionRestoreData = null;
 
-  const { transformState, activeLayer } = context;
+  const { transformState } = context;
+  const { isFloating, floatingImage } = transformState;
   const t = transformState.currentTransform;
-  const originalImg = transformState.originalLayer.image;
 
+  // Define a imagem de origem (ou flutuante ou da camada)
+  const originalImg = isFloating
+    ? floatingImage
+    : transformState.originalLayer.image;
+
+  // ... (Cálculo existente para encontrar os cantos transformados)
   const corners = [
     { x: -t.width * t.anchor.x, y: -t.height * t.anchor.y },
     { x: t.width * (1 - t.anchor.x), y: -t.height * t.anchor.y },
     { x: t.width * (1 - t.anchor.x), y: t.height * (1 - t.anchor.y) },
     { x: -t.width * t.anchor.x, y: t.height * (1 - t.anchor.y) },
   ];
-
   const rot = (t.rotation * Math.PI) / 180;
   const cos = Math.cos(rot);
   const sin = Math.sin(rot);
-
   const transformedCorners = corners.map((c) => {
+    // ... (cálculo existente)
     const scaledX = c.x * t.scaleX;
     const scaledY = c.y * t.scaleY;
     return {
@@ -266,24 +366,35 @@ export async function applyTransform(context) {
       y: t.y + (scaledX * sin + scaledY * cos),
     };
   });
-
   const minX = Math.min(...transformedCorners.map((c) => c.x));
   const minY = Math.min(...transformedCorners.map((c) => c.y));
   const maxX = Math.max(...transformedCorners.map((c) => c.x));
   const maxY = Math.max(...transformedCorners.map((c) => c.y));
-
   const newWidth = parseInt(Math.ceil(maxX - minX));
   const newHeight = parseInt(Math.ceil(maxY - minY));
   const newX = parseInt(Math.round(minX));
   const newY = parseInt(Math.round(minY));
 
+  // --- INÍCIO DA MODIFICAÇÃO (Lógica de Aplicação) ---
+
+  // --- INÍCIO DA MODIFICAÇÃO (Bug 1) ---
+  // Se a camada/conteúdo desapareceu
   if (newWidth < 1 || newHeight < 1) {
-    // A camada desapareceu, remove-a
-    context.layers = context.layers.filter((l) => l.id !== activeLayer.id);
-    context.setActiveLayer(
-      context.layers.length > 0 ? context.layers[0].id : null
-    );
+    if (isFloating) {
+      // CASO 1: Transformação flutuante (aplicando "nada")
+      // A camada já tem o "buraco". Não há nada para flutuar.
+      // O estado `hasFloatingContent` permanece `false`.
+    } else {
+      // CASO 2: Transformação normal (apagando camada)
+      context.layers = context.layers.filter(
+        (l) => l.id !== context.activeLayer.id
+      );
+      context.setActiveLayer(
+        context.layers.length > 0 ? context.layers[0].id : null
+      );
+    }
   } else {
+    // A camada é válida, cria o canvas com o conteúdo transformado
     const newLayerCanvas = document.createElement("canvas");
     newLayerCanvas.width = newWidth;
     newLayerCanvas.height = newHeight;
@@ -291,29 +402,69 @@ export async function applyTransform(context) {
 
     newCtx.translate(-newX, -newY);
     newCtx.translate(t.x, t.y);
-    newCtx.rotate(rot);
+    newCtx.rotate((t.rotation * Math.PI) / 180);
     newCtx.scale(t.scaleX, t.scaleY);
     newCtx.drawImage(
-      originalImg,
+      originalImg, // Imagem flutuante ou da camada
       -t.width * t.anchor.x,
       -t.height * t.anchor.y
     );
+    // Não precisamos converter para Imagem, podemos usar o canvas
 
-    const img = new Image();
-    await new Promise((resolve) => {
-      img.onload = resolve;
-      img.src = newLayerCanvas.toDataURL();
-    });
+    if (isFloating) {
+      // CASO 1: Era uma transformação flutuante
+      // Define o estado de conteúdo flutuante
+      context.hasFloatingContent = true;
+      context.floatingContent = {
+        image: newLayerCanvas,
+        x: newX,
+        y: newY,
+        // CORREÇÃO: Passa o estado original da camada (sem buraco)
+        originalLayerState: transformState.originalLayer,
+      };
 
-    activeLayer.image = img;
-    activeLayer.x = newX;
-    activeLayer.y = newY;
+      // Cria a nova SELEÇÃO (correto: newLayerCanvas tem o alfa correto)
+      context.selectionBounds = {
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight,
+      };
+      context.selectionCanvas.width = newWidth;
+      context.selectionCanvas.height = newHeight;
+      context.selectionCtx.drawImage(newLayerCanvas, 0, 0); // Cria máscara de seleção
+
+      context.hasSelection = true;
+      context.cacheSelectionEdges();
+      context.startAnimation(); // Inicia as "marching ants"
+
+      console.log("Transformação flutuante aplicada. Conteúdo está flutuando.");
+    } else {
+      // CASO 2: Transformação normal de camada (comportamento antigo)
+      // Precisamos converter para imagem aqui
+      const img = new Image();
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.src = newLayerCanvas.toDataURL();
+      });
+      context.activeLayer.image = img;
+      context.activeLayer.x = newX;
+      context.activeLayer.y = newY;
+      console.log("Transformação de camada aplicada.");
+      // SALVA O ESTADO (apenas para T de camada inteira)
+      context.saveState(); // <-- RE-ADICIONAR O SAVE AQUI (apenas no 'else')
+    }
   }
-
-  console.log("Transformação aplicada.");
+  // --- FIM DA MODIFICAÇÃO ---
 
   cancelTransform(context, true); // Sai sem reverter
-  context.saveState();
+
+  // --- CORREÇÃO (Bug 1) ---
+  // NÃO SALVA O ESTADO AQUI. O estado só será salvo quando o
+  // conteúdo flutuante for mesclado (em engineSelection.js)
+  // context.saveState(); // <-- REMOVER ESTA LINHA
+  // --- FIM DA CORREÇÃO ---
+
   context.draw();
   if (typeof window.Engine.updateLayersPanel === "function") {
     window.Engine.updateLayersPanel();

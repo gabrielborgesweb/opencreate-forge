@@ -198,8 +198,8 @@ button {
 #canvasContainer.drag-over::after {
   content: "";
   position: absolute;
-  inset: 0.5rem;
-  top: 2.8rem; /* abaixo da barra de abas */
+  inset: 0.25rem;
+  top: 2.5rem; /* abaixo da barra de abas */
   border: 2px dashed var(--accent-color);
   border-radius: 4px;
   background-color: #ce570133;
@@ -443,6 +443,18 @@ canvas {
   z-index: 1;
   gap: 1px;
 }
+#projectsTabs.drag-over::after {
+  content: "";
+  position: absolute;
+  inset: 0.25rem;
+  height: 1.5rem;
+  left: 3.2rem;
+  border: 2px dashed var(--accent-color);
+  border-radius: 4px;
+  background-color: #ce570133;
+  z-index: 10;
+  pointer-events: none;
+}
 
 #projectsTabs button {
   all: unset;
@@ -464,6 +476,9 @@ canvas {
     border-bottom: 2px solid var(--accent-color);
     /* pointer-events: none; */
   }
+  &.unsaved {
+    font-weight: 600;
+  }
   &:hover {
     background: #555;
   }
@@ -481,8 +496,19 @@ canvas {
     cursor: pointer;
   }
 
+  &.unsaved .close-tab-btn {
+    color: #0000;
+    background: #fff;
+    border-radius: 1rem;
+  }
+
+  &.unsaved:hover .close-tab-btn {
+    color: #ccc;
+    background: #0000;
+  }
+
   .close-tab-btn:hover {
-    color: #fff;
+    color: #fff !important;
   }
 
   &#homeTab {

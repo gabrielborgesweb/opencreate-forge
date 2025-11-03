@@ -3,6 +3,12 @@
 // const btnNew = document.getElementById("btnNew");
 const btnOpen = document.getElementById("btnOpen");
 const btnSave = document.getElementById("btnSave");
+const btnOpenProject = document.getElementById("btnOpenProject");
+const btnSaveProject = document.getElementById("btnSaveProject");
+// --- INÍCIO DA MODIFICAÇÃO ---
+const btnSaveProjectAs = document.getElementById("btnSaveProjectAs");
+// --- FIM DA MODIFICAÇÃO ---
+
 const btnGrayscale = document.getElementById("btnGrayscale");
 const toolButtons = document.querySelectorAll(".tool-button");
 
@@ -456,30 +462,296 @@ function getActiveProject() {
   return projects.find((p) => p.id == activeTab.id);
 }
 
-// --- NOVO: FUNÇÃO PARA FECHAR PROJETO ---
-function closeProject(projectId) {
+// --- INÍCIO: NOVAS FUNÇÕES DE PROJETO ---
+
+/**
+ * Helper para extrair o nome do arquivo de um caminho (ex: "C:\bla\proj.ocfd" -> "proj")
+ */
+function getProjectNameFromPath(filePath) {
+  if (!filePath) return "Untitled";
+  // Pega a parte depois da última barra (qualquer tipo)
+  const fileName = filePath.split(/[\\/]/).pop();
+  // Remove a extensão .ocfd
+  // const name = fileName.replace(/\.ocfd$/i, "");
+  // return name;
+  return fileName;
+}
+
+// --- INÍCIO DA MODIFICAÇÃO ---
+// Adicione estas funções globais para marcar o estado do projeto
+
+/** Marca o projeto ativo como "não salvo" (sujo) e atualiza a aba */
+window.markActiveProjectUnsaved = function () {
+  const activeProject = getActiveProject();
+  if (activeProject && !activeProject.isUnsaved) {
+    activeProject.isUnsaved = true;
+    const activeTab = document.getElementById(activeProject.id);
+    if (activeTab) {
+      // const titleSpan = activeTab.querySelector("span");
+      activeTab.classList.add("unsaved");
+      // if (titleSpan && !titleSpan.textContent.endsWith("*")) {
+      //   titleSpan.textContent += "*";
+      // }
+    }
+  }
+};
+
+/** Marca o projeto ativo como "salvo" e atualiza a aba */
+function markActiveProjectSaved(filePath) {
+  const activeProject = getActiveProject();
+  if (activeProject) {
+    activeProject.isUnsaved = false;
+    activeProject.filePath = filePath; // Armazena o caminho
+    activeProject.name = getProjectNameFromPath(filePath); // Atualiza o nome
+
+    const activeTab = document.getElementById(activeProject.id);
+    if (activeTab) {
+      // const titleSpan = activeTab.querySelector("span");
+      activeTab.classList.remove("unsaved");
+      if (titleSpan) {
+        titleSpan.textContent = activeProject.name; // Atualiza o nome
+      }
+    }
+  }
+}
+// --- FIM DA MODIFICAÇÃO ---
+
+/**
+ * Cria um novo projeto na UI e no Engine a partir de dados de um arquivo .ocfd
+ */
+async function createProjectFromData(projectData, filePath = null) {
+  if (!projectData || !projectData.layers) {
+    alert("Erro: Arquivo de projeto inválido ou corrompido.");
+    return;
+  }
+
+  // 1. Salva o estado do projeto atual (se houver um)
+  const currentProject = getActiveProject();
+  if (currentProject) {
+    const state = window.Engine.getState();
+    currentProject.layers = state.layers;
+    currentProject.scale = state.scale;
+    currentProject.originX = state.originX;
+    currentProject.originY = state.originY;
+    currentProject.selectionDataURL = state.selectionDataURL;
+    currentProject.selectionBounds = state.selectionBounds;
+    currentProject.activeLayerId = state.activeLayerId; // Salva o ID
+  }
+
+  // 2. Deserializar camadas: Converter dataURLs de volta para <canvas>
+  const loadedLayers = await Promise.all(
+    projectData.layers.map(async (layerData) => {
+      if (!layerData.image) {
+        // Pode ser uma camada vazia que foi salva sem imagem
+        const emptyCanvas = document.createElement("canvas");
+        emptyCanvas.width = layerData.width || projectData.width;
+        emptyCanvas.height = layerData.height || projectData.height;
+        return { ...layerData, image: emptyCanvas };
+      }
+
+      const img = new Image();
+      img.src = layerData.image; // layer.image é a dataURL
+      try {
+        await img.decode();
+      } catch (e) {
+        console.error("Erro ao decodificar imagem da camada:", e, layerData);
+        // Cria um canvas vazio no lugar se a imagem falhar
+        const fallbackCanvas = document.createElement("canvas");
+        fallbackCanvas.width = layerData.width || projectData.width;
+        fallbackCanvas.height = layerData.height || projectData.height;
+        return { ...layerData, image: fallbackCanvas };
+      }
+
+      // ***** INÍCIO DA CORREÇÃO *****
+      // O motor espera um <img> com o .src (dataURL),
+      // não um <canvas> pré-renderizado.
+
+      // REMOVA ESTAS LINHAS:
+      // const canvas = document.createElement("canvas");
+      // canvas.width = img.width;
+      // canvas.height = img.height;
+      // canvas.getContext("2d").drawImage(img, 0, 0);
+
+      // Reconstrói o objeto da camada, retornando o <img> carregado
+      return { ...layerData, image: img };
+      // ***** FIM DA CORREÇÃO *****
+    })
+  );
+
+  // 3. Criar a aba (lógica similar a createProjectFromHome)
+  const projectId = Date.now();
+  // Remove a extensão .ocfd
+  if (projectData.name && projectData.name.endsWith(".ocfd")) {
+    projectData.name = projectData.name.replace(/\.ocfd$/i, "");
+  }
+  const projectName = projectData.name || "Untitled";
+
+  const tab = document.createElement("button");
+  tab.id = projectId;
+
+  const tabTitle = document.createElement("span");
+  tabTitle.textContent = `${projectName}.ocfd`;
+  tab.appendChild(tabTitle);
+
+  const closeBtn = document.createElement("button");
+  closeBtn.innerHTML = "✕";
+  closeBtn.className = "close-tab-btn";
+  closeBtn.title = "Close Project";
+  closeBtn.addEventListener("click", async (e) => {
+    // <-- Adicione async
+    e.stopPropagation();
+    await closeProject(projectId); // <-- Adicione await
+  });
+  tab.appendChild(closeBtn);
+
+  projectsTabs
+    .querySelectorAll("button")
+    .forEach((b) => b.classList.remove("active"));
+  tab.classList.add("active");
+
+  // Listener da aba
+  tab.addEventListener("click", () => {
+    if (window.Engine.isTransforming() || window.Engine.isCropping()) {
+      alert("Finalize a operação atual (transform/crop) antes de trocar.");
+      return;
+    }
+
+    // Salva o estado do projeto que estava ativo
+    const currentProject = getActiveProject();
+    if (currentProject) {
+      const state = window.Engine.getState();
+      currentProject.layers = state.layers;
+      currentProject.scale = state.scale;
+      currentProject.originX = state.originX;
+      currentProject.originY = state.originY;
+      currentProject.selectionDataURL = state.selectionDataURL;
+      currentProject.selectionBounds = state.selectionBounds;
+      currentProject.activeLayerId = state.activeLayerId; // Salva o ID
+    }
+
+    // Carrega o novo projeto
+    const proj = projects.find((p) => p.id == tab.id);
+    if (proj) {
+      const viewportState = {
+        scale: proj.scale,
+        originX: proj.originX,
+        originY: proj.originY,
+      };
+      // Carrega o projeto no Engine
+      window.Engine.setProject(
+        proj.width,
+        proj.height,
+        proj.layers,
+        viewportState,
+        proj.selectionDataURL,
+        proj.selectionBounds,
+        proj.activeLayerId // Passa o ID da camada ativa
+      );
+      projectsTabs
+        .querySelectorAll("button")
+        .forEach((b) => b.classList.remove("active"));
+      tab.classList.add("active");
+      document.getElementById("zoomScale").style.display = "block";
+      hideHomeScreen();
+    }
+  });
+
+  projectsTabs.appendChild(tab);
+
+  // 4. Adicionar à lista de projetos
+  const newProject = {
+    id: projectId,
+    name: projectName,
+    // --- INÍCIO DA MODIFICAÇÃO ---
+    filePath: filePath, // Armazena o caminho do arquivo (pode ser null)
+    isUnsaved: false, // Um projeto recém-aberto está salvo
+    // --- FIM DA MODIFICAÇÃO ---
+    width: projectData.width,
+    height: projectData.height,
+    layers: loadedLayers, // Armazena as camadas com <img> VIVOS
+    scale: projectData.viewport.scale,
+    originX: projectData.viewport.originX,
+    originY: projectData.viewport.originY,
+    selectionDataURL: projectData.selection
+      ? projectData.selection.dataURL
+      : null,
+    selectionBounds: projectData.selection
+      ? projectData.selection.bounds
+      : null,
+    activeLayerId: projectData.activeLayerId || null,
+    // ***** INÍCIO DA CORREÇÃO *****
+    historyStack: projectData.historyStack || null, // Carrega o histórico
+    // ***** FIM DA CORREÇÃO *****
+  };
+  projects.push(newProject);
+
+  // 5. Ativar o projeto no Engine
+  window.Engine.setProject(
+    newProject.width,
+    newProject.height,
+    newProject.layers, // Passa o array de <img>
+    projectData.viewport,
+    newProject.selectionDataURL,
+    newProject.selectionBounds,
+    newProject.activeLayerId,
+    // ***** INÍCIO DA CORREÇÃO *****
+    newProject.historyStack // Passa o histórico para o motor
+    // ***** FIM DA CORREÇÃO *****
+  );
+
+  // 6. Atualizar UI
+  document.getElementById("zoomScale").style.display = "block";
+  hideHomeScreen();
+  window.context.resizeViewport(window.context);
+}
+
+// --- NOVO: FUNÇÃO PARA FECHAR PROJETO (MODIFICADA) ---
+async function closeProject(projectId) {
+  // <-- Adicionada async
   const projectIndex = projects.findIndex((p) => p.id == projectId);
   if (projectIndex === -1) return;
 
   const project = projects[projectIndex];
 
-  // Use native confirm dialog
-  if (
-    !confirm(
-      `Are you sure you want to close "${project.name}"? Unsaved changes will be lost.`
-    )
-  ) {
-    return;
+  // --- INÍCIO DA MODIFICAÇÃO ---
+  let canClose = false;
+
+  if (project.isUnsaved) {
+    // Pergunta ao usuário o que fazer
+    const choice = await window.electronAPI.confirmClose(project.name);
+
+    if (choice === 0) {
+      // 0: Salvar
+      await saveActiveProject(); // Tenta salvar
+      // Se o projeto ainda não estiver salvo (ex: usuário cancelou o "Salvar Como"),
+      // não feche a aba.
+      if (!project.isUnsaved) {
+        canClose = true;
+      }
+    } else if (choice === 1) {
+      // 1: Não Salvar
+      canClose = true;
+    } else if (choice === 2) {
+      // 2: Cancelar
+      canClose = false;
+    }
+  } else {
+    // Projeto não tem alterações, pode fechar
+    canClose = true;
   }
 
+  if (!canClose) {
+    return; // Usuário cancelou, aborta o fechamento
+  }
+  // --- FIM DA MODIFICAÇÃO ---
+
+  // O código abaixo só executa se canClose for true
   const tabToClose = document.getElementById(projectId);
   const wasActive = tabToClose.classList.contains("active");
 
   let nextActiveTab = null;
   if (wasActive) {
-    // Try to activate the tab to the right
-    nextActiveTab = tabToClose.nextElementSibling;
-    // If there's no tab to the right, try the one to the left
+    // ... (lógica existente para encontrar a próxima aba) ...
     if (!nextActiveTab) {
       nextActiveTab = tabToClose.previousElementSibling;
     }
@@ -491,14 +763,198 @@ function closeProject(projectId) {
 
   if (wasActive) {
     if (nextActiveTab) {
-      // This will either be another project tab or the home tab
       nextActiveTab.click();
     } else {
-      // Fallback to home tab if no other tabs exist
       homeTab.click();
     }
   }
 }
+
+// --- INÍCIO DA MODIFICAÇÃO ---
+// Nova função "Salvar Como..."
+async function saveActiveProjectAs() {
+  const project = getActiveProject();
+  if (!project) {
+    alert("Nenhum projeto ativo para salvar.");
+    return;
+  }
+
+  // 1. Pega o estado e serializa (lógica de serialização copiada)
+  const state = window.Engine.getState();
+  const serializableLayers = state.layers.map((layer) => {
+    let imageDataURL;
+    if (layer.image instanceof HTMLCanvasElement) {
+      imageDataURL = layer.image.toDataURL();
+    } else if (layer.image instanceof HTMLImageElement) {
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = layer.image.naturalWidth;
+      tempCanvas.height = layer.image.naturalHeight;
+      tempCanvas.getContext("2d").drawImage(layer.image, 0, 0);
+      imageDataURL = tempCanvas.toDataURL();
+    } else {
+      imageDataURL = null;
+    }
+    return { ...layer, image: imageDataURL };
+  });
+
+  const projectData = {
+    name: project.name,
+    width: state.projectWidth,
+    height: state.projectHeight,
+    activeLayerId: state.activeLayerId,
+    viewport: {
+      scale: state.scale,
+      originX: state.originX,
+      originY: state.originY,
+    },
+    selection: {
+      dataURL: state.selectionDataURL,
+      bounds: state.selectionBounds,
+    },
+    layers: serializableLayers,
+    historyStack: state.undoStack,
+  };
+
+  // 2. Converte para JSON e envia para o handler "saveProjectAs"
+  try {
+    const jsonString = JSON.stringify(projectData);
+    const defaultName = `${project.name || "Untitled"}.ocfd`;
+
+    // Chama o handler "Save As"
+    const result = await window.electronAPI.saveProjectAs({
+      jsonString,
+      defaultName,
+    });
+
+    if (result && result.success && result.filePath) {
+      // Marca como salvo com o NOVO caminho
+      markActiveProjectSaved(result.filePath);
+      alert("Projeto salvo em: " + result.filePath);
+    } else if (result && result.error) {
+      alert("Erro ao salvar o projeto: " + result.error);
+    }
+  } catch (err) {
+    console.error("Erro ao serializar o projeto:", err);
+    alert("Erro fatal ao preparar o projeto para salvar.");
+  }
+}
+
+// Nova função "Salvar" inteligente
+async function saveActiveProject() {
+  const project = getActiveProject();
+  if (!project) {
+    alert("Nenhum projeto ativo para salvar.");
+    return;
+  }
+
+  console.log("Salvando o projeto:", project);
+
+  // Se o projeto não tiver um caminho, execute "Salvar Como"
+  if (!project.filePath) {
+    await saveActiveProjectAs();
+    return;
+  }
+
+  // Se o projeto já tem um caminho, execute o "Salvar" rápido
+
+  // 1. Pega o estado e serializa (lógica de serialização copiada)
+  const state = window.Engine.getState();
+  const serializableLayers = state.layers.map((layer) => {
+    let imageDataURL;
+    if (layer.image instanceof HTMLCanvasElement) {
+      imageDataURL = layer.image.toDataURL();
+    } else if (layer.image instanceof HTMLImageElement) {
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = layer.image.naturalWidth;
+      tempCanvas.height = layer.image.naturalHeight;
+      tempCanvas.getContext("2d").drawImage(layer.image, 0, 0);
+      imageDataURL = tempCanvas.toDataURL();
+    } else {
+      imageDataURL = null;
+    }
+    return { ...layer, image: imageDataURL };
+  });
+
+  const projectData = {
+    name: project.name,
+    width: state.projectWidth,
+    height: state.projectHeight,
+    activeLayerId: state.activeLayerId,
+    viewport: {
+      scale: state.scale,
+      originX: state.originX,
+      originY: state.originY,
+    },
+    selection: {
+      dataURL: state.selectionDataURL,
+      bounds: state.selectionBounds,
+    },
+    layers: serializableLayers,
+    historyStack: state.undoStack,
+  };
+
+  // 2. Converte para JSON e envia para o handler "saveProject" (rápido)
+  try {
+    const jsonString = JSON.stringify(projectData);
+
+    // Chama o handler "Save" (rápido)
+    const result = await window.electronAPI.saveProject({
+      jsonString,
+      filePath: project.filePath, // Passa o caminho existente
+    });
+
+    if (result && result.success) {
+      // Marca como salvo
+      markActiveProjectSaved(result.filePath);
+      console.log("Projeto salvo em: " + result.filePath); // Log silencioso
+    } else if (result && result.error) {
+      alert("Erro ao salvar o projeto: " + result.error);
+    }
+  } catch (err) {
+    console.error("Erro ao serializar o projeto:", err);
+    alert("Erro fatal ao preparar o projeto para salvar.");
+  }
+}
+
+// --- NOVO: Listener do botão "Open Project" ---
+btnOpenProject.addEventListener("click", async () => {
+  if (window.Engine.isTransforming() || window.Engine.isCropping()) {
+    alert("Finalize a operação atual (transform/crop) antes de abrir.");
+    return;
+  }
+
+  try {
+    const result = await window.electronAPI.openProject();
+    if (result && result.success) {
+      const projectData = JSON.parse(result.content);
+
+      // Define o nome do projeto com base no nome do arquivo, se não estiver no JSON
+      if (!projectData.name) {
+        projectData.name = getProjectNameFromPath(result.filePath);
+      }
+
+      // --- INÍCIO DA MODIFICAÇÃO ---
+      // Passa o result.filePath para a função
+      await createProjectFromData(projectData, result.filePath);
+      // --- FIM DA MODIFICAÇÃO ---
+    } else if (result && result.error) {
+      alert("Falha ao abrir o projeto: " + result.error);
+    }
+  } catch (err) {
+    console.error("Erro ao abrir e processar o projeto:", err);
+    alert("Erro: O arquivo de projeto pode estar corrompido.");
+  }
+});
+
+// Listener do botão "Save Project" (MODIFICADO)
+btnSaveProject.addEventListener("click", async () => {
+  await saveActiveProject();
+});
+
+// Listener do NOVO botão "Save Project As"
+btnSaveProjectAs.addEventListener("click", async () => {
+  await saveActiveProjectAs();
+});
 
 // --- NOVO: FUNÇÕES DA TELA INICIAL ---
 function showHomeScreen() {
@@ -705,16 +1161,18 @@ function createProjectFromHome() {
   tab.id = projectId;
 
   const tabTitle = document.createElement("span");
-  tabTitle.textContent = projectName;
+  // tabTitle.textContent = projectName;
+  tabTitle.textContent = projectName + ".ocfd";
   tab.appendChild(tabTitle);
 
   const closeBtn = document.createElement("button");
   closeBtn.innerHTML = "✕"; // Using times symbol for 'x'
   closeBtn.className = "close-tab-btn";
   closeBtn.title = "Close Project";
-  closeBtn.addEventListener("click", (e) => {
-    e.stopPropagation(); // Don't trigger tab switch
-    closeProject(projectId);
+  closeBtn.addEventListener("click", async (e) => {
+    // <-- Adiciona async
+    e.stopPropagation();
+    await closeProject(projectId); // <-- Adiciona await
   });
   tab.appendChild(closeBtn);
 
@@ -754,6 +1212,7 @@ function createProjectFromHome() {
       currentProject.selectionDataURL = state.selectionDataURL;
       // CORREÇÃO: Usar selectionBounds
       currentProject.selectionBounds = state.selectionBounds;
+      currentProject.activeLayerId = state.activeLayerId;
       console.log(
         "Salvando layers e viewport do projeto '",
         currentProject.name,
@@ -778,7 +1237,8 @@ function createProjectFromHome() {
         proj.layers,
         viewportState,
         proj.selectionDataURL,
-        proj.selectionBounds // <-- CORREÇÃO: Mude de proj.selectionOffset para proj.selectionBounds
+        proj.selectionBounds, // <-- CORREÇÃO: Mude de proj.selectionOffset para proj.selectionBounds
+        proj.activeLayerId
       );
       // ------------------------------------
       projectsTabs.querySelectorAll("button").forEach((b) => {
@@ -819,6 +1279,10 @@ function createProjectFromHome() {
   projects.push({
     id: projectId,
     name: projectName,
+    // --- INÍCIO DA MODIFICAÇÃO ---
+    filePath: null, // Novo projeto não tem caminho
+    isUnsaved: false, // Novo projeto começa "limpo"
+    // --- FIM DA MODIFICAÇÃO ---
     width: w,
     height: h,
     layers: initialState.layers, // Camadas iniciais (ex: fundo)
@@ -828,6 +1292,7 @@ function createProjectFromHome() {
     selectionDataURL: initialState.selectionDataURL,
     // CORREÇÃO: Usar selectionBounds
     selectionBounds: initialState.selectionBounds,
+    activeLayerId: initialState.activeLayerId,
   });
   // --------------------------------------------------------
 
@@ -1467,19 +1932,26 @@ document.addEventListener("keydown", (e) => {
         e.preventDefault();
         btnOpen.click();
         break;
+      // --- INÍCIO DA MODIFICAÇÃO ---
       case "s":
         e.preventDefault();
-        btnSave.click();
+        if (e.shiftKey) {
+          // Ctrl+Shift+S -> Salvar Como...
+          saveActiveProjectAs();
+        } else {
+          // Ctrl+S -> Salvar
+          saveActiveProject();
+        }
         break;
+      // --- FIM DA MODIFICAÇÃO ---
       case "w":
         e.preventDefault();
         const activeProject = getActiveProject();
         // fechar projeto ativo
         if (activeProject) {
-          closeProject(activeProject.id);
-        }
-        // else, se estiver na home tab, fechar o app
-        else {
+          closeProject(activeProject.id); // Chama a função de fechar (agora assíncrona)
+        } else {
+          // else, se estiver na home tab, fechar o app
           window.close(); // Fecha a janela atual
         }
         break;
@@ -1703,62 +2175,235 @@ canvasContainer.addEventListener("mousemove", (e) => {
   updateBrushPreview(e);
 });
 
-/**
- * --- NOVO: LÓGICA DE ARRASTAR E SOLTAR (DRAG & DROP) ---
- */
-canvasContainer.addEventListener("dragover", (e) => {
-  e.preventDefault(); // MUITO IMPORTANTE: Prevenir o comportamento padrão para permitir o drop.
-  e.stopPropagation();
-  // Verificar se há arquivos sendo arrastados
-  if (e.dataTransfer.items) {
-    const hasFiles = Array.from(e.dataTransfer.items).some(
-      (item) => item.kind === "file"
-    );
-    if (!hasFiles) return; // Se não houver arquivos, não faz nada
-  }
-  // Verificar se há um projeto ativo
-  const activeProject = getActiveProject();
-  if (!activeProject) return; // Se não houver projeto, não faz nada
-  // Opcional: Adicionar um feedback visual, como uma borda
-  // canvasContainer.style.outline = "2px dashed var(--accent-color)";
+// /**
+//  * --- NOVO: LÓGICA DE ARRASTAR E SOLTAR (DRAG & DROP) ---
+//  */
+// canvasContainer.addEventListener("dragover", (e) => {
+//   e.preventDefault(); // MUITO IMPORTANTE: Prevenir o comportamento padrão para permitir o drop.
+//   e.stopPropagation();
+//   // Verificar se há arquivos sendo arrastados
+//   if (e.dataTransfer.items) {
+//     const hasFiles = Array.from(e.dataTransfer.items).some(
+//       (item) => item.kind === "file"
+//     );
+//     if (!hasFiles) return; // Se não houver arquivos, não faz nada
+//   }
+//   // Verificar se há um projeto ativo
+//   const activeProject = getActiveProject();
+//   if (!activeProject) return; // Se não houver projeto, não faz nada
+//   // Opcional: Adicionar um feedback visual, como uma borda
+//   // canvasContainer.style.outline = "2px dashed var(--accent-color)";
+//   canvasContainer.classList.add("drag-over");
+// });
+
+// canvasContainer.addEventListener("dragleave", (e) => {
+//   e.preventDefault();
+//   e.stopPropagation();
+//   // Remove o feedback visual
+//   // canvasContainer.style.outline = "none";
+//   canvasContainer.classList.remove("drag-over");
+// });
+
+// // --- MODIFICADO: Listener de Drop no CONTAINER DO CANVAS ---
+// canvasContainer.addEventListener("drop", async (e) => {
+//   e.preventDefault();
+//   e.stopPropagation();
+//   canvasContainer.classList.remove("drag-over");
+
+//   const files = e.dataTransfer.files;
+//   if (files.length === 0) return;
+
+//   // --- LÓGICA ATUALIZADA ---
+
+//   // Se estivermos na tela inicial, abra projetos ou imagens como novos projetos
+//   if (homeScreen.classList.contains("visible")) {
+//     let fileToOpen = null;
+//     // Prioriza arquivos .ocfd
+//     fileToOpen = Array.from(files).find((f) => f.name.endsWith(".ocfd"));
+
+//     if (fileToOpen) {
+//       // Abre o projeto
+//       try {
+//         // --- CORREÇÃO ---
+//         // O renderer pode ler o conteúdo do arquivo arrastado diretamente.
+//         const fileContent = await fileToOpen.text();
+//         // --- FIM DA CORREÇÃO ---
+
+//         const projectData = JSON.parse(fileContent);
+
+//         console.log("projectData:", projectData);
+
+//         if (!projectData.name) {
+//           projectData.name = getProjectNameFromPath(fileToOpen.name);
+//         }
+//         await createProjectFromData(projectData);
+//       } catch (err) {
+//         console.error("Erro ao ler ou processar o arquivo:", err);
+//         alert("Erro: Arquivo de projeto corrompido ou ilegível.");
+//       }
+//     } else {
+//       // Se não for .ocfd, procura a primeira imagem
+//       fileToOpen = Array.from(files).find((f) => f.type.startsWith("image/"));
+//       if (fileToOpen) {
+//         // TODO: Futuramente, você pode criar um novo projeto com as
+//         // dimensões da imagem. Por enquanto, vamos apenas avisar.
+//         alert(
+//           "Para abrir uma imagem como um novo projeto, use o botão 'Open Image' ou crie um projeto primeiro."
+//         );
+//         // ou, se preferir, crie um projeto com ela:
+//         // window.Engine.loadImage(fileToOpen.path); // (Isso não vai funcionar bem na home)
+//       }
+//     }
+//   }
+//   // Se estivermos em um projeto ativo, adicione arquivos como novas camadas
+//   else {
+//     const activeProject = getActiveProject();
+//     if (!activeProject) return;
+
+//     for (const file of files) {
+//       if (file.type.startsWith("image/")) {
+//         // Lógica existente: Adiciona como camada
+//         const center = window.Engine.screenToProject(
+//           mainCanvas.width / 2,
+//           mainCanvas.height / 2
+//         );
+//         window.Engine.createLayerFromBlob(file, center, true);
+//       } else if (file.name.endsWith(".ocfd")) {
+//         // Futuro: Lógica da Smart Layer que você mencionou
+//         alert("Arraste na barra de abas para abrir como projeto.");
+//       }
+//     }
+//   }
+// });
+
+// // --- NOVO: Listener de Drop na BARRA DE ABAS ---
+// // (Como você mencionou que queria isso no futuro)
+// projectsTabs.addEventListener("dragover", (e) => {
+//   e.preventDefault();
+//   e.stopPropagation();
+//   // Feedback visual
+//   projectsTabs.classList.add("drag-over");
+// });
+
+// projectsTabs.addEventListener("dragleave", (e) => {
+//   e.preventDefault();
+//   e.stopPropagation();
+//   projectsTabs.classList.remove("drag-over");
+// });
+
+// projectsTabs.addEventListener("drop", async (e) => {
+//   e.preventDefault();
+//   e.stopPropagation();
+//   projectsTabs.classList.remove("drag-over");
+
+//   const files = e.dataTransfer.files;
+//   if (files.length > 0) {
+//     for (const file of files) {
+//       if (file.name.endsWith(".ocfd")) {
+//         // É um projeto, vamos abri-lo
+//         try {
+//           // --- CORREÇÃO ---
+//           // O renderer pode ler o conteúdo do arquivo arrastado diretamente.
+//           const fileContent = await file.text();
+//           // --- FIM DA CORREÇÃO ---
+
+//           const projectData = JSON.parse(fileContent);
+//           if (!projectData.name) {
+//             projectData.name = getProjectNameFromPath(file.name);
+//           }
+//           // --- INÍCIO DA MODIFICAÇÃO ---
+//           // Arquivos arrastados não têm um caminho completo (por segurança).
+//           // Eles serão abertos, mas precisarão de "Salvar Como" na primeira vez.
+//           await createProjectFromData(projectData);
+//           // --- FIM DA MODIFICAÇÃO ---
+//         } catch (err) {
+//           console.error("Erro ao ler ou processar o arquivo:", err);
+//           alert("Erro: Arquivo de projeto corrompido ou ilegível.");
+//         }
+//         break; // Abre apenas o primeiro arquivo .ocfd encontrado
+//       }
+//     }
+//   }
+// });
+
+// --- INÍCIO DA NOVA SOLUÇÃO: OUVIR OS EVENTOS DO PRELOAD ---
+
+// --- INÍCIO DA MODIFICAÇÃO ---
+// Listener para mostrar o feedback visual nas ABAS
+window.addEventListener("drag-over-tabs", () => {
+  projectsTabs.classList.add("drag-over");
+  canvasContainer.classList.remove("drag-over");
+});
+
+// Listener para mostrar o feedback visual no CANVAS
+window.addEventListener("drag-over-canvas", () => {
   canvasContainer.classList.add("drag-over");
+  projectsTabs.classList.remove("drag-over");
 });
 
-canvasContainer.addEventListener("dragleave", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  // Remove o feedback visual
-  // canvasContainer.style.outline = "none";
+// (Substitui o antigo listener "drag-started")
+// --- FIM DA MODIFICAÇÃO ---
+
+// Listener para limpar o feedback visual
+window.addEventListener("drag-ended", () => {
   canvasContainer.classList.remove("drag-over");
+  projectsTabs.classList.remove("drag-over");
 });
 
-canvasContainer.addEventListener("drop", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  // canvasContainer.style.outline = "none"; // Limpa o feedback visual
+// Listener principal que recebe o arquivo
+window.addEventListener("project-dropped", async (e) => {
+  const { detail } = e; // detail contém { filePath, content, name }
+
+  // Limpa o feedback visual
   canvasContainer.classList.remove("drag-over");
+  projectsTabs.classList.remove("drag-over");
 
-  // Verificar se há um projeto ativo
-  const activeProject = getActiveProject();
-  if (!activeProject) return; // Se não houver projeto, não faz nada
-
-  const files = e.dataTransfer.files;
-  if (files.length > 0) {
-    for (const file of files) {
-      // Checa se é um tipo de imagem suportado
-      if (file.type.startsWith("image/")) {
-        // Usa a mesma lógica do paste externo: calcula o centro e cria a camada
-
-        // CORREÇÃO AQUI: Renomeado para window.Engine
-        const center = window.Engine.screenToProject(
-          mainCanvas.width / 2,
-          mainCanvas.height / 2
-        );
-        window.Engine.createLayerFromBlob(file, center, true);
-      }
-    }
+  if (!detail || !detail.content) {
+    alert("Erro: Não foi possível ler o arquivo arrastado.");
+    return;
   }
+
+  // --- INÍCIO DA MODIFICAÇÃO ---
+  // Lógica de Roteamento baseada no Alvo (Target)
+  const activeProject = getActiveProject();
+
+  if (
+    detail.target === "tabs" ||
+    (detail.target === "canvas" && !activeProject)
+  ) {
+    // Se soltar nas abas (sempre abre)
+    // OU Se soltar no canvas E NÃO HÁ projeto ativo (trata como "abrir")
+    try {
+      const projectData = JSON.parse(detail.content);
+      if (!projectData.name) {
+        projectData.name = getProjectNameFromPath(detail.name);
+      }
+      await createProjectFromData(projectData, detail.filePath);
+    } catch (err) {
+      console.error("Erro ao processar o projeto (abrir):", err);
+      alert("Erro: Arquivo de projeto corrompido ou ilegível.");
+    }
+  } else if (detail.target === "canvas" && activeProject) {
+    // Se soltar no canvas E HÁ um projeto ativo (Smart Layer)
+
+    // TODO: Lógica da Smart Layer
+    console.log(
+      "Arquivo .ocfd solto no canvas (Smart Layer):",
+      detail.name,
+      detail.filePath
+    );
+    alert("Importar como Smart Layer (ainda não implementado).");
+
+    // Futuramente, você chamaria algo como:
+    // await importAsSmartLayer(detail.filePath, detail.content);
+  } else {
+    // Soltou em outro lugar (ex: painel lateral)
+    console.warn("Arquivo solto em local não tratado:", detail.target);
+  }
+  // --- FIM DA MODIFICAÇÃO ---
 });
+
+// --- FIM DA NOVA SOLUÇÃO ---
 
 // Initialize UI
 document.getElementById("moveTool").click();

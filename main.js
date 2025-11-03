@@ -178,6 +178,97 @@ app.whenReady().then(() => {
     }
   });
 
+  // 1. RENOMEIE o handler "dialog:saveProject" para "dialog:saveProjectAs"
+  ipcMain.handle(
+    "dialog:saveProjectAs",
+    async (event, { jsonString, defaultName }) => {
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: "Salvar Projeto Como...", // Título atualizado
+        defaultPath: defaultName || "projeto.ocfd",
+        filters: [{ name: "OpenCreate Forge Document", extensions: ["ocfd"] }],
+      });
+      if (canceled || !filePath) {
+        // Retorna o filePath como nulo se cancelado
+        return { success: false, filePath: null };
+      }
+      let projectData = await JSON.parse(jsonString);
+      projectData = {
+        ...projectData,
+        originalName: projectData.name,
+        name: filePath.split(/[\\/]/).pop(),
+      };
+
+      jsonString = JSON.stringify(projectData);
+
+      try {
+        await fs.writeFile(filePath, jsonString);
+        return { success: true, filePath }; // Retorna o caminho bem-sucedido
+      } catch (err) {
+        return { success: false, error: err.message, filePath: null };
+      }
+    }
+  );
+
+  // 2. CRIE o NOVO handler "fs:saveProject" para salvamento rápido
+  ipcMain.handle("fs:saveProject", async (event, { jsonString, filePath }) => {
+    if (!filePath) {
+      return { success: false, error: "Nenhum caminho de arquivo fornecido." };
+    }
+    try {
+      await fs.writeFile(filePath, jsonString); // Salva no caminho existente
+      return { success: true, filePath };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // 3. ADICIONE um handler para o diálogo de confirmação de fechamento
+  ipcMain.handle("dialog:confirmClose", async (event, projectName) => {
+    const { response } = await dialog.showMessageBox({
+      type: "question",
+      buttons: ["Salvar", "Não Salvar", "Cancelar"],
+      defaultId: 0, // Botão "Salvar" é o padrão
+      cancelId: 2, // Botão "Cancelar"
+      message: `Deseja salvar as alterações em "${projectName}"?`,
+      detail: "Suas alterações serão perdidas se você não as salvar.",
+    });
+    return response; // Retorna o índice do botão clicado (0, 1, ou 2)
+  });
+
+  // --- NOVO: Handler para abrir o arquivo de projeto (.ocfd) ---
+  ipcMain.handle("dialog:openProject", async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: "Abrir Projeto",
+      properties: ["openFile"],
+      filters: [{ name: "OpenCreate Forge Document", extensions: ["ocfd"] }],
+    });
+    if (canceled || !filePaths[0]) {
+      return null;
+    }
+
+    const filePath = filePaths[0];
+    try {
+      // ***** INÍCIO DA CORREÇÃO *****
+      // Esta linha é ESSENCIAL. Ela lê o arquivo.
+      const content = await fs.readFile(filePath, "utf8");
+      // Retorna o conteúdo para o app.js
+      return { success: true, filePath, content };
+      // ***** FIM DA CORREÇÃO *****
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // --- NOVO: Handler para ler um arquivo (usado pelo Drag-and-Drop) ---
+  // ipcMain.handle("fs:readFile", async (event, filePath) => {
+  //   try {
+  //     const content = await fs.readFile(filePath, "utf8");
+  //     return { success: true, content };
+  //   } catch (err) {
+  //     return { success: false, error: err.message };
+  //   }
+  // });
+
   if (process.platform === "darwin") {
     const iconPath = path.join(__dirname, "favicon-darwin.png");
     app.dock.setIcon(iconPath);

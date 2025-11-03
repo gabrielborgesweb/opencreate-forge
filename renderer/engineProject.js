@@ -87,7 +87,11 @@ export function setProject(
   projLayers,
   viewportState = {},
   selectionDataURL = null,
-  selBounds = null
+  selBounds = null,
+  // ***** INÍCIO DA CORREÇÃO *****
+  activeLayerId = null, // 1. Aceita activeLayerId
+  historyStack = null // 2. Aceita historyStack
+  // ***** FIM DA CORREÇÃO *****
 ) {
   context.projectWidth = w;
   context.projectHeight = h;
@@ -140,6 +144,23 @@ export function setProject(
       context.originY = viewportState.originY;
     } else {
       context.fitToScreen();
+    }
+
+    // 4. Restaura o histórico
+    // O seu engineHistory.js já salva/lê estados com dataURLs,
+    // então podemos carregar o stack diretamente.
+    if (
+      historyStack &&
+      Array.isArray(historyStack) &&
+      historyStack.length > 0
+    ) {
+      context.undoStack = historyStack;
+      context.redoStack = []; // Limpa o "refazer"
+    } else {
+      // Se não há histórico, este estado carregado é o primeiro
+      context.undoStack = [];
+      context.redoStack = [];
+      // context.saveState(); // Salva o estado "aberto"
     }
 
     resizeViewport(context);

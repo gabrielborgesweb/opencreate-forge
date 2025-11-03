@@ -13,6 +13,15 @@ import * as Transform from "./engineTransform.js";
 import * as Input from "./engineInput.js";
 import * as Crop from "./engineCrop.js";
 
+// --- INÍCIO DA CORREÇÃO ---
+// Crie os canvases de seleção "off-screen" aqui,
+// no escopo global do módulo.
+const selectionCanvas = document.createElement("canvas");
+const selectionCtx = selectionCanvas.getContext("2d", {
+  willReadFrequently: true, // Otimização para getImageData
+});
+// --- FIM DA CORREÇÃO ---
+
 // 2. Definir o Objeto de Contexto (Estado Central)
 const context = {
   // --- Constantes ---
@@ -71,8 +80,8 @@ const context = {
   },
 
   // --- Estado da Seleção ---
-  selectionCanvas: null,
-  selectionCtx: null,
+  selectionCanvas: selectionCanvas, // <-- Atribui o canvas recém-criado
+  selectionCtx: selectionCtx, // <-- Atribui o context recém-criado
   hasSelection: false,
   selectionBounds: null,
   newSelectionRect: null,
@@ -437,7 +446,6 @@ function draw() {
   }
 }
 
-// --- NOVO: Adicionar esta função em algum lugar antes do "4. Ligar (Bind)") ---
 /** Restaura a seleção a partir de dados salvos (bounds e dataURL) */
 function restoreSelection(context, restoreData) {
   if (!restoreData || !restoreData.bounds || !restoreData.dataURL) {
@@ -462,7 +470,16 @@ function restoreSelection(context, restoreData) {
 // 4. Ligar (Bind) todas as funções ao Contexto
 // Isso permite que os módulos chamem funções uns dos outros (ex: History.js chama Selection.js)
 context.draw = draw;
-context.saveState = () => History.saveState(context);
+// --- INÍCIO DA MODIFICAÇÃO ---
+// Modifique o context.saveState para notificar a UI
+context.saveState = () => {
+  History.saveState(context); // Chama a função original
+  // Notifica a UI (app.js) que o projeto está "sujo"
+  if (window.markActiveProjectUnsaved) {
+    window.markActiveProjectUnsaved();
+  }
+};
+// --- FIM DA MODIFICAÇÃO ---
 context.restoreState = (state) => History.restoreState(context, state);
 context.restoreSelection = (data) => restoreSelection(context, data); // <-- ADICIONAR ESTA LINHA
 context.clearSelection = () => Selection.clearSelection(context);
@@ -532,8 +549,50 @@ window.Engine = {
   exportImage: () => Project.exportImage(context),
   draw: draw,
   resetViewport: () => Project.resetViewport(context),
-  setProject: (w, h, layers, viewport, selData, selBounds) =>
-    Project.setProject(context, w, h, layers, viewport, selData, selBounds),
+  setProject: (
+    w,
+    h,
+    layers,
+    viewport,
+    selData,
+    selBounds,
+    activeLayerId,
+    // ***** INÍCIO DA CORREÇÃO *****
+    historyStack // 1. Aceita o novo argumento
+    // ***** FIM DA CORREÇÃO *****
+  ) => {
+    // ***** INÍCIO DA CORREÇÃO *****
+
+    // 1. REATIVE a chamada para Project.setProject.
+    //    O app.js agora envia <img>, que é o que Project.setProject espera.
+    // 2. Passe o activeLayerId para que ele possa ser definido
+    //    após o carregamento assíncrono das imagens.
+    Project.setProject(
+      context,
+      w,
+      h,
+      layers,
+      viewport,
+      selData,
+      selBounds,
+      activeLayerId,
+      // ***** INÍCIO DA CORREÇÃO *****
+      historyStack // 2. Passa para a função real
+      // ***** FIM DA CORREÇÃO *****
+    );
+
+    // 3. REMOVA toda a lógica manual que definia o contexto.
+    //    Project.setProject é agora o único responsável por isso.
+    /*
+    context.layers = layers; 
+    context.projectWidth = w;
+    context.projectHeight = h;
+    ... (toda a lógica que adicionamos antes deve ser removida daqui) ...
+    Renderer.updateLayersPanel(context);
+    context.draw();
+    */
+    // ***** FIM DA CORREÇÃO *****
+  },
   createEmptyLayer: (name) => Layers.createEmptyLayer(context, name),
   addFillLayer: (color, name) => Layers.addFillLayer(context, color, name),
   updateLayersPanel: () => Renderer.updateLayersPanel(context),
@@ -543,7 +602,7 @@ window.Engine = {
     projectWidth: context.projectWidth,
     projectHeight: context.projectHeight,
     layers: context.layers,
-    activeLayer: context.activeLayer,
+    activeLayerId: context.activeLayer ? context.activeLayer.id : null,
     scale: context.scale,
     originX: context.originX,
     originY: context.originY,
@@ -552,6 +611,9 @@ window.Engine = {
       ? context.selectionCanvas.toDataURL()
       : null,
     selectionBounds: context.hasSelection ? context.selectionBounds : null,
+    // ***** INÍCIO DA CORREÇÃO *****
+    undoStack: context.undoStack, // Adiciona o stack ao estado
+    // ***** FIM DA CORREÇÃO *****
   }),
 
   // Histórico

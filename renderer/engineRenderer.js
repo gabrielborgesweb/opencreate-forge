@@ -1,5 +1,217 @@
 // renderer/engineRenderer.js
 
+/** Inicia a renomeação de uma camada */
+function startRename(e, nameSpan, layer, context) {
+  // 'nameSpan' agora é passado diretamente, não pego de e.target
+
+  e.stopPropagation(); // Impede que o clique ative a camada
+  const { saveState } = context;
+
+  // console.log("startRename:", nameSpan.parentElement);
+
+  // ***** CORREÇÃO: Removida a linha que usava e.target *****
+  // const nameSpan = e.target; // Esta linha falhava (e.target era null)
+  // ***** FIM DA CORREÇÃO *****
+
+  const div = nameSpan.parentElement;
+
+  // Substituir o span por um input
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = layer.name;
+  input.className = "layer-rename-input"; // Para estilização
+
+  // Manter o layout
+  input.style.flex = "1";
+
+  div.replaceChild(input, nameSpan);
+  input.focus();
+  input.select();
+
+  const finishRename = () => {
+    // console.log("finishRename");
+
+    const newName = input.value.trim();
+    if (newName && newName !== layer.name) {
+      layer.name = newName;
+      saveState();
+    }
+    // Redesenha o painel de camadas para restaurar o span
+    // Usar a API exposta no window.Engine
+    window.Engine.updateLayersPanel();
+  };
+
+  input.onblur = finishRename;
+  input.onkeydown = (ke) => {
+    if (ke.key === "Enter") {
+      ke.preventDefault();
+      input.blur();
+    } else if (ke.key === "Escape") {
+      ke.preventDefault();
+      input.value = layer.name; // Cancela a edição
+      input.blur();
+    }
+  };
+}
+
+/** Inicia o arraste */
+function handleDragStart(e, layer, context) {
+  e.stopPropagation();
+  e.dataTransfer.setData("text/plain", layer.id);
+
+  // ***** CORREÇÃO: Reabilitado. Essencial para o drag-drop. *****
+  e.dataTransfer.effectAllowed = "move";
+  // ***** FIM DA CORREÇÃO *****
+
+  // Usar e.currentTarget para garantir que é o .layer-item
+  e.currentTarget.classList.add("dragging");
+
+  // --- INÍCIO DA CORREÇÃO ---
+  // Sinaliza ao 'preload.js' (ouvinte global)
+  // para ignorar este evento de D&D.
+  window.isLayerDragging = true;
+  // --- FIM DA CORREÇÃO ---
+}
+
+/** No final do arraste (com sucesso ou não), limpa as classes */
+function handleDragEnd(e, context) {
+  e.stopPropagation();
+  // Limpa todas as classes de feedback de arraste de todos os elementos
+  document
+    .querySelectorAll(".layer-item.dragging")
+    .forEach((el) => el.classList.remove("dragging"));
+  document
+    .querySelectorAll(".layer-item.drag-over-top")
+    .forEach((el) => el.classList.remove("drag-over-top"));
+  document
+    .querySelectorAll(".layer-item.drag-over-bottom")
+    .forEach((el) => el.classList.remove("drag-over-bottom"));
+
+  // --- INÍCIO DA CORREÇÃO ---
+  // Limpa a flag global.
+  window.isLayerDragging = false;
+  // --- FIM DA CORREÇÃO ---
+}
+
+/** Controla sobre qual item estamos arrastando */
+function handleDragOver(e, div) {
+  // --- INÍCIO DA CORREÇÃO ---
+  // Se não for um arraste de camada (ex: um arquivo), ignore.
+  if (!window.isLayerDragging) {
+    return;
+  }
+  // --- FIM DA CORREÇÃO ---
+
+  if (div.classList.contains("dragging")) {
+    return;
+  }
+  // console.log("handleDragOver:", e);
+
+  e.preventDefault(); // Necessário para permitir o drop
+
+  // ***** CORREÇÃO: Reabilitado. Essencial para o drag-drop. *****
+  e.dataTransfer.dropEffect = "move";
+  // ***** FIM DA CORREÇÃO *****
+
+  // ***** LÓGICA DE UX: Implementando sua sugestão *****
+  // Verifica se o mouse está na metade superior ou inferior do item
+  const rect = div.getBoundingClientRect();
+  const midY = rect.top + rect.height / 2;
+
+  if (e.clientY < midY) {
+    div.classList.add("drag-over-top");
+    div.classList.remove("drag-over-bottom");
+  } else {
+    div.classList.add("drag-over-bottom");
+    div.classList.remove("drag-over-top");
+  }
+  // ***** FIM DA LÓGICA DE UX *****
+}
+
+/** Limpa a classe quando saímos de um item */
+function handleDragLeave(e, div) {
+  // --- INÍCIO DA CORREÇÃO ---
+  // Se não for um arraste de camada (ex: um arquivo), ignore.
+  if (!window.isLayerDragging) {
+    return;
+  }
+  // --- FIM DA CORREÇÃO ---
+
+  // console.log("handleDragLeave:", div);
+  // Limpa ambos os feedbacks
+  div.classList.remove("drag-over-top");
+  div.classList.remove("drag-over-bottom");
+}
+
+/** Lógica de soltar (drop) */
+function handleDrop(e, targetLayer, context) {
+  // --- INÍCIO DA CORREÇÃO ---
+  // Se não for um arraste de camada (ex: um arquivo), ignore.
+  if (!window.isLayerDragging) {
+    return;
+  }
+  // --- FIM DA CORREÇÃO ---
+
+  e.preventDefault();
+  // MUITO IMPORTANTE: Impede que o 'drop' borbulhe para o 'body'
+  // e acione o D&D de arquivos.
+  e.stopPropagation();
+
+  const draggedId = e.dataTransfer.getData("text/plain");
+  const targetId = targetLayer.id;
+
+  // Pega o elemento DOM que sofreu o drop
+  const dropTargetElement = e.currentTarget;
+  const isDropOnTopHalf = dropTargetElement.classList.contains("drag-over-top");
+
+  // Limpa as classes de feedback visual (o handleDragEnd fará o resto)
+  dropTargetElement.classList.remove("drag-over-top");
+  dropTargetElement.classList.remove("drag-over-bottom");
+  handleDragEnd(e, context); // Limpa tudo
+
+  if (draggedId === targetId) {
+    return; // Soltou em si mesmo
+  }
+
+  const { layers, saveState, draw, setActiveLayer } = context;
+  const draggedIndex = layers.findIndex((l) => l.id == draggedId);
+
+  if (draggedIndex === -1) return;
+
+  // Lógica de reordenação
+  // 1. Remove o item arrastado
+  const [draggedLayer] = layers.splice(draggedIndex, 1);
+
+  // 2. Re-encontra o índice do alvo, pois o array mudou
+  // Este é o índice do targetLayer no *novo* array (sem o item arrastado)
+  let targetIndex = layers.findIndex((l) => l.id == targetId);
+
+  // 3. Determina onde inserir
+  // A lista visual é invertida (índice 0 do array é a camada de baixo)
+  // - Soltar na "metade de cima" (visual) significa "antes" (visual).
+  // - "Antes" (visual) de um item significa "depois" (no array).
+  // - Soltar na "metade de baixo" (visual) significa "depois" (visual).
+  // - "Depois" (visual) de um item significa "antes" (no array).
+
+  let insertIndex;
+  if (isDropOnTopHalf) {
+    // Insere *depois* do alvo no array (visualmente *acima*)
+    insertIndex = targetIndex + 1;
+  } else {
+    // Insere *antes* do alvo no array (visualmente *abaixo*)
+    insertIndex = targetIndex;
+  }
+
+  layers.splice(insertIndex, 0, draggedLayer);
+
+  saveState();
+  window.Engine.updateLayersPanel(); // Usa a API para redesenhar o painel
+  draw();
+
+  // Ativa a camada que foi movida
+  setActiveLayer(draggedId);
+}
+
 /** Cria ou retorna o padrão de quadriculado (checkerboard) */
 export function getCheckerPattern(context) {
   const { ctx } = context;
@@ -293,6 +505,8 @@ export function drawDebugHitboxes(context) {
 }
 
 export function updateLayersPanel(context) {
+  console.log("updateLayersPanel");
+
   const { layersList, setActiveLayer, draw, saveState } = context;
   let { layers, activeLayer } = context;
 
@@ -306,15 +520,35 @@ export function updateLayersPanel(context) {
     const layer = layers[i];
     const div = document.createElement("div");
     div.className = "layer-item";
-    div.style.display = "flex";
-    div.style.alignItems = "center";
-    div.style.padding = "6px";
-    div.style.background = layer === activeLayer ? "#555" : "transparent";
+    if (layer === activeLayer) {
+      div.classList.add("layer-item-active");
+    }
+    // div.style.display = "flex";
+    // div.style.alignItems = "center";
+    // div.style.padding = "6px";
+    // div.style.background = layer === activeLayer ? "#555" : "transparent";
+
+    // ***** INÍCIO DA MODIFICAÇÃO: Adicionar Drag & Drop e ID *****
+    div.dataset.layerId = layer.id;
+    div.draggable = true;
+
+    div.ondragstart = (e) => handleDragStart(e, layer, context);
+    div.ondragover = (e) => handleDragOver(e, div);
+    div.ondragleave = (e) => handleDragLeave(e, div);
+
+    // ***** CORREÇÃO: Usar 'layer' em vez de 'targetLayer' *****
+    div.ondrop = (e) => handleDrop(e, layer, context);
+    // ***** FIM DA CORREÇÃO *****
+
+    div.ondragend = (e) => handleDragEnd(e, context);
+    // ***** FIM DA MODIFICAÇÃO *****
 
     // Visibility toggle
     const visibilityBtn = document.createElement("button");
-    visibilityBtn.innerHTML = layer.visible ? "👁" : "👁‍🗨";
-    visibilityBtn.style.marginRight = "8px";
+    visibilityBtn.classList.add("visibility-btn");
+    visibilityBtn.classList.add(
+      layer.visible ? "visibility-btn" : "visibility-btn-hidden"
+    );
     visibilityBtn.onclick = (e) => {
       e.stopPropagation();
       layer.visible = !layer.visible;
@@ -323,27 +557,42 @@ export function updateLayersPanel(context) {
       draw();
     };
 
+    // Thumbnail
+    const thumbnail = document.createElement("img");
+    thumbnail.className = "layer-thumbnail";
+    thumbnail.src = layer.image.src;
+
     // Layer name
     const name = document.createElement("span");
     name.textContent = layer.name;
-    name.style.flex = "1";
+
+    // ***** INÍCIO DA CORREÇÃO *****
+    // Passar 'name' (o próprio <span>) para startRename,
+    // já que 'e.target' não é confiável.
+    name.ondblclick = (e) => startRename(e, name, layer, context);
+    // ***** FIM DA CORREÇÃO *****
 
     // Delete button
-    const deleteBtn = document.createElement("button");
-    deleteBtn.innerHTML = "🗑";
-    deleteBtn.onclick = (e) => {
-      e.stopPropagation();
-      context.layers = context.layers.filter((l) => l.id !== layer.id);
-      if (context.activeLayer === layer) {
-        context.activeLayer = context.layers[context.layers.length - 1] || null;
+    // const deleteBtn = document.createElement("button");
+    // deleteBtn.innerHTML = "🗑";
+    // deleteBtn.onclick = (e) => {
+    //   e.stopPropagation();
+    //   context.layers = context.layers.filter((l) => l.id !== layer.id);
+    //   if (context.activeLayer === layer) {
+    //     context.activeLayer = context.layers[context.layers.length - 1] || null;
+    //   }
+    //   saveState();
+    //   updateLayersPanel(context);
+    //   draw();
+    // };
+
+    div.append(visibilityBtn, thumbnail, name);
+    div.onclick = () => {
+      if (context.activeLayer.id != layer.id) {
+        setActiveLayer(layer.id);
       }
-      saveState();
-      updateLayersPanel(context);
-      draw();
     };
 
-    div.append(visibilityBtn, name, deleteBtn);
-    div.onclick = () => setActiveLayer(layer.id);
     layersList.appendChild(div);
   }
 }

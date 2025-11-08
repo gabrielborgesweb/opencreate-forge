@@ -16,6 +16,8 @@ const toolButtons = document.querySelectorAll(".tool-button");
 let lastUserSelectMode = "replace";
 
 const btnAddEmptyLayer = document.getElementById("btnAddEmptyLayer");
+const btnDeleteActiveLayer = document.getElementById("btnDeleteActiveLayer");
+
 const selectedToolDiv = document.getElementById("selectedtool");
 // NOVO: Elemento de pré-visualização
 const brushPreview = document.getElementById("brushPreview");
@@ -506,7 +508,7 @@ function markActiveProjectSaved(filePath) {
 
     const activeTab = document.getElementById(activeProject.id);
     if (activeTab) {
-      // const titleSpan = activeTab.querySelector("span");
+      const titleSpan = activeTab.querySelector("span");
       activeTab.classList.remove("unsaved");
       if (titleSpan) {
         titleSpan.textContent = activeProject.name; // Atualiza o nome
@@ -1812,6 +1814,51 @@ btnAddEmptyLayer.addEventListener("click", () => {
   }
   window.Engine.createEmptyLayer();
 });
+
+// ***** INÍCIO DA ADIÇÃO *****
+// Delete active layer button handler
+btnDeleteActiveLayer.addEventListener("click", () => {
+  const activeProject = getActiveProject();
+  if (!activeProject) {
+    alert("Create a project first");
+    return;
+  }
+
+  // O engine.js expõe o 'context' globalmente
+  if (!window.context || !window.context.activeLayer) {
+    console.warn("No active layer to delete.");
+    return;
+  }
+
+  const { layers, activeLayer, saveState, draw, setActiveLayer } =
+    window.context;
+  const layerIdToDelete = activeLayer.id;
+
+  const indexToDelete = layers.findIndex((l) => l.id === layerIdToDelete);
+  if (indexToDelete === -1) return;
+
+  // Remove a camada
+  layers.splice(indexToDelete, 1);
+
+  // Determina a nova camada ativa
+  let newActiveId = null;
+  if (layers.length > 0) {
+    // Tenta selecionar a camada que ficou no mesmo índice (a camada "abaixo")
+    // Se deletamos a última, seleciona a nova última
+    const newIndex = Math.min(indexToDelete, layers.length - 1);
+    newActiveId = layers[newIndex].id;
+  }
+
+  // `setActiveLayer` (exposto pelo engine) cuida de definir
+  // context.activeLayer e atualizar o painel
+  setActiveLayer(newActiveId);
+
+  // Salva o estado e redesenha
+  saveState();
+  window.Engine.updateLayersPanel(); // Atualiza a UI de camadas
+  draw();
+});
+// ***** FIM DA ADIÇÃO *****
 
 // MODIFICADO: Adicionar atalhos de teclado
 document.addEventListener("keydown", (e) => {

@@ -1,3 +1,5 @@
+// preload.js
+
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -38,6 +40,10 @@ window.addEventListener("DOMContentLoaded", () => {
   document.body.addEventListener(
     "drop",
     async (e) => {
+      if (window.isLayerDragging) {
+        return;
+      }
+
       e.preventDefault();
       e.stopPropagation();
 
@@ -101,44 +107,59 @@ window.addEventListener("DOMContentLoaded", () => {
       // Você pode adicionar um 'else if' aqui e disparar um evento
       // 'image-dropped' com o file.path e o tipo.
     },
-    true
+    false // <-- MUDANÇA CRUCIAL: de 'true' para 'false'
   ); // Use 'capture' para pegar o evento primeiro
 
   // 4. Prevenir o comportamento padrão do 'dragover' é essencial
+  // --- INÍCIO DA CORREÇÃO ---
+  // Esta é a única função que precisa ser alterada.
   document.body.addEventListener(
     "dragover",
     (e) => {
+      // 1. CHAME PREVENTDEFAULT() IMEDIATAMENTE.
+      // Isso sinaliza ao navegador que um drop é permitido,
+      // permitindo que o evento continue a propagar.
       e.preventDefault();
+
+      // 2. Verifique a flag.
+      if (window.isLayerDragging) {
+        // É um arraste de camada. Apenas retorne e deixe
+        // o `div.ondragover` do engineRenderer lidar com o evento.
+        return true;
+      }
+
+      // 3. Se NÃO for um arraste de camada, é um ARQUIVO.
+      // Agora podemos parar a propagação (para não confundir o div)
+      // e mostrar a UI de feedback de arquivo.
       e.stopPropagation();
-      // Envia um evento para o app.js mostrar o feedback visual
-      // --- INÍCIO DA MODIFICAÇÃO ---
-      // Lógica de feedback visual isolado
+
+      // Lógica de feedback visual (para arquivos)
       if (projectsTabs && projectsTabs.contains(e.target)) {
-        // Está sobre as abas
         window.dispatchEvent(new CustomEvent("drag-over-tabs"));
       } else if (canvasContainer && canvasContainer.contains(e.target)) {
-        // Está sobre o canvas
         window.dispatchEvent(new CustomEvent("drag-over-canvas"));
       } else {
-        // Está sobre qualquer outra coisa (limpa os destaques)
         window.dispatchEvent(new CustomEvent("drag-ended"));
       }
-      // REMOVE a linha antiga: window.dispatchEvent(new CustomEvent("drag-started"));
-      // --- FIM DA MODIFICAÇÃO ---
     },
-    true
+    false // <-- MUDANÇA CRUCIAL: de 'true' para 'false'
   );
+  // --- FIM DA CORREÇÃO ---
 
   // 5. Limpa o feedback visual se o mouse sair
   document.body.addEventListener(
     "dragleave",
     (e) => {
+      if (window.isLayerDragging) {
+        return;
+      }
+
       e.preventDefault();
       e.stopPropagation();
       // Envia um evento para o app.js limpar o feedback visual
       window.dispatchEvent(new CustomEvent("drag-ended"));
     },
-    true
+    false // <-- MUDANÇA CRUCIAL: de 'true' para 'false'
   );
 });
 // --- FIM DA NOVA SOLUÇÃO ---

@@ -130,10 +130,18 @@
           <div id="layersPanel" class="panel">
             <h3 style="margin-block-start: 0">Layers</h3>
             <div id="layersList" class="list"></div>
+            <div class="layerActions">
+              <button id="btnDeleteActiveLayer" title="Remover Camada">
+                <svg-src src="assets/svg/Crop.svg"></svg-src>
+              </button>
+              <button id="btnAddEmptyLayer" title="Nova Camada">
+                <svg-src src="assets/svg/Crop.svg"></svg-src>
+              </button>
+            </div>
             <div
               style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px"
             >
-              <button id="btnAddEmptyLayer">+ Empty Layer</button>
+              <!-- <button id="btnAddEmptyLayer">+ Empty Layer</button> -->
               <button id="btnOpen">+ Image Layer</button>
 
               <button id="btnOpenProject">Open Project...</button>

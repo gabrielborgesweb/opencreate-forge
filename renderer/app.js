@@ -800,7 +800,7 @@ async function saveActiveProjectAs() {
   });
 
   const projectData = {
-    name: project.name,
+    name: project.name.replace(".ocfd", ""),
     width: state.projectWidth,
     height: state.projectHeight,
     activeLayerId: state.activeLayerId,

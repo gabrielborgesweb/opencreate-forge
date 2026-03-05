@@ -1802,6 +1802,11 @@ toolButtons.forEach((btn) => {
     if (lastMouseEvent) {
       updateBrushPreview(lastMouseEvent);
     }
+
+    // Se a ferramenta for typeTool, renderize as opções:
+    if (btn.id === "typeTool") {
+      updateTypeToolOptions();
+    }
   });
 });
 
@@ -2168,6 +2173,97 @@ function updateBrushPreview(e) {
     brushPreview.style.display = "block";
   }
 }
+
+// Função para renderizar a barra de opções
+function renderTypeToolOptions() {
+  selectedToolDiv.innerHTML = "";
+  const context = window.Engine.getContext();
+  const opts = context.tools["typeTool"];
+
+  // 1. Cor
+  const colorInp = document.createElement("input");
+  colorInp.type = "color";
+  colorInp.value = opts.color;
+  colorInp.oninput = (e) => {
+    window.Engine.setToolOption("typeTool", "color", e.target.value);
+    updateActiveTextLayer("color", e.target.value);
+  };
+
+  // 2. Tamanho
+  const sizeInp = document.createElement("input");
+  sizeInp.type = "number";
+  sizeInp.value = opts.size;
+  sizeInp.min = 1;
+  sizeInp.style.width = "60px";
+  sizeInp.onchange = (e) => {
+    const val = Number(e.target.value);
+    window.Engine.setToolOption("typeTool", "size", val);
+    updateActiveTextLayer("size", val);
+  };
+
+  // 3. Alinhamento
+  const alignSel = document.createElement("select");
+  ["left", "center", "right", "justify"].forEach((al) => {
+    const o = document.createElement("option");
+    o.value = al;
+    o.text = al;
+    if (al === opts.align) o.selected = true;
+    alignSel.appendChild(o);
+  });
+  alignSel.onchange = (e) => {
+    window.Engine.setToolOption("typeTool", "align", e.target.value);
+    updateActiveTextLayer("align", e.target.value);
+  };
+
+  // 4. Texto (Edição rápida)
+  const textInp = document.createElement("input");
+  textInp.type = "text";
+  textInp.placeholder = "Type content...";
+  textInp.value = opts.text;
+  textInp.style.width = "200px";
+  textInp.oninput = (e) => {
+    window.Engine.setToolOption("typeTool", "text", e.target.value);
+    updateActiveTextLayer("text", e.target.value);
+  };
+
+  // Layout
+  selectedToolDiv.style.display = "flex";
+  selectedToolDiv.style.gap = "10px";
+  selectedToolDiv.style.alignItems = "center";
+  selectedToolDiv.append(
+    "Color:",
+    colorInp,
+    "Size:",
+    sizeInp,
+    alignSel,
+    textInp
+  );
+}
+
+// Atualiza a camada em tempo real
+function updateActiveTextLayer(prop, val) {
+  const context = window.Engine.getContext();
+  const layer = context.layers.find((l) => l.id === context.activeLayer);
+
+  if (layer && layer.type === "text") {
+    layer[prop] = val;
+
+    // Recalcular largura se mudar texto ou tamanho (para bounding box)
+    if (prop === "text" || prop === "size" || prop === "font") {
+      const tempCtx = document.createElement("canvas").getContext("2d");
+      tempCtx.font = `${layer.size}px ${layer.font}`;
+      layer.width = Math.ceil(tempCtx.measureText(layer.text).width);
+      layer.height = layer.size;
+      if (prop === "text") layer.name = val.substring(0, 15);
+    }
+
+    context.saveState();
+    context.draw();
+  }
+}
+
+// Expor função para o engine.js chamar quando clicar numa camada existente
+window.updateTypeToolUI = renderTypeToolOptions;
 
 canvasContainer.addEventListener("mouseenter", (e) => {
   // Armazena o evento para o caso de um atalho de teclado ser usado

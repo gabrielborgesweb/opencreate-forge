@@ -5,16 +5,69 @@ export function addLayer(context, img, name = "Layer") {
   const { projectWidth, projectHeight } = context;
   const lx = Math.round((projectWidth - img.width) / 2);
   const ly = Math.round((projectHeight - img.height) / 2);
+
   const newLayer = {
     id: context.uid(),
+    type: "raster", // <--- NOVO: Define tipo explícito
     name,
     image: img,
     x: lx,
     y: ly,
     visible: true,
+    opacity: 1, // Recomendado ter opacidade
+    blendMode: "source-over",
+    // Raster layers usam as dimensoes da imagem
+    width: img.width,
+    height: img.height,
   };
+
   context.layers.push(newLayer);
   context.setActiveLayer(newLayer.id);
+  if (typeof window.Engine.updateLayersPanel === "function") {
+    window.Engine.updateLayersPanel();
+  }
+  context.saveState();
+  context.draw();
+}
+
+/** (NOVO) Adiciona uma camada de Texto */
+export function addTextLayer(context, text, options, x, y) {
+  // Cria contexto temporário para medir tamanho do texto
+  const tempCanvas = document.createElement("canvas");
+  const tempCtx = tempCanvas.getContext("2d");
+  tempCtx.font = `${options.size}px ${options.font || "system-ui"}`;
+  const metrics = tempCtx.measureText(text);
+
+  const width = Math.ceil(metrics.width);
+  const height = options.size; // Aproximação da altura baseada no tamanho da fonte
+
+  const newLayer = {
+    id: context.uid(),
+    type: "text", // <--- Tipo Texto
+    name: text.substring(0, 15),
+    text: text,
+
+    // Propriedades de Estilo
+    color: options.color || "#000000",
+    size: options.size || 24,
+    align: options.align || "left",
+    font: "system-ui",
+
+    // Geometria
+    x: x,
+    y: y,
+    width: width, // Necessário para seleção e bounding box
+    height: height, // Necessário para seleção e bounding box
+    image: null, // Camadas de texto não têm imagem bitmap
+
+    visible: true,
+    opacity: 1,
+    blendMode: "source-over",
+  };
+
+  context.layers.push(newLayer);
+  context.setActiveLayer(newLayer.id);
+
   if (typeof window.Engine.updateLayersPanel === "function") {
     window.Engine.updateLayersPanel();
   }

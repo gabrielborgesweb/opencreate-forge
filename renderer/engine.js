@@ -77,6 +77,12 @@ const context = {
       ratioH: 1,
       deleteCropped: true, // Checkbox
     },
+    typeTool: {
+      color: "#000000",
+      size: 40,
+      align: "left",
+      text: "Lorem Ipsum",
+    },
   },
 
   // --- Estado da Seleção ---
@@ -204,16 +210,47 @@ function draw() {
 
   // Helper function para desenhar uma camada (para evitar repetição)
   function drawLayer(ctx, layer, activeLayer, isTransforming, transformState) {
+    // Lógica de transformação
     if (isTransforming && layer === activeLayer && transformState) {
-      ctx.save();
       const t = transformState.currentTransform;
+      ctx.save();
       ctx.translate(t.x, t.y);
       ctx.rotate((t.rotation * Math.PI) / 180);
       ctx.scale(t.scaleX, t.scaleY);
-      ctx.drawImage(layer.image, -t.width * t.anchor.x, -t.height * t.anchor.y);
+
+      // Verifica o tipo para desenhar transformado
+      if (layer.type === "text") {
+        ctx.font = `${layer.size}px ${layer.font}`;
+        ctx.fillStyle = layer.color;
+        ctx.textBaseline = "top";
+        ctx.textAlign = layer.align === "justify" ? "left" : layer.align;
+        // O anchor point muda a posição relativa
+        ctx.fillText(layer.text, -t.width * t.anchor.x, -t.height * t.anchor.y);
+      } else {
+        // Raster
+        if (layer.image) {
+          ctx.drawImage(
+            layer.image,
+            -t.width * t.anchor.x,
+            -t.height * t.anchor.y
+          );
+        }
+      }
       ctx.restore();
     } else {
-      ctx.drawImage(layer.image, layer.x, layer.y);
+      // Desenho normal (sem transformação ativa)
+      if (layer.type === "text") {
+        ctx.font = `${layer.size}px ${layer.font}`;
+        ctx.fillStyle = layer.color;
+        ctx.textBaseline = "top";
+        ctx.textAlign = layer.align === "justify" ? "left" : layer.align;
+        ctx.fillText(layer.text, layer.x, layer.y);
+      } else {
+        // Raster
+        if (layer.image) {
+          ctx.drawImage(layer.image, layer.x, layer.y);
+        }
+      }
     }
   }
 
@@ -254,11 +291,14 @@ function draw() {
     if (!layer.visible) continue;
     if (layer === activeLayer && isDrawing) continue;
 
+    const w = layer.width || (layer.image ? layer.image.width : 0);
+    const h = layer.height || (layer.image ? layer.image.height : 0);
+
     const layerBounds = {
       x: layer.x,
       y: layer.y,
-      width: layer.image.width,
-      height: layer.image.height,
+      width: w,
+      height: h,
     };
     const intersects = !(
       layerBounds.x > projectBounds.width ||
@@ -280,11 +320,14 @@ function draw() {
     if (!layer.visible) continue;
     if (layer === activeLayer && isDrawing) continue;
 
+    const w = layer.width || (layer.image ? layer.image.width : 0);
+    const h = layer.height || (layer.image ? layer.image.height : 0);
+
     const layerBounds = {
       x: layer.x,
       y: layer.y,
-      width: layer.image.width,
-      height: layer.image.height,
+      width: w,
+      height: h,
     };
     const intersects = !(
       layerBounds.x > projectBounds.width ||
@@ -322,12 +365,13 @@ function draw() {
   if (activeLayer && activeLayer.visible && !isTransforming) {
     ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
     ctx.lineWidth = 1 / scale;
-    ctx.strokeRect(
-      activeLayer.x,
-      activeLayer.y,
-      activeLayer.image.width,
-      activeLayer.image.height
-    );
+
+    const w =
+      activeLayer.width || (activeLayer.image ? activeLayer.image.width : 0);
+    const h =
+      activeLayer.height || (activeLayer.image ? activeLayer.image.height : 0);
+
+    ctx.strokeRect(activeLayer.x, activeLayer.y, w, h);
   }
 
   if (isCropping && cropState) {

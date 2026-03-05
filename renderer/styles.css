@@ -85,7 +85,7 @@ button {
   gap: 1rem;
   text-wrap: nowrap;
   overflow: hidden;
-  overflow-x: scroll;
+  overflow-x: auto;
 }
 
 .select-modes {

@@ -371,6 +371,53 @@ export function handleMouseDown(context, e) {
       context.draggingLayerState.offsetY = py - activeLayer.y;
     }
   }
+
+  // Ferramenta de Texto
+  if (context.activeToolId === "typeTool") {
+    // 1. Verifica se clicou em uma camada de texto existente para selecionar
+    // (Simples verificação de bounding box)
+    let clickedTextLayer = null;
+    for (let i = context.layers.length - 1; i >= 0; i--) {
+      const l = context.layers[i];
+      if (!l.visible || l.type !== "text") continue;
+      if (
+        mouseX >= l.x &&
+        mouseX <= l.x + l.width &&
+        mouseY >= l.y &&
+        mouseY <= l.y + l.height
+      ) {
+        clickedTextLayer = l;
+        break;
+      }
+    }
+
+    if (clickedTextLayer) {
+      context.setActiveLayer(clickedTextLayer.id);
+      // Atualiza a UI da ferramenta com as props dessa camada
+      window.Engine.setToolOption("typeTool", "color", clickedTextLayer.color);
+      window.Engine.setToolOption("typeTool", "size", clickedTextLayer.size);
+      window.Engine.setToolOption("typeTool", "text", clickedTextLayer.text);
+      // Atualizar visual da barra (função auxiliar que criaremos no app.js)
+      if (window.updateTypeToolUI) window.updateTypeToolUI();
+    } else {
+      // 2. Cria nova camada de texto
+      const opts = context.tools.typeTool;
+      Layers.addTextLayer(context, opts.text, opts, mouseX, mouseY);
+
+      // Foca no input de texto da UI para digitar imediatamente
+      setTimeout(() => {
+        const input = document.querySelector(
+          "#selectedtool input[type='text']"
+        );
+        if (input) {
+          input.value = opts.text;
+          input.focus();
+          input.select();
+        }
+      }, 50);
+    }
+    return;
+  }
 }
 
 /** Evento: Mouse Move Principal */

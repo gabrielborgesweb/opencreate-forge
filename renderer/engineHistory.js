@@ -18,7 +18,16 @@ export function saveState(context) {
   const state = {
     projectWidth: projectWidth,
     projectHeight: projectHeight,
-    layers: layers.map((l) => ({ ...l, image: l.image.src })),
+    // Verifica o tipo da camada antes de tentar acessar image.src
+    layers: layers.map((l) => {
+      if (l.type === "text") {
+        // Camadas de texto: salvamos o objeto como está (sem image.src)
+        return { ...l, image: null };
+      } else {
+        // Camadas Raster: salvamos o base64 da imagem
+        return { ...l, image: l.image ? l.image.src : null };
+      }
+    }),
     activeLayer: activeLayer ? activeLayer.id : null,
     hasSelection: hasSelection,
     selectionDataURL: hasSelection ? selectionCanvas.toDataURL() : null,
@@ -42,12 +51,42 @@ export function restoreState(context, state) {
     context.selectionCanvas.height = context.projectHeight;
   }
 
+  // Recria as camadas (carregando imagens APENAS se necessário)
   const promises = state.layers.map(
     (l) =>
       new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve({ ...l, image: img });
-        img.src = l.image;
+        if (l.type === "text") {
+          // Se for TEXTO, não precisa carregar imagem. Resolve imediatamente.
+          // Precisamos garantir que a propriedade image continue null no objeto vivo
+          resolve({
+            ...l,
+            image: null,
+          });
+        } else {
+          // Se for RASTER, carrega a imagem
+          const img = new Image();
+          img.onload = () => {
+            resolve({
+              ...l,
+              image: img,
+            });
+          };
+          // Tratamento de erro caso a imagem esteja corrompida ou vazia
+          img.onerror = () => {
+            console.warn(
+              "Falha ao carregar imagem do histórico para a camada:",
+              l.name
+            );
+            resolve({ ...l, image: null });
+          };
+
+          if (l.image) {
+            img.src = l.image;
+          } else {
+            // Se não tiver source (ex: camada vazia antiga), resolve direto
+            resolve({ ...l, image: null });
+          }
+        }
       })
   );
 

@@ -505,7 +505,7 @@ export function drawDebugHitboxes(context) {
 }
 
 export function updateLayersPanel(context) {
-  console.log("updateLayersPanel");
+  // console.log("updateLayersPanel");
 
   const { layersList, setActiveLayer, draw, saveState } = context;
   let { layers, activeLayer } = context;
@@ -560,7 +560,20 @@ export function updateLayersPanel(context) {
     // Thumbnail
     const thumbnail = document.createElement("img");
     thumbnail.className = "layer-thumbnail";
-    thumbnail.src = layer.image.src;
+
+    if (layer.type === "text") {
+      // Se for texto, usa um ícone de "T" genérico (Base64 SVG simples para não depender de arquivos externos agora)
+      thumbnail.src =
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MCA1MCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0id2hpdGUiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1zaXplPSIzNSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZpbGw9ImJsYWNrIj5UPC90ZXh0Pjwvc3ZnPg==";
+      thumbnail.style.border = "1px solid #555"; // Borda sutil para diferenciar
+    } else if (layer.image && layer.image.src) {
+      // Se for raster, usa a imagem da camada
+      thumbnail.src = layer.image.src;
+    } else {
+      // Fallback para camadas vazias ou erros
+      thumbnail.src = "";
+      thumbnail.style.backgroundColor = "#333";
+    }
 
     // Layer name
     const name = document.createElement("span");

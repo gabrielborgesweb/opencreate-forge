@@ -1805,10 +1805,124 @@ toolButtons.forEach((btn) => {
 
     // Se a ferramenta for typeTool, renderize as opções:
     if (btn.id === "typeTool") {
-      updateTypeToolOptions();
+      if (typeof window.updateTypeToolOptions === "function") {
+        window.updateTypeToolOptions();
+      }
     }
   });
 });
+
+/** Constrói a UI da barra de propriedades para a Type Tool */
+window.updateTypeToolOptions = function () {
+  const selectedToolDiv = document.getElementById("selectedtool");
+  if (!selectedToolDiv) return;
+
+  selectedToolDiv.innerHTML = ""; // Limpa opções anteriores
+
+  const context = window.Engine.getContext();
+  // Pega opções atuais ou define padrões
+  const options = context.tools["typeTool"] || {
+    color: "#000000",
+    size: 24,
+    align: "left",
+    text: "Type Here",
+  };
+
+  // -- 1. Cor --
+  const colorInput = document.createElement("input");
+  colorInput.type = "color";
+  colorInput.value = options.color;
+  colorInput.title = "Text Color";
+  colorInput.oninput = (e) => {
+    window.Engine.setToolOption("typeTool", "color", e.target.value);
+    updateActiveTextLayerProp("color", e.target.value);
+  };
+
+  // -- 2. Tamanho (px) --
+  const sizeInput = document.createElement("input");
+  sizeInput.type = "number";
+  sizeInput.min = "8";
+  sizeInput.value = options.size;
+  sizeInput.style.width = "50px";
+  sizeInput.title = "Font Size (px)";
+  sizeInput.onchange = (e) => {
+    const val = parseInt(e.target.value, 10);
+    window.Engine.setToolOption("typeTool", "size", val);
+    updateActiveTextLayerProp("size", val);
+  };
+
+  // -- 3. Alinhamento --
+  const alignSelect = document.createElement("select");
+  ["left", "center", "right"].forEach((align) => {
+    const opt = document.createElement("option");
+    opt.value = align;
+    opt.textContent = align.charAt(0).toUpperCase() + align.slice(1);
+    if (align === options.align) opt.selected = true;
+    alignSelect.appendChild(opt);
+  });
+  alignSelect.onchange = (e) => {
+    window.Engine.setToolOption("typeTool", "align", e.target.value);
+    updateActiveTextLayerProp("align", e.target.value);
+  };
+
+  // -- 4. Input de Texto Rápido --
+  const textInput = document.createElement("input");
+  textInput.type = "text";
+  textInput.placeholder = "Text content...";
+  // Se houver uma camada ativa de texto, mostre o texto dela, senão mostre o padrão da ferramenta
+  const activeL = context.layers.find((l) => l.id === context.activeLayer);
+  if (activeL && activeL.type === "text") {
+    textInput.value = activeL.text;
+  } else {
+    textInput.value = options.text;
+  }
+
+  textInput.style.width = "150px";
+  textInput.oninput = (e) => {
+    window.Engine.setToolOption("typeTool", "text", e.target.value);
+    updateActiveTextLayerProp("text", e.target.value);
+  };
+
+  // Montagem da barra
+  const container = document.createElement("div");
+  container.style.display = "flex";
+  container.style.gap = "8px";
+  container.style.alignItems = "center";
+
+  container.appendChild(document.createTextNode("Color:"));
+  container.appendChild(colorInput);
+  container.appendChild(document.createTextNode("Size:"));
+  container.appendChild(sizeInput);
+  container.appendChild(alignSelect);
+  container.appendChild(textInput);
+
+  selectedToolDiv.appendChild(container);
+};
+
+/** Função auxiliar para atualizar a camada ativa em tempo real */
+function updateActiveTextLayerProp(prop, value) {
+  const context = window.Engine.getContext();
+  const layer = context.layers.find((l) => l.id === context.activeLayer);
+
+  // Só atualiza se for camada de texto
+  if (layer && layer.type === "text") {
+    layer[prop] = value;
+
+    // Se mudou texto ou tamanho, precisa recalcular a largura (bounding box)
+    if (prop === "text" || prop === "size" || prop === "font") {
+      const tempCtx = document.createElement("canvas").getContext("2d");
+      tempCtx.font = `${layer.size}px ${layer.font || "system-ui"}`;
+      const metrics = tempCtx.measureText(layer.text);
+      layer.width = Math.ceil(metrics.width);
+      layer.height = layer.size; // Aproximação
+
+      if (prop === "text") layer.name = value.substring(0, 15);
+    }
+
+    context.saveState();
+    context.draw();
+  }
+}
 
 // Add empty layer button handler
 btnAddEmptyLayer.addEventListener("click", () => {

@@ -4,7 +4,7 @@ const path = require("path");
 
 function createWindow() {
   // A lógica para escolher o ícone da janela continua útil, vamos mantê-la.
-  let iconPath = path.join(__dirname, "favicon-darwin.png");
+  let iconPath = path.join(__dirname, "favicon-darwin-liquid.png");
 
   if (process.platform === "win32") {
     iconPath = path.join(__dirname, "favicon-windows.ico");
@@ -206,7 +206,7 @@ app.whenReady().then(() => {
       } catch (err) {
         return { success: false, error: err.message, filePath: null };
       }
-    }
+    },
   );
 
   // 2. CRIE o NOVO handler "fs:saveProject" para salvamento rápido
@@ -270,7 +270,7 @@ app.whenReady().then(() => {
   // });
 
   if (process.platform === "darwin") {
-    const iconPath = path.join(__dirname, "favicon-darwin.png");
+    const iconPath = path.join(__dirname, "favicon-darwin-liquid.png");
     app.dock.setIcon(iconPath);
   }
 

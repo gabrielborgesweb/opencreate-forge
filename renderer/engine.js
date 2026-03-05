@@ -209,8 +209,13 @@ function draw() {
   ctx.restore();
 
   // Helper function para desenhar uma camada (para evitar repetição)
+  // Helper function modificada para suportar MULTILINHA
   function drawLayer(ctx, layer, activeLayer, isTransforming, transformState) {
-    // Lógica de transformação
+    // Configura opacidade e blend mode (se houver essas props no objeto layer)
+    ctx.globalAlpha = layer.opacity !== undefined ? layer.opacity : 1;
+    ctx.globalCompositeOperation = layer.blendMode || "source-over";
+
+    // 1. Caso esteja transformando (Rotacionando/Escalando)
     if (isTransforming && layer === activeLayer && transformState) {
       const t = transformState.currentTransform;
       ctx.save();
@@ -218,16 +223,27 @@ function draw() {
       ctx.rotate((t.rotation * Math.PI) / 180);
       ctx.scale(t.scaleX, t.scaleY);
 
-      // Verifica o tipo para desenhar transformado
       if (layer.type === "text") {
-        ctx.font = `${layer.size}px ${layer.font}`;
+        const fontSize = layer.fontSize || 40;
+        const fontFamily = layer.fontFamily || "Arial";
+        const lineHeight = fontSize * 1.2;
+
+        ctx.font = `${fontSize}px ${fontFamily}`;
         ctx.fillStyle = layer.color;
         ctx.textBaseline = "top";
-        ctx.textAlign = layer.align === "justify" ? "left" : layer.align;
-        // O anchor point muda a posição relativa
-        ctx.fillText(layer.text, -t.width * t.anchor.x, -t.height * t.anchor.y);
+        ctx.textAlign = "left"; // Mantemos left para alinhar com o textarea
+
+        // Suporte a múltiplas linhas
+        const lines = (layer.text || "").split("\n");
+        // O ponto de ancoragem define onde o texto começa em relação à caixa de transformação
+        const startX = -t.width * t.anchor.x;
+        const startY = -t.height * t.anchor.y;
+
+        lines.forEach((line, index) => {
+          ctx.fillText(line, startX, startY + index * lineHeight);
+        });
       } else {
-        // Raster
+        // Raster Image
         if (layer.image) {
           ctx.drawImage(
             layer.image,
@@ -237,21 +253,34 @@ function draw() {
         }
       }
       ctx.restore();
-    } else {
-      // Desenho normal (sem transformação ativa)
+    }
+    // 2. Desenho Normal (Estático)
+    else {
       if (layer.type === "text") {
-        ctx.font = `${layer.size}px ${layer.font}`;
+        const fontSize = layer.fontSize || 40;
+        const fontFamily = layer.fontFamily || "Arial";
+        const lineHeight = fontSize * 1.2;
+
+        ctx.font = `${fontSize}px ${fontFamily}`;
         ctx.fillStyle = layer.color;
         ctx.textBaseline = "top";
-        ctx.textAlign = layer.align === "justify" ? "left" : layer.align;
-        ctx.fillText(layer.text, layer.x, layer.y);
+        ctx.textAlign = "left";
+
+        const lines = (layer.text || "").split("\n");
+        lines.forEach((line, index) => {
+          ctx.fillText(line, layer.x, layer.y + index * lineHeight);
+        });
       } else {
-        // Raster
+        // Raster Image
         if (layer.image) {
           ctx.drawImage(layer.image, layer.x, layer.y);
         }
       }
     }
+
+    // Restaura opacidade para o próximo layer
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
   }
 
   // Camadas
@@ -575,6 +604,9 @@ window.addEventListener("resize", (e) => {
 
 // 6. Expor a API Pública (`window.Engine`)
 window.Engine = {
+  // --- ADICIONE ESTA LINHA ABAIXO ---
+  getContext: () => context,
+
   Debug: {
     // Funções de depuração
     get: (key) => Utils.DebugGet(key),

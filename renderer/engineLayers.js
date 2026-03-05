@@ -30,39 +30,33 @@ export function addLayer(context, img, name = "Layer") {
   context.draw();
 }
 
-/** (NOVO) Adiciona uma camada de Texto */
-export function addTextLayer(context, text, options, x, y) {
-  // Cria contexto temporário para medir tamanho do texto
-  const tempCanvas = document.createElement("canvas");
-  const tempCtx = tempCanvas.getContext("2d");
-  tempCtx.font = `${options.size}px ${options.font || "system-ui"}`;
-  const metrics = tempCtx.measureText(text);
+/** Adiciona uma camada de Texto Vetorial */
+export function addTextLayer(context, text, x, y, options = {}) {
+  const { tools } = context;
 
-  const width = Math.ceil(metrics.width);
-  const height = options.size; // Aproximação da altura baseada no tamanho da fonte
+  // Pega as configurações atuais da ferramenta de texto se não passadas
+  const toolSettings = options.toolSettings || tools.typeTool || {};
 
   const newLayer = {
     id: context.uid(),
-    type: "text", // <--- Tipo Texto
-    name: text.substring(0, 15),
+    type: "text", // IMPORTANTE: Tipo texto
+    name: text.substring(0, 20) || "Text Layer",
     text: text,
-
-    // Propriedades de Estilo
-    color: options.color || "#000000",
-    size: options.size || 24,
-    align: options.align || "left",
-    font: "system-ui",
-
-    // Geometria
     x: x,
     y: y,
-    width: width, // Necessário para seleção e bounding box
-    height: height, // Necessário para seleção e bounding box
-    image: null, // Camadas de texto não têm imagem bitmap
-
     visible: true,
     opacity: 1,
     blendMode: "source-over",
+
+    // Propriedades específicas de texto
+    color: toolSettings.color || "#000000",
+    fontSize: toolSettings.size || 40,
+    fontFamily: toolSettings.font || "system-ui",
+    align: toolSettings.align || "left", // left, center, right
+
+    // Para cálculos de colisão (hitbox) aproximados
+    width: 100,
+    height: 50,
   };
 
   context.layers.push(newLayer);
@@ -71,8 +65,11 @@ export function addTextLayer(context, text, options, x, y) {
   if (typeof window.Engine.updateLayersPanel === "function") {
     window.Engine.updateLayersPanel();
   }
+
   context.saveState();
   context.draw();
+
+  return newLayer; // Retorna a camada criada para podermos ativar a edição logo em seguida
 }
 
 /** Adiciona uma nova camada preenchida com uma cor */

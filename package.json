@@ -21,7 +21,7 @@
     "appId": "com.opencreate.forge",
     "mac": {
       "category": "public.app-category.graphics-design",
-      "icon": "favicon-darwin.icns"
+      "icon": "favicon-darwin-liquid.icns"
     }
   }
 }

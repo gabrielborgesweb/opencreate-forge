@@ -1,5 +1,10 @@
 // renderer/engineInput.js
 
+// Importe Layers para poder criar a camada
+import * as Layers from "./engineLayers.js";
+
+const textEditor = document.getElementById("textEditor");
+
 /** Evento: Roda do mouse (Zoom/Pan) */
 export function handleWheel(context, e) {
   e.preventDefault();
@@ -372,51 +377,33 @@ export function handleMouseDown(context, e) {
     }
   }
 
-  // Ferramenta de Texto
+  // --- LÓGICA DA FERRAMENTA DE TEXTO ---
   if (context.activeToolId === "typeTool") {
-    // 1. Verifica se clicou em uma camada de texto existente para selecionar
-    // (Simples verificação de bounding box)
-    let clickedTextLayer = null;
-    for (let i = context.layers.length - 1; i >= 0; i--) {
-      const l = context.layers[i];
-      if (!l.visible || l.type !== "text") continue;
-      if (
-        mouseX >= l.x &&
-        mouseX <= l.x + l.width &&
-        mouseY >= l.y &&
-        mouseY <= l.y + l.height
-      ) {
-        clickedTextLayer = l;
-        break;
-      }
-    }
+    const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
 
-    if (clickedTextLayer) {
-      context.setActiveLayer(clickedTextLayer.id);
-      // Atualiza a UI da ferramenta com as props dessa camada
-      window.Engine.setToolOption("typeTool", "color", clickedTextLayer.color);
-      window.Engine.setToolOption("typeTool", "size", clickedTextLayer.size);
-      window.Engine.setToolOption("typeTool", "text", clickedTextLayer.text);
-      // Atualizar visual da barra (função auxiliar que criaremos no app.js)
-      if (window.updateTypeToolUI) window.updateTypeToolUI();
+    // 1. Tentar clicar em uma camada de texto existente para editar
+    // (Lógica simples de hit test baseada em bounding box aproximado)
+    const clickedLayer = context.layers
+      .slice()
+      .reverse() // Checa do topo para baixo
+      .find((l) => {
+        if (!l.visible || l.type !== "text") return false;
+        // Estimativa simples de hit box (pode melhorar com measureText)
+        const width = l.text.length * (l.fontSize * 0.6);
+        const height = l.fontSize * 1.2 * l.text.split("\n").length;
+        return x >= l.x && x <= l.x + width && y >= l.y && y <= l.y + height;
+      });
+
+    if (clickedLayer) {
+      context.setActiveLayer(clickedLayer.id);
+      startTextEditing(context, clickedLayer);
     } else {
-      // 2. Cria nova camada de texto
-      const opts = context.tools.typeTool;
-      Layers.addTextLayer(context, opts.text, opts, mouseX, mouseY);
-
-      // Foca no input de texto da UI para digitar imediatamente
-      setTimeout(() => {
-        const input = document.querySelector(
-          "#selectedtool input[type='text']"
-        );
-        if (input) {
-          input.value = opts.text;
-          input.focus();
-          input.select();
-        }
-      }, 50);
+      // 2. Criar nova camada de texto onde clicou
+      const newLayer = Layers.addTextLayer(context, "", x, y);
+      // Inicia edição imediatamente
+      startTextEditing(context, newLayer);
     }
-    return;
+    return; // Impede outras lógicas de desenho
   }
 }
 
@@ -642,4 +629,87 @@ export function attachInputListeners(context) {
   canvas.addEventListener("mouseup", onMouseUp);
   canvas.addEventListener("mouseleave", onMouseLeave);
   canvas.addEventListener("dblclick", onDoubleClick);
+}
+
+/** Finaliza a edição atual (esconde o textarea e salva na camada) */
+function commitTextEdit(context) {
+  if (textEditor.style.display === "none") return;
+
+  // Atualiza a camada com o texto final
+  if (context.editingLayerId) {
+    const layer = context.layers.find((l) => l.id === context.editingLayerId);
+    if (layer) {
+      layer.text = textEditor.value;
+      // Atualiza nome da camada se quiser
+      if (layer.name.startsWith("Text Layer") || layer.name === "") {
+        layer.name = layer.text.substring(0, 15) || "Empty Text";
+      }
+    }
+  }
+
+  // Limpa estado
+  textEditor.style.display = "none";
+  textEditor.value = "";
+  context.editingLayerId = null;
+  context.isTextEditing = false; // Flag para bloquear outras ferramentas
+
+  if (window.Engine.updateLayersPanel) window.Engine.updateLayersPanel();
+  context.saveState();
+  context.draw();
+}
+
+/** Inicia a edição de uma camada de texto */
+function startTextEditing(context, layer) {
+  commitTextEdit(context); // Fecha edição anterior se houver
+
+  context.isTextEditing = true;
+  context.editingLayerId = layer.id;
+
+  // 1. Configura o textarea com os dados da camada
+  textEditor.value = layer.text;
+  textEditor.style.color = layer.color;
+  textEditor.style.font = `${layer.fontSize}px ${layer.fontFamily}`;
+  textEditor.style.lineHeight = "1.2";
+
+  // 2. Calcula posição na TELA (Screen Coordinates)
+  // O textarea é um elemento DOM, então precisa considerar Zoom e Pan do Canvas
+  const screenX = layer.x * context.scale + context.originX;
+  const screenY = layer.y * context.scale + context.originY;
+
+  textEditor.style.left = `${screenX}px`;
+  textEditor.style.top = `${screenY}px`;
+
+  // Aplica o Zoom do CSS no textarea para bater com o zoom do canvas
+  textEditor.style.transform = `scale(${context.scale})`;
+
+  // Mostra e foca
+  textEditor.style.display = "block";
+
+  // Ajusta tamanho do box automaticamente
+  setTimeout(() => {
+    textEditor.style.width = textEditor.scrollWidth + 20 + "px";
+    textEditor.style.height = textEditor.scrollHeight + 20 + "px";
+    textEditor.focus();
+  }, 0);
+
+  // Sincronização ao vivo: Digitar no textarea atualiza o canvas (opcional, ou espera o commit)
+  textEditor.oninput = () => {
+    layer.text = textEditor.value;
+    textEditor.style.width = "0px"; // Hack para recalcular width
+    textEditor.style.width = textEditor.scrollWidth + 10 + "px";
+    textEditor.style.height = textEditor.scrollHeight + "px";
+    context.draw();
+  };
+
+  // Atalhos dentro do editor
+  textEditor.onkeydown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      // Enter sem shift finaliza (opcional)
+      // e.preventDefault();
+      // commitTextEdit(context);
+    }
+    if (e.key === "Escape") {
+      commitTextEdit(context);
+    }
+  };
 }

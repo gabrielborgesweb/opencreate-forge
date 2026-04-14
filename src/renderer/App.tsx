@@ -34,7 +34,7 @@ function App() {
       {activeTab !== "home" && (
         <header
           style={{
-            height: "45px",
+            height: "24px",
             background: "#222",
             borderBottom: "1px solid #333",
             display: "flex",

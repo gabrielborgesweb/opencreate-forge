@@ -1,5 +1,6 @@
 import React from "react";
 import { useUIStore } from "@store/uiStore";
+import { useProjectStore } from "@store/projectStore";
 import CanvasViewport from "./components/CanvasViewport";
 import LayerList from "./components/Sidebar/LayerList";
 import Toolbar from "./components/Toolbar";
@@ -9,6 +10,10 @@ import HomeScreen from "./components/HomeScreen";
 
 function App() {
   const activeTab = useUIStore((state) => state.activeTab);
+  const activeProjectId = useProjectStore((state) => state.activeProjectId);
+  const activeProject = useProjectStore((state) =>
+    state.projects.find((p) => p.id === activeProjectId),
+  );
 
   return (
     <div
@@ -47,11 +52,7 @@ function App() {
         ) : (
           <>
             <aside
-              style={{
-                // width: "60px",
-                background: "#222",
-                borderRight: "1px solid #333",
-              }}
+              style={{ background: "#222", borderRight: "1px solid #333" }}
             >
               <Toolbar />
             </aside>
@@ -94,12 +95,25 @@ function App() {
           fontSize: "0.75rem",
           display: "flex",
           alignItems: "center",
-          color: "#666",
+          justifyContent: "space-between",
+          color: "#888",
         }}
       >
-        {activeTab === "home"
-          ? "Welcome to OpenCreate Forge"
-          : `Editing ${activeTab}.ocfd`}
+        <div>
+          {activeTab === "home"
+            ? "Welcome to OpenCreate Forge"
+            : `Editing ${activeProject?.name || "Unknown"}.ocfd`}
+        </div>
+        {activeProject && (
+          <div style={{ display: "flex", gap: "1rem" }}>
+            <span>
+              {activeProject.width} x {activeProject.height} px
+            </span>
+            <span style={{ color: "#cc6d29", fontWeight: "bold" }}>
+              Zoom: {Math.round(activeProject.zoom * 100)}%
+            </span>
+          </div>
+        )}
       </footer>
     </div>
   );

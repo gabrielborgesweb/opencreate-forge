@@ -4,13 +4,11 @@ export interface ViewportState {
   scale: number;
   originX: number;
   originY: number;
-  targetScale: number;
 }
 
 export class ForgeEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private viewport: ViewportState = { scale: 1, originX: 0, originY: 0, targetScale: 1 };
   private project: Project | null = null;
   private checkerPattern: CanvasPattern | null = null;
 
@@ -18,27 +16,41 @@ export class ForgeEngine {
   private ZOOM_SMOOTHING = 0.15;
   private animationFrameId: number | null = null;
 
-  // Panning state
   private isPanning = false;
   private startX = 0;
   private startY = 0;
 
-  constructor(canvas: HTMLCanvasElement) {
+  private onViewportChange: (zoom: number, x: number, y: number) => void;
+
+  constructor(canvas: HTMLCanvasElement, onViewportChange: (zoom: number, x: number, y: number) => void) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+    this.onViewportChange = onViewportChange;
+    
+    // Bind event handlers once to avoid memory leaks and fix removeEventListener
+    this.handleWheel = this.handleWheel.bind(this);
+    this.handleMouseDown = this.handleMouseDown.bind(this);
+    this.handleMouseMove = this.handleMouseMove.bind(this);
+    this.handleMouseUp = this.handleMouseUp.bind(this);
+
     this.setupEventListeners();
     this.startRenderLoop();
   }
 
   private setupEventListeners() {
-    this.canvas.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
-    this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
-    window.addEventListener('mousemove', this.handleMouseMove.bind(this));
-    window.addEventListener('mouseup', this.handleMouseUp.bind(this));
+    this.canvas.addEventListener('wheel', this.handleWheel, { passive: false });
+    this.canvas.addEventListener('mousedown', this.handleMouseDown);
+    window.addEventListener('mousemove', this.handleMouseMove);
+    window.addEventListener('mouseup', this.handleMouseUp);
   }
 
   private handleWheel(e: WheelEvent) {
+    if (!this.project) return;
     e.preventDefault();
+
+    let newScale = this.project.zoom;
+    let newOriginX = this.project.panX;
+    let newOriginY = this.project.panY;
 
     if (e.ctrlKey || e.metaKey) {
       const mx = e.offsetX;
@@ -47,42 +59,56 @@ export class ForgeEngine {
       const normalizedDelta = Math.sign(wheelDelta) * Math.min(Math.abs(wheelDelta * this.ZOOM_SENSITIVITY), 0.5);
 
       const zoomFactor = Math.exp(normalizedDelta);
-      this.viewport.targetScale = Math.min(Math.max(this.viewport.scale * zoomFactor, 0.05), 50);
+      const targetScale = Math.min(Math.max(this.project.zoom * zoomFactor, 0.05), 50);
 
-      const scaleChange = (this.viewport.targetScale - this.viewport.scale) * this.ZOOM_SMOOTHING;
-      const newScale = this.viewport.scale + scaleChange;
+      const scaleChange = (targetScale - this.project.zoom) * this.ZOOM_SMOOTHING;
+      newScale = this.project.zoom + scaleChange;
 
-      this.viewport.originX = mx - (mx - this.viewport.originX) * (newScale / this.viewport.scale);
-      this.viewport.originY = my - (my - this.viewport.originY) * (newScale / this.viewport.scale);
-      this.viewport.scale = newScale;
-      this.ctx.imageSmoothingEnabled = this.viewport.scale <= 1.0;
+      newOriginX = mx - (mx - this.project.panX) * (newScale / this.project.zoom);
+      newOriginY = my - (my - this.project.panY) * (newScale / this.project.zoom);
     } else {
-      this.viewport.originX -= e.deltaX;
-      this.viewport.originY -= e.deltaY;
+      newOriginX = this.project.panX - e.deltaX;
+      newOriginY = this.project.panY - e.deltaY;
     }
+    
+    // Update local state immediately to avoid race conditions during interaction
+    this.project.zoom = newScale;
+    this.project.panX = newOriginX;
+    this.project.panY = newOriginY;
+    
+    this.onViewportChange(newScale, newOriginX, newOriginY);
   }
 
   private handleMouseDown(e: MouseEvent) {
-    if (e.button === 1 || (e.button === 0 && e.spaceKey)) { // Middle button or Space+Left
+    if (!this.project) return;
+    // Adicionamos suporte a Alt ou Space para Pan (Space key detectado via flag global se necessário, 
+    // mas por enquanto mantemos o middle click ou clique normal se o usuário preferir)
+    if (e.button === 1 || (e.button === 0 && (e as any).spaceKey)) { 
       this.isPanning = true;
-      this.startX = e.clientX - this.viewport.originX;
-      this.startY = e.clientY - this.viewport.originY;
+      this.startX = e.clientX - this.project.panX;
+      this.startY = e.clientY - this.project.panY;
       this.canvas.style.cursor = 'grabbing';
       e.preventDefault();
     }
   }
 
   private handleMouseMove(e: MouseEvent) {
-    if (this.isPanning) {
-      this.viewport.originX = e.clientX - this.startX;
-      this.viewport.originY = e.clientY - this.startY;
+    if (this.isPanning && this.project) {
+      const newPanX = e.clientX - this.startX;
+      const newPanY = e.clientY - this.startY;
+      
+      // Update local state immediately
+      this.project.panX = newPanX;
+      this.project.panY = newPanY;
+      
+      this.onViewportChange(this.project.zoom, newPanX, newPanY);
     }
   }
 
   private handleMouseUp() {
     if (this.isPanning) {
       this.isPanning = false;
-      this.canvas.style.cursor = "default";
+      this.canvas.style.cursor = 'default';
     }
   }
 
@@ -98,9 +124,10 @@ export class ForgeEngine {
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
     }
-    // Remove window listeners
-    window.removeEventListener('mousemove', this.handleMouseMove.bind(this));
-    window.removeEventListener('mouseup', this.handleMouseUp.bind(this));
+    this.canvas.removeEventListener('wheel', this.handleWheel);
+    this.canvas.removeEventListener('mousedown', this.handleMouseDown);
+    window.removeEventListener('mousemove', this.handleMouseMove);
+    window.removeEventListener('mouseup', this.handleMouseUp);
   }
 
   private getCheckerPattern(): CanvasPattern {
@@ -127,6 +154,37 @@ export class ForgeEngine {
     this.project = project;
   }
 
+  public fitToScreen() {
+    if (!this.project || !this.canvas.parentElement) return;
+    
+    // Usar o tamanho do pai (viewport) para garantir precisão
+    const cw = this.canvas.parentElement.clientWidth;
+    const ch = this.canvas.parentElement.clientHeight;
+
+    // Sincronizar o tamanho interno do canvas com o viewport
+    if (this.canvas.width !== cw || this.canvas.height !== ch) {
+      this.canvas.width = cw;
+      this.canvas.height = ch;
+    }
+
+    const padding = 40;
+    const availableWidth = cw - padding * 2;
+    const availableHeight = ch - padding * 2;
+    
+    const scaleX = availableWidth / this.project.width;
+    const scaleY = availableHeight / this.project.height;
+    const scale = Math.min(scaleX, scaleY); // Permitir zoom > 100% se o projeto for pequeno    
+    const originX = (cw - this.project.width * scale) / 2;
+    const originY = (ch - this.project.height * scale) / 2;
+    
+    // Atualiza estado local imediatamente
+    this.project.zoom = scale;
+    this.project.panX = originX;
+    this.project.panY = originY;
+    
+    this.onViewportChange(scale, originX, originY);
+  }
+
   public render() {
     if (!this.project) return;
 
@@ -134,14 +192,14 @@ export class ForgeEngine {
 
     // 1. Draw Checkerboard Background
     this.ctx.save();
-    this.ctx.setTransform(this.viewport.scale, 0, 0, this.viewport.scale, this.viewport.originX, this.viewport.originY);
+    this.ctx.setTransform(this.project.zoom, 0, 0, this.project.zoom, this.project.panX, this.project.panY);
     this.ctx.fillStyle = this.getCheckerPattern();
     this.ctx.fillRect(0, 0, this.project.width, this.project.height);
     this.ctx.restore();
 
     // 2. Draw Layers
     this.ctx.save();
-    this.ctx.setTransform(this.viewport.scale, 0, 0, this.viewport.scale, this.viewport.originX, this.viewport.originY);
+    this.ctx.setTransform(this.project.zoom, 0, 0, this.project.zoom, this.project.panX, this.project.panY);
     
     for (const layer of this.project.layers) {
       if (!layer.visible) continue;
@@ -167,17 +225,9 @@ export class ForgeEngine {
         this.ctx.font = `${layer.fontSize}px ${layer.fontFamily}`;
         this.ctx.fillText(layer.text || '', layer.x, layer.y + (layer.fontSize || 0));
     } else if (layer.type === 'raster' && !layer.data) {
-        // Just fill with a color for debugging empty layers
         this.ctx.fillStyle = 'rgba(100, 100, 100, 0.2)';
         this.ctx.fillRect(layer.x, layer.y, layer.width, layer.height);
     }
     this.ctx.restore();
-  }
-
-  public screenToProject(sx: number, sy: number) {
-    return {
-      x: (sx - this.viewport.originX) / this.viewport.scale,
-      y: (sy - this.viewport.originY) / this.viewport.scale
-    };
   }
 }

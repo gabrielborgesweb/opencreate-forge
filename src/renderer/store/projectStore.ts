@@ -11,8 +11,8 @@ export interface Layer {
   y: number;
   width: number;
   height: number;
-  data?: ImageData; // For raster
-  text?: string;    // For text
+  data?: ImageData;
+  text?: string;
   fontSize?: number;
   fontFamily?: string;
   color?: string;
@@ -26,18 +26,20 @@ export interface Project {
   height: number;
   layers: Layer[];
   activeLayerId: string | null;
+  // Viewport isolada por projeto
   zoom: number;
   panX: number;
   panY: number;
+  isDirty: boolean; // Para saber se houve mudanças não salvas
 }
 
 interface ProjectState {
   projects: Project[];
   activeProjectId: string | null;
   
-  // Actions
   addProject: (project: Project) => void;
-  setActiveProject: (id: string) => void;
+  removeProject: (id: string) => void;
+  setActiveProject: (id: string | null) => void;
   updateProject: (id: string, updates: Partial<Project>) => void;
   addLayer: (projectId: string, layer: Layer) => void;
   updateLayer: (projectId: string, layerId: string, updates: Partial<Layer>) => void;
@@ -53,15 +55,24 @@ export const useProjectStore = create<ProjectState>((set) => ({
     activeProjectId: project.id
   })),
 
+  removeProject: (id) => set((state) => {
+    const newProjects = state.projects.filter(p => p.id !== id);
+    let newActiveId = state.activeProjectId;
+    if (state.activeProjectId === id) {
+      newActiveId = newProjects.length > 0 ? newProjects[newProjects.length - 1].id : null;
+    }
+    return { projects: newProjects, activeProjectId: newActiveId };
+  }),
+
   setActiveProject: (id) => set({ activeProjectId: id }),
 
   updateProject: (id, updates) => set((state) => ({
-    projects: state.projects.map((p) => p.id === id ? { ...p, ...updates } : p)
+    projects: state.projects.map((p) => p.id === id ? { ...p, ...updates, isDirty: updates.isDirty !== undefined ? updates.isDirty : true } : p)
   })),
 
   addLayer: (projectId, layer) => set((state) => ({
     projects: state.projects.map((p) => 
-      p.id === projectId ? { ...p, layers: [...p.layers, layer], activeLayerId: layer.id } : p
+      p.id === projectId ? { ...p, layers: [...p.layers, layer], activeLayerId: layer.id, isDirty: true } : p
     )
   })),
 
@@ -69,6 +80,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
     projects: state.projects.map((p) => 
       p.id === projectId ? {
         ...p,
+        isDirty: true,
         layers: p.layers.map((l) => l.id === layerId ? { ...l, ...updates } : l)
       } : p
     )

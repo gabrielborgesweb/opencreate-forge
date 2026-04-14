@@ -4,14 +4,34 @@ import { useUIStore } from '@store/uiStore';
 import { Home, X } from 'lucide-react';
 
 const ProjectTabs: React.FC = () => {
-  const { projects } = useProjectStore();
+  const { projects, removeProject, setActiveProject } = useProjectStore();
   const { activeTab, setActiveTab } = useUIStore();
-  const setActiveProject = useProjectStore((state) => state.setActiveProject);
 
-  const handleTabClick = (id: 'home' | string) => {
+  const handleTabClick = (id: "home" | string) => {
     setActiveTab(id);
-    if (id !== 'home') {
+    if (id !== "home") {
       setActiveProject(id);
+    }
+  };
+
+  const handleCloseTab = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const project = projects.find((p) => p.id === id);
+    if (!project) return;
+
+    if (project.isDirty) {
+      // @ts-expect-error - Electron API
+      const result = await window.electronAPI.confirmClose(project.name);
+      if (result === 2) return; // Cancel
+      if (result === 0) {
+        // TODO: Implement Save before closing
+        console.log("Saving project before close...");
+      }
+    }
+    
+    removeProject(id);
+    if (activeTab === id) {
+      setActiveTab('home');
     }
   };
 
@@ -22,7 +42,8 @@ const ProjectTabs: React.FC = () => {
       height: '35px', 
       borderBottom: '1px solid #333',
       padding: '0 5px',
-      alignItems: 'flex-end'
+      alignItems: 'flex-end',
+      overflowX: 'auto'
     }}>
       <button 
         onClick={() => handleTabClick('home')}
@@ -38,7 +59,8 @@ const ProjectTabs: React.FC = () => {
           borderTopRightRadius: '4px',
           cursor: 'pointer',
           fontSize: '0.8rem',
-          gap: '8px'
+          gap: '8px',
+          flexShrink: 0
         }}
       >
         <Home size={14} />
@@ -62,14 +84,30 @@ const ProjectTabs: React.FC = () => {
             fontSize: '0.8rem',
             gap: '8px',
             borderRight: '1px solid #222',
-            minWidth: '120px',
-            justifyContent: 'space-between'
+            minWidth: '150px',
+            justifyContent: 'space-between',
+            flexShrink: 0
           }}
         >
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {project.name}.ocfd
+            {project.name}{project.isDirty ? '*' : ''}.ocfd
           </span>
-          <X size={12} className="close-tab" style={{ cursor: 'pointer', opacity: 0.5 }} />
+          <button 
+            onClick={(e) => handleCloseTab(e, project.id)}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              color: 'inherit', 
+              display: 'flex', 
+              padding: '2px',
+              borderRadius: '2px',
+              cursor: 'pointer'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#444'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+          >
+            <X size={12} />
+          </button>
         </div>
       ))}
     </div>

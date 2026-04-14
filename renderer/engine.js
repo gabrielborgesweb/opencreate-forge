@@ -208,6 +208,125 @@ function draw() {
   );
   ctx.restore();
 
+  // Helper function para desenhar o cursor e a seleção de texto
+  function drawTextCursor(ctx, layer) {
+    const textEditor = document.getElementById("textEditor");
+    if (!textEditor) return;
+
+    const selStart = textEditor.selectionStart;
+    const selEnd = textEditor.selectionEnd;
+    const text = layer.text || "";
+    const lines = text.split("\n");
+    
+    const fontSize = layer.fontSize || 40;
+    const fontFamily = layer.fontFamily || "Arial";
+    const lineHeight = fontSize * 1.2;
+    
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    
+    // Função auxiliar para obter coordenadas de um índice
+    function getCharCoordinates(index) {
+      let currentIdx = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const lineLength = line.length + 1; // +1 for \n
+        
+        if (index < currentIdx + lineLength) {
+          const charInLine = index - currentIdx;
+          const subStr = line.substring(0, charInLine);
+          const w = ctx.measureText(subStr).width;
+          const lineW = ctx.measureText(line).width;
+          
+          let lineStartX = layer.x;
+          if (layer.align === "center") {
+             lineStartX = layer.x + (layer.width / 2) - (lineW / 2);
+          } else if (layer.align === "right") {
+             lineStartX = layer.x + layer.width - lineW;
+          }
+          
+          return {
+            x: lineStartX + w,
+            y: layer.y + i * lineHeight,
+            height: fontSize // ou lineHeight
+          };
+        }
+        currentIdx += lineLength;
+      }
+      // Fallback para o final
+      const lastLineIdx = lines.length - 1;
+      const lastLine = lines[lastLineIdx] || "";
+      const lineW = ctx.measureText(lastLine).width;
+      let lineStartX = layer.x;
+      if (layer.align === "center") {
+         lineStartX = layer.x + (layer.width / 2) - (lineW / 2);
+      } else if (layer.align === "right") {
+         lineStartX = layer.x + layer.width - lineW;
+      }
+      return {
+        x: lineStartX + lineW,
+        y: layer.y + lastLineIdx * lineHeight,
+        height: fontSize
+      };
+    }
+
+    // Desenhar Seleção (Azul)
+    if (selStart !== selEnd) {
+      const start = Math.min(selStart, selEnd);
+      const end = Math.max(selStart, selEnd);
+      
+      ctx.fillStyle = "rgba(0, 120, 215, 0.3)"; // Azul semitransparente
+      
+      // Maneira simplificada: iterar char por char no range (pode ser otimizado)
+      for (let i = start; i < end; i++) {
+        // Pega coord do char i
+        // Precisamos saber a largura do char i
+        let currentIdx = 0;
+        for (let l = 0; l < lines.length; l++) {
+           const line = lines[l];
+           const lineLen = line.length + 1;
+           if (i >= currentIdx && i < currentIdx + line.length) { // Ignora o \n
+              const charInLine = i - currentIdx;
+              const charStr = line[charInLine];
+              const subStrBefore = line.substring(0, charInLine);
+              const xBefore = ctx.measureText(subStrBefore).width;
+              const charW = ctx.measureText(charStr).width;
+              
+              const lineW = ctx.measureText(line).width;
+              let lineStartX = layer.x;
+              if (layer.align === "center") lineStartX = layer.x + (layer.width / 2) - (lineW / 2);
+              else if (layer.align === "right") lineStartX = layer.x + layer.width - lineW;
+
+              ctx.fillRect(lineStartX + xBefore, layer.y + l * lineHeight, charW, lineHeight);
+           }
+           currentIdx += lineLen;
+        }
+      }
+    }
+
+    // Desenhar Cursor (Piscando)
+    if (selStart === selEnd) {
+      if (Math.floor(Date.now() / 500) % 2 === 0) {
+        const pos = getCharCoordinates(selEnd);
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        ctx.lineTo(pos.x, pos.y + lineHeight);
+        ctx.strokeStyle = layer.color; // Usa cor do texto
+        ctx.lineWidth = 2; // Cursor um pouco mais grosso
+        ctx.stroke();
+      }
+      // Força redraw para animação
+      // requestAnimationFrame(() => context.draw()); // Cuidado com loop infinito
+      if (!context.cursorBlinkInterval) {
+         context.cursorBlinkInterval = setInterval(() => context.draw(), 500);
+      }
+    } else {
+      if (context.cursorBlinkInterval) {
+        clearInterval(context.cursorBlinkInterval);
+        context.cursorBlinkInterval = null;
+      }
+    }
+  }
+
   // Helper function para desenhar uma camada (para evitar repetição)
   // Helper function modificada para suportar MULTILINHA
   function drawLayer(ctx, layer, activeLayer, isTransforming, transformState) {
@@ -231,16 +350,19 @@ function draw() {
         ctx.font = `${fontSize}px ${fontFamily}`;
         ctx.fillStyle = layer.color;
         ctx.textBaseline = "top";
-        ctx.textAlign = "left"; // Mantemos left para alinhar com o textarea
+        ctx.textAlign = layer.align || "left";
 
-        // Suporte a múltiplas linhas
         const lines = (layer.text || "").split("\n");
         // O ponto de ancoragem define onde o texto começa em relação à caixa de transformação
         const startX = -t.width * t.anchor.x;
         const startY = -t.height * t.anchor.y;
 
+        let x = startX;
+        if (ctx.textAlign === "center") x += t.width / 2;
+        if (ctx.textAlign === "right") x += t.width;
+
         lines.forEach((line, index) => {
-          ctx.fillText(line, startX, startY + index * lineHeight);
+          ctx.fillText(line, x, startY + index * lineHeight);
         });
       } else {
         // Raster Image
@@ -264,12 +386,24 @@ function draw() {
         ctx.font = `${fontSize}px ${fontFamily}`;
         ctx.fillStyle = layer.color;
         ctx.textBaseline = "top";
-        ctx.textAlign = "left";
+        ctx.textAlign = layer.align || "left";
 
         const lines = (layer.text || "").split("\n");
+
+        let x = layer.x;
+        if (ctx.textAlign === "center") x += layer.width / 2;
+        if (ctx.textAlign === "right") x += layer.width;
+
         lines.forEach((line, index) => {
-          ctx.fillText(line, layer.x, layer.y + index * lineHeight);
+          ctx.fillText(line, x, layer.y + index * lineHeight);
         });
+
+        // --- NOVO: Desenha o cursor se estiver editando esta camada ---
+        if (context.isTextEditing && context.editingLayerId === layer.id) {
+           drawTextCursor(ctx, layer);
+        }
+        // -------------------------------------------------------------
+
       } else {
         // Raster Image
         if (layer.image) {

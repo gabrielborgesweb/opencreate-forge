@@ -1820,107 +1820,167 @@ window.updateTypeToolOptions = function () {
   selectedToolDiv.innerHTML = ""; // Limpa opções anteriores
 
   const context = window.Engine.getContext();
-  // Pega opções atuais ou define padrões
-  const options = context.tools["typeTool"] || {
+  const toolState = context.tools["typeTool"] || {
     color: "#000000",
     size: 24,
     align: "left",
-    text: "Type Here",
+    font: "system-ui",
   };
 
-  // -- 1. Cor --
+  const activeLayer = context.activeLayer;
+  const isTextLayer = activeLayer && activeLayer.type === "text";
+
+  // Se houver uma camada ativa de texto, as opções na barra devem refletir essa camada
+  const currentOptions = isTextLayer
+    ? {
+        color: activeLayer.color,
+        size: activeLayer.fontSize,
+        align: activeLayer.align,
+        font: activeLayer.fontFamily,
+      }
+    : toolState;
+
+  // -- 1. Font Family --
+  const fontSelect = document.createElement("select");
+  const fonts = [
+    "system-ui",
+    "Arial",
+    "Courier New",
+    "Georgia",
+    "Times New Roman",
+    "Verdana",
+    "Impact",
+  ];
+  fonts.forEach((f) => {
+    const opt = document.createElement("option");
+    opt.value = f;
+    opt.textContent = f;
+    opt.style.fontFamily = f;
+    if (f === currentOptions.font) opt.selected = true;
+    fontSelect.appendChild(opt);
+  });
+  fontSelect.className = "tool-select";
+  fontSelect.style.cssText =
+    "background: #333; border: 1px solid #555; border-radius: 4px; color: #fff; padding: 2px; width: 120px;";
+  fontSelect.onchange = (e) => {
+    window.Engine.setToolOption("typeTool", "font", e.target.value);
+    updateActiveTextLayerProp("font", e.target.value);
+  };
+
+  // -- 2. Cor --
   const colorInput = document.createElement("input");
   colorInput.type = "color";
-  colorInput.value = options.color;
-  colorInput.title = "Text Color";
+  colorInput.value = currentOptions.color;
+  colorInput.style.cssText =
+    "width: 30px; height: 20px; padding: 0; border: none; background: none; cursor: pointer;";
   colorInput.oninput = (e) => {
     window.Engine.setToolOption("typeTool", "color", e.target.value);
     updateActiveTextLayerProp("color", e.target.value);
   };
 
-  // -- 2. Tamanho (px) --
+  // -- 3. Tamanho (px) --
   const sizeInput = document.createElement("input");
   sizeInput.type = "number";
   sizeInput.min = "8";
-  sizeInput.value = options.size;
-  sizeInput.style.width = "50px";
-  sizeInput.title = "Font Size (px)";
+  sizeInput.value = currentOptions.size;
+  sizeInput.style.cssText =
+    "width: 50px; background: #333; border: 1px solid #555; border-radius: 4px; color: #fff; padding: 2px;";
   sizeInput.onchange = (e) => {
     const val = parseInt(e.target.value, 10);
     window.Engine.setToolOption("typeTool", "size", val);
     updateActiveTextLayerProp("size", val);
   };
 
-  // -- 3. Alinhamento --
-  const alignSelect = document.createElement("select");
+  // -- 4. Alinhamento --
+  const alignContainer = document.createElement("div");
+  alignContainer.style.display = "flex";
+  alignContainer.className = "select-modes";
   ["left", "center", "right"].forEach((align) => {
-    const opt = document.createElement("option");
-    opt.value = align;
-    opt.textContent = align.charAt(0).toUpperCase() + align.slice(1);
-    if (align === options.align) opt.selected = true;
-    alignSelect.appendChild(opt);
+    const btn = document.createElement("button");
+    btn.className = "select-mode-button";
+    if (align === currentOptions.align) btn.classList.add("active");
+    btn.title = align.charAt(0).toUpperCase() + align.slice(1);
+    btn.innerHTML = align === "left" ? "L" : align === "center" ? "C" : "R";
+    btn.style.width = "24px";
+    btn.style.height = "24px";
+    btn.onclick = () => {
+      window.Engine.setToolOption("typeTool", "align", align);
+      updateActiveTextLayerProp("align", align);
+      window.updateTypeToolOptions(); // Re-render para atualizar estado do botão
+    };
+    alignContainer.appendChild(btn);
   });
-  alignSelect.onchange = (e) => {
-    window.Engine.setToolOption("typeTool", "align", e.target.value);
-    updateActiveTextLayerProp("align", e.target.value);
-  };
-
-  // -- 4. Input de Texto Rápido --
-  const textInput = document.createElement("input");
-  textInput.type = "text";
-  textInput.placeholder = "Text content...";
-  // Se houver uma camada ativa de texto, mostre o texto dela, senão mostre o padrão da ferramenta
-  const activeL = context.layers.find((l) => l.id === context.activeLayer);
-  if (activeL && activeL.type === "text") {
-    textInput.value = activeL.text;
-  } else {
-    textInput.value = options.text;
-  }
-
-  textInput.style.width = "150px";
-  textInput.oninput = (e) => {
-    window.Engine.setToolOption("typeTool", "text", e.target.value);
-    updateActiveTextLayerProp("text", e.target.value);
-  };
 
   // Montagem da barra
-  const container = document.createElement("div");
-  container.style.display = "flex";
-  container.style.gap = "8px";
-  container.style.alignItems = "center";
+  const barContainer = document.createElement("div");
+  barContainer.style.cssText =
+    "display: flex; gap: 12px; align-items: center; margin-left: 10px;";
 
-  container.appendChild(document.createTextNode("Color:"));
-  container.appendChild(colorInput);
-  container.appendChild(document.createTextNode("Size:"));
-  container.appendChild(sizeInput);
-  container.appendChild(alignSelect);
-  container.appendChild(textInput);
+  const addField = (label, el) => {
+    const group = document.createElement("div");
+    group.style.display = "flex";
+    group.style.alignItems = "center";
+    group.style.gap = "4px";
+    if (label) {
+      const l = document.createElement("span");
+      l.textContent = label;
+      group.appendChild(l);
+    }
+    group.appendChild(el);
+    barContainer.appendChild(group);
+  };
 
-  selectedToolDiv.appendChild(container);
+  addField(null, fontSelect);
+  addField("Size:", sizeInput);
+  addField("Color:", colorInput);
+  addField(null, alignContainer);
+
+  selectedToolDiv.appendChild(barContainer);
 };
 
 /** Função auxiliar para atualizar a camada ativa em tempo real */
 function updateActiveTextLayerProp(prop, value) {
   const context = window.Engine.getContext();
-  const layer = context.layers.find((l) => l.id === context.activeLayer);
+  const layer = context.activeLayer;
 
   // Só atualiza se for camada de texto
   if (layer && layer.type === "text") {
-    layer[prop] = value;
+    // Mapeia nomes da UI para nomes da Engine
+    let engineProp = prop;
+    if (prop === "size") engineProp = "fontSize";
+    if (prop === "font") engineProp = "fontFamily";
 
-    // Se mudou texto ou tamanho, precisa recalcular a largura (bounding box)
-    if (prop === "text" || prop === "size" || prop === "font") {
+    layer[engineProp] = value;
+
+    // Se mudou texto, tamanho ou fonte, precisa recalcular a largura (bounding box)
+    if (
+      engineProp === "text" ||
+      engineProp === "fontSize" ||
+      engineProp === "fontFamily"
+    ) {
       const tempCtx = document.createElement("canvas").getContext("2d");
-      tempCtx.font = `${layer.size}px ${layer.font || "system-ui"}`;
-      const metrics = tempCtx.measureText(layer.text);
-      layer.width = Math.ceil(metrics.width);
-      layer.height = layer.size; // Aproximação
+      const fSize = layer.fontSize || 24;
+      const fFamily = layer.fontFamily || "system-ui";
+      tempCtx.font = `${fSize}px ${fFamily}`;
 
-      if (prop === "text") layer.name = value.substring(0, 15);
+      const lines = (layer.text || "").split("\n");
+      let maxWidth = 0;
+      lines.forEach((line) => {
+        const metrics = tempCtx.measureText(line);
+        if (metrics.width > maxWidth) maxWidth = metrics.width;
+      });
+
+      layer.width = Math.ceil(maxWidth) || 10;
+      layer.height = Math.ceil(fSize * 1.2 * lines.length) || 10;
+
+      if (engineProp === "text") {
+        layer.name = value.substring(0, 15) || "Text Layer";
+      }
     }
 
     context.saveState();
     context.draw();
+    if (window.Engine.updateLayersPanel) window.Engine.updateLayersPanel();
   }
 }
 

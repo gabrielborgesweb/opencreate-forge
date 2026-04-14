@@ -381,29 +381,123 @@ export function handleMouseDown(context, e) {
   if (context.activeToolId === "typeTool") {
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
 
-    // 1. Tentar clicar em uma camada de texto existente para editar
-    // (Lógica simples de hit test baseada em bounding box aproximado)
+    // Se já estiver editando...
+    if (context.isTextEditing && context.editingLayerId) {
+      const editingLayer = context.layers.find(l => l.id === context.editingLayerId);
+      
+      // Verifica se o clique foi DENTRO da caixa da camada sendo editada
+      // (Hit test simplificado, mas suficiente para saber se o usuário quer mover o cursor ou sair)
+      if (editingLayer) {
+        // Recalcula bounding box apenas para garantir
+        const fSize = editingLayer.fontSize || 24;
+        const lines = (editingLayer.text || "").split("\n");
+        const height = Math.max(fSize * 1.2 * lines.length, fSize);
+        // A largura (width) já deve estar atualizada no layer object pelo oninput
+        
+        // Verifica bounding box
+        if (x >= editingLayer.x && x <= editingLayer.x + editingLayer.width &&
+            y >= editingLayer.y && y <= editingLayer.y + height) {
+          
+          // --- CALCULAR POSIÇÃO DO CURSOR ---
+          const tempCtx = document.createElement("canvas").getContext("2d");
+          tempCtx.font = `${fSize}px ${editingLayer.fontFamily || "system-ui"}`;
+          
+          const lineHeight = fSize * 1.2;
+          // 1. Descobrir a linha
+          let lineIndex = Math.floor((y - editingLayer.y) / lineHeight);
+          if (lineIndex < 0) lineIndex = 0;
+          if (lineIndex >= lines.length) lineIndex = lines.length - 1;
+          
+          const lineText = lines[lineIndex];
+          const lineWidth = tempCtx.measureText(lineText).width;
+          
+          // 2. Descobrir X inicial da linha com base no alinhamento
+          let lineStartX = editingLayer.x;
+          if (editingLayer.align === "center") {
+            lineStartX = editingLayer.x + (editingLayer.width / 2) - (lineWidth / 2);
+          } else if (editingLayer.align === "right") {
+            lineStartX = editingLayer.x + editingLayer.width - lineWidth;
+          }
+          
+          // 3. Descobrir índice do caractere mais próximo
+          let closestCharIndex = 0;
+          let minDiff = Infinity;
+          
+          for (let i = 0; i <= lineText.length; i++) {
+            const subStr = lineText.substring(0, i);
+            const w = tempCtx.measureText(subStr).width;
+            const charX = lineStartX + w;
+            const diff = Math.abs(x - charX);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestCharIndex = i;
+            }
+          }
+          
+          // 4. Converter para índice global no textarea
+          let globalIndex = 0;
+          for (let i = 0; i < lineIndex; i++) {
+            globalIndex += lines[i].length + 1; // +1 do \n
+          }
+          globalIndex += closestCharIndex;
+          
+          // Atualiza o textarea e força redesenho
+          textEditor.setSelectionRange(globalIndex, globalIndex);
+          // Previne que o textarea perca foco (já que clicamos no canvas)
+          setTimeout(() => textEditor.focus(), 0);
+          context.draw();
+          return; // Consumiu o evento, não commita nem cria nova camada
+        }
+      }
+      
+      // Se clicou FORA, commita a edição atual
+      commitTextEdit(context);
+    }
+
+    // 1. Tentar clicar em uma camada de texto existente para editar (nova edição)
     const clickedLayer = context.layers
       .slice()
-      .reverse() // Checa do topo para baixo
+      .reverse()
       .find((l) => {
         if (!l.visible || l.type !== "text") return false;
-        // Estimativa simples de hit box (pode melhorar com measureText)
-        const width = l.text.length * (l.fontSize * 0.6);
-        const height = l.fontSize * 1.2 * l.text.split("\n").length;
+
+        const tempCtx = document.createElement("canvas").getContext("2d");
+        const fSize = l.fontSize || 24;
+        const fFamily = l.fontFamily || "system-ui";
+        tempCtx.font = `${fSize}px ${fFamily}`;
+
+        const lines = (l.text || "").split("\n");
+        let maxWidth = 0;
+        lines.forEach((line) => {
+          const m = tempCtx.measureText(line);
+          if (m.width > maxWidth) maxWidth = m.width;
+        });
+
+        const width = Math.max(maxWidth, 20);
+        const height = Math.max(fSize * 1.2 * lines.length, fSize);
+
+        // Atualiza dimensões reais no objeto se precisar
+        l.width = Math.ceil(width);
+        l.height = Math.ceil(height);
+
         return x >= l.x && x <= l.x + width && y >= l.y && y <= l.y + height;
       });
 
     if (clickedLayer) {
       context.setActiveLayer(clickedLayer.id);
       startTextEditing(context, clickedLayer);
+      if (typeof window.updateTypeToolOptions === "function") {
+        window.updateTypeToolOptions();
+      }
     } else {
       // 2. Criar nova camada de texto onde clicou
       const newLayer = Layers.addTextLayer(context, "", x, y);
-      // Inicia edição imediatamente
       startTextEditing(context, newLayer);
+      if (typeof window.updateTypeToolOptions === "function") {
+        window.updateTypeToolOptions();
+      }
     }
-    return; // Impede outras lógicas de desenho
+    return;
   }
 }
 
@@ -632,26 +726,46 @@ export function attachInputListeners(context) {
 }
 
 /** Finaliza a edição atual (esconde o textarea e salva na camada) */
-function commitTextEdit(context) {
-  if (textEditor.style.display === "none") return;
+function commitTextEdit(context, cancel = false) {
+  if (!context.isTextEditing || !context.editingLayerId) return;
 
-  // Atualiza a camada com o texto final
-  if (context.editingLayerId) {
-    const layer = context.layers.find((l) => l.id === context.editingLayerId);
-    if (layer) {
+  const layer = context.layers.find((l) => l.id === context.editingLayerId);
+
+  if (layer) {
+    if (cancel) {
+      // Reverte para o texto original
+      layer.text = context.originalTextBeforeEdit || "";
+    } else {
+      // Salva o texto do editor
       layer.text = textEditor.value;
-      // Atualiza nome da camada se quiser
-      if (layer.name.startsWith("Text Layer") || layer.name === "") {
+
+      if (layer.name.startsWith("Text Layer") || layer.name === "Empty Text") {
         layer.name = layer.text.substring(0, 15) || "Empty Text";
       }
     }
+
+    // Recalcula dimensões
+    const tempCtx = document.createElement("canvas").getContext("2d");
+    const fSize = layer.fontSize || 24;
+    const fFamily = layer.fontFamily || "system-ui";
+    tempCtx.font = `${fSize}px ${fFamily}`;
+
+    const lines = (layer.text || "").split("\n");
+    let maxW = 0;
+    lines.forEach((ln) => {
+      const m = tempCtx.measureText(ln);
+      if (m.width > maxW) maxW = m.width;
+    });
+    layer.width = Math.ceil(maxW) || 10;
+    layer.height = Math.ceil(fSize * 1.2 * lines.length) || 10;
   }
 
   // Limpa estado
   textEditor.style.display = "none";
   textEditor.value = "";
   context.editingLayerId = null;
-  context.isTextEditing = false; // Flag para bloquear outras ferramentas
+  context.isTextEditing = false;
+  context.originalTextBeforeEdit = null;
 
   if (window.Engine.updateLayersPanel) window.Engine.updateLayersPanel();
   context.saveState();
@@ -660,56 +774,77 @@ function commitTextEdit(context) {
 
 /** Inicia a edição de uma camada de texto */
 function startTextEditing(context, layer) {
-  commitTextEdit(context); // Fecha edição anterior se houver
-
+  // 1. Configura estado
   context.isTextEditing = true;
   context.editingLayerId = layer.id;
+  context.originalTextBeforeEdit = layer.text;
 
-  // 1. Configura o textarea com os dados da camada
+  // 2. Configura o textarea invisível
   textEditor.value = layer.text;
-  textEditor.style.color = layer.color;
-  textEditor.style.font = `${layer.fontSize}px ${layer.fontFamily}`;
-  textEditor.style.lineHeight = "1.2";
-
-  // 2. Calcula posição na TELA (Screen Coordinates)
-  // O textarea é um elemento DOM, então precisa considerar Zoom e Pan do Canvas
-  const screenX = layer.x * context.scale + context.originX;
-  const screenY = layer.y * context.scale + context.originY;
-
-  textEditor.style.left = `${screenX}px`;
-  textEditor.style.top = `${screenY}px`;
-
-  // Aplica o Zoom do CSS no textarea para bater com o zoom do canvas
-  textEditor.style.transform = `scale(${context.scale})`;
-
-  // Mostra e foca
+  
+  // Não precisamos posicionar o textarea, pois ele está oculto via CSS
+  // Mas precisamos garantir que ele esteja "visível" para o DOM focar
   textEditor.style.display = "block";
+  textEditor.focus();
+  
+  // Seleciona todo o texto por padrão ao iniciar a edição
+  textEditor.setSelectionRange(0, textEditor.value.length);
 
-  // Ajusta tamanho do box automaticamente
-  setTimeout(() => {
-    textEditor.style.width = textEditor.scrollWidth + 20 + "px";
-    textEditor.style.height = textEditor.scrollHeight + 20 + "px";
-    textEditor.focus();
-  }, 0);
-
-  // Sincronização ao vivo: Digitar no textarea atualiza o canvas (opcional, ou espera o commit)
-  textEditor.oninput = () => {
+  // Sincronização ao vivo
+  const handleInput = () => {
     layer.text = textEditor.value;
-    textEditor.style.width = "0px"; // Hack para recalcular width
-    textEditor.style.width = textEditor.scrollWidth + 10 + "px";
-    textEditor.style.height = textEditor.scrollHeight + "px";
+    // Recalcula dimensões para que o cursor funcione corretamente
+    const tempCtx = document.createElement("canvas").getContext("2d");
+    const fSize = layer.fontSize || 24;
+    const fFamily = layer.fontFamily || "system-ui";
+    tempCtx.font = `${fSize}px ${fFamily}`;
+    const lines = (layer.text || "").split("\n");
+    let maxW = 0;
+    lines.forEach((ln) => {
+      const m = tempCtx.measureText(ln);
+      if (m.width > maxW) maxW = m.width;
+    });
+    layer.width = Math.ceil(maxW) || 10;
+    layer.height = Math.ceil(fSize * 1.2 * lines.length) || 10;
+    
     context.draw();
   };
 
-  // Atalhos dentro do editor
+  textEditor.oninput = handleInput;
+
+  // Redesenhar ao mover cursor (keydown/keyup/click/select)
+  const handleSelectionChange = () => {
+    context.draw();
+  };
+  
   textEditor.onkeydown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      // Enter sem shift finaliza (opcional)
-      // e.preventDefault();
-      // commitTextEdit(context);
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      commitTextEdit(context);
+      return;
     }
     if (e.key === "Escape") {
-      commitTextEdit(context);
+      e.preventDefault();
+      commitTextEdit(context, true);
+      return;
     }
+    // Permite que o evento propague para o textarea atualizar o cursor
+    // Mas agendamos um draw logo após
+    setTimeout(handleSelectionChange, 0);
+    e.stopPropagation();
+  };
+  
+  textEditor.onkeyup = handleSelectionChange;
+  textEditor.onmouseup = handleSelectionChange; // Para seleção com mouse no textarea (se fosse visível)
+
+  // Commit ao perder foco
+  textEditor.onblur = () => {
+    // Pequeno delay para permitir que cliques no canvas não fechem a edição imediatamente
+    // se o clique for na mesma camada de texto
+    setTimeout(() => {
+      if (context.isTextEditing && context.editingLayerId === layer.id && document.activeElement !== textEditor) {
+        commitTextEdit(context);
+      }
+    }, 100);
   };
 }

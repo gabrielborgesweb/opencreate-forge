@@ -269,10 +269,10 @@ app.whenReady().then(() => {
   //   }
   // });
 
-  if (process.platform === "darwin") {
-    const iconPath = path.join(__dirname, "favicon-darwin-liquid.png");
-    app.dock.setIcon(iconPath);
-  }
+  // if (process.platform === "darwin") {
+  //   const iconPath = path.join(__dirname, "favicon-darwin-liquid.png");
+  //   app.dock.setIcon(iconPath);
+  // }
 
   createWindow();
 

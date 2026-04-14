@@ -400,26 +400,19 @@ button {
 }
 
 #textEditor {
-  position: absolute;
-  display: none; /* Oculto por padrão */
-  background: transparent;
-  border: 1px dashed var(--accent-color); /* Borda tracejada ao editar */
+  position: fixed; /* Fixado para não afetar layout */
+  top: -1000px; /* Fora da tela visível */
+  left: 0;
+  opacity: 0; /* Invisível */
+  width: 1px;
+  height: 1px;
   padding: 0;
   margin: 0;
-  outline: none;
-  resize: none;
+  border: none;
   overflow: hidden;
-  white-space: pre; /* Respeita quebras de linha */
-  z-index: 1000;
-  transform-origin: top left;
-  /* A fonte será injetada via JS, mas defina um reset básico */
-  font-family: sans-serif;
-  line-height: 1.2;
-}
-
-/* Opcional: Quando não estiver focado, pode esconder a borda se quiser */
-#textEditor:focus {
-  border: 1px solid var(--accent-color);
+  white-space: pre;
+  z-index: -1; /* Atrás de tudo */
+  pointer-events: none; /* Não interage com mouse */
 }
 
 canvas {

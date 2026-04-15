@@ -6,79 +6,33 @@ const HomeScreen: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
-    <div className="home-screen" style={{ 
-      flex: 1, 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center', 
-      justifyContent: 'center',
-      background: '#1a1a1a',
-      color: '#eee',
-      gap: '2rem'
-    }}>
-      <div style={{ textAlign: 'center' }}>
-        <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem', color: '#cc6d29' }}>OpenCreate Forge</h2>
-        <p style={{ color: '#888' }}>Modern Image Editor powered by React & Electron</p>
+    <div className="flex-1 flex flex-col items-center justify-center bg-bg-primary text-[#eee] gap-8">
+      <div className="text-center">
+        <h2 className="text-[2rem] mb-2 text-accent">OpenCreate Forge</h2>
+        <p className="text-[#888]">
+          Modern Image Editor powered by React & Electron
+        </p>
       </div>
 
-      <div style={{ display: 'flex', gap: '1.5rem' }}>
-        <button 
+      <div className="flex gap-6">
+        <button
           onClick={() => setIsModalOpen(true)}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '1rem',
-            padding: '2rem',
-            background: '#252525',
-            border: '1px solid #333',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            width: '160px',
-            transition: 'transform 0.2s, border-color 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = '#cc6d29';
-            e.currentTarget.style.transform = 'translateY(-5px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = '#333';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
+          className="flex flex-col items-center gap-4 p-8 bg-[#252525] border border-bg-tertiary rounded-lg cursor-pointer w-40 transition-all hover:border-accent hover:-translate-y-1"
         >
-          <Plus size={32} color="#cc6d29" />
-          <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>New Project</span>
+          <Plus size={32} className="text-accent" />
+          <span className="text-[0.9rem] font-medium">New Project</span>
         </button>
 
-        <button 
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '1rem',
-            padding: '2rem',
-            background: '#252525',
-            border: '1px solid #333',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            width: '160px',
-            transition: 'transform 0.2s, border-color 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = '#cc6d29';
-            e.currentTarget.style.transform = 'translateY(-5px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = '#333';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
-        >
-          <FolderOpen size={32} color="#cc6d29" />
-          <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Open Project</span>
+        <button className="flex flex-col items-center gap-4 p-8 bg-[#252525] border border-bg-tertiary rounded-lg cursor-pointer w-40 transition-all hover:border-accent hover:-translate-y-1">
+          <FolderOpen size={32} className="text-accent" />
+          <span className="text-[0.9rem] font-medium">Open Project</span>
         </button>
       </div>
 
-      <NewProjectModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <NewProjectModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </div>
   );
 };

@@ -86,11 +86,8 @@ const CanvasViewport: React.FC = () => {
   }, []);
 
   return (
-    <div className="canvas-container" style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#111' }}>
-      <canvas
-        ref={canvasRef}
-        style={{ display: 'block', width: '100%', height: '100%' }}
-      />
+    <div className="flex-1 relative overflow-hidden bg-[#111]">
+      <canvas ref={canvasRef} className="block w-full h-full" />
     </div>
   );
 };

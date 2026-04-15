@@ -15,11 +15,9 @@ const ToolOptions: React.FC = () => {
     switch (activeToolId) {
       case "brush":
         return (
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <div
-              style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-            >
-              <label style={{ fontSize: "0.75rem", color: "#999" }}>Size</label>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label className="text-[0.75rem] text-[#999]">Size</label>
               <input
                 type="range"
                 min="1"
@@ -30,37 +28,28 @@ const ToolOptions: React.FC = () => {
                     size: parseInt(e.target.value),
                   })
                 }
+                className="accent-accent"
               />
-              <span style={{ fontSize: "0.75rem", width: "30px" }}>
+              <span className="text-[0.75rem] w-[30px]">
                 {toolSettings.brush.size}px
               </span>
             </div>
-            <div
-              style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-            >
-              <label style={{ fontSize: "0.75rem", color: "#999" }}>
-                Color
-              </label>
+            <div className="flex items-center gap-2">
+              <label className="text-[0.75rem] text-[#999]">Color</label>
               <input
                 type="color"
                 value={toolSettings.brush.color}
                 onChange={(e) =>
                   updateToolSettings("brush", { color: e.target.value })
                 }
-                style={{
-                  border: "none",
-                  background: "none",
-                  width: "24px",
-                  height: "24px",
-                  cursor: "pointer",
-                }}
+                className="border-none bg-none w-6 h-6 cursor-pointer"
               />
             </div>
           </div>
         );
       default:
         return (
-          <span style={{ fontSize: "0.75rem", color: "#666" }}>
+          <span className="text-[0.75rem] text-[#666]">
             No options for this tool
           </span>
         );
@@ -68,33 +57,10 @@ const ToolOptions: React.FC = () => {
   };
 
   return (
-    <div
-      className="tool-options"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "1.5rem",
-        padding: "0 .5rem",
-        paddingRight: "calc(.5rem - 1px)",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          borderRight: "1px solid #444",
-          paddingRight: "1rem",
-        }}
-      >
-        <ToolIcon size={16} color="#cc6d29" />
-        <span
-          style={{
-            fontSize: "0.85rem",
-            fontWeight: "bold",
-            textTransform: "uppercase",
-          }}
-        >
+    <div className="flex items-center gap-6 px-4 py-1 pr-[calc(0.5rem-1px)]">
+      <div className="flex items-center gap-2 border-r border-border pr-4 h-full py-1">
+        <ToolIcon size={16} className="text-accent" />
+        <span className="text-[0.85rem] font-bold uppercase">
           {activeTool?.name || activeToolId}
         </span>
       </div>

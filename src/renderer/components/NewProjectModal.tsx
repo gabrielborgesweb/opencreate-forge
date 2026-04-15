@@ -65,43 +65,39 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
   };
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        background: '#252525', width: '650px', borderRadius: '8px', border: '1px solid #444',
-        overflow: 'hidden', display: 'flex', flexDirection: 'column'
-      }}>
-        <div style={{ padding: '1rem', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#2a2a2a' }}>
-          <h2 style={{ fontSize: '1rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Layout size={18} color="#cc6d29" /> New Project
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[1000]">
+      <div className="bg-[#252525] w-[650px] rounded-lg border border-border overflow-hidden flex flex-col">
+        <div className="p-4 border-b border-bg-tertiary flex justify-between items-center bg-bg-secondary">
+          <h2 className="text-base m-0 flex items-center gap-2">
+            <Layout size={18} className="text-accent" /> New Project
           </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}><X size={20} /></button>
+          <button
+            onClick={onClose}
+            className="bg-none border-none text-[#666] cursor-pointer hover:text-white transition-colors"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        <div style={{ display: 'flex', flex: 1 }}>
+        <div className="flex flex-1">
           {/* Presets */}
-          <div style={{ width: '250px', borderRight: '1px solid #333', padding: '1rem', background: '#222' }}>
-            <h3 style={{ fontSize: '0.75rem', color: '#666', marginBottom: '1rem', textTransform: 'uppercase' }}>Presets</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {presets.map(p => (
-                <button 
+          <div className="w-[250px] border-r border-bg-tertiary p-4 bg-[#222]">
+            <h3 className="text-[0.75rem] text-[#666] mb-4 uppercase font-bold">
+              Presets
+            </h3>
+            <div className="flex flex-col gap-2">
+              {presets.map((p) => (
+                <button
                   key={p.name}
                   onClick={() => applyPreset(p.w, p.h, p.name)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '0.6rem',
-                    background: '#2a2a2a', border: '1px solid #333', borderRadius: '4px',
-                    color: '#eee', cursor: 'pointer', textAlign: 'left', fontSize: '0.8rem'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.borderColor = '#cc6d29'}
-                  onMouseLeave={(e) => e.currentTarget.style.borderColor = '#333'}
+                  className="flex items-center gap-3 p-2 bg-bg-secondary border border-bg-tertiary rounded cursor-pointer text-left text-[0.8rem] text-[#eee] transition-colors hover:border-accent"
                 >
-                  <p.icon size={16} color="#888" />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 'bold' }}>{p.name}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#666' }}>{p.w} x {p.h} px</div>
+                  <p.icon size={16} className="text-[#888]" />
+                  <div className="flex-1">
+                    <div className="font-bold">{p.name}</div>
+                    <div className="text-[0.7rem] text-[#666]">
+                      {p.w} x {p.h} px
+                    </div>
                   </div>
                 </button>
               ))}
@@ -109,38 +105,41 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
           </div>
 
           {/* Form */}
-          <div style={{ flex: 1, padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.8rem', color: '#888' }}>Project Name</label>
-              <input 
-                type="text" value={name} onChange={e => setName(e.target.value)}
-                style={{ background: '#1a1a1a', border: '1px solid #444', color: '#eee', padding: '0.6rem', borderRadius: '4px', outline: 'none' }}
+          <div className="flex-1 p-8 flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <label className="text-[0.8rem] text-[#888]">Project Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="bg-bg-primary border border-border text-[#eee] p-2 rounded outline-none focus:border-accent"
               />
             </div>
 
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.8rem', color: '#888' }}>Width (px)</label>
-                <input 
-                  type="number" value={width} onChange={e => setWidth(parseInt(e.target.value))}
-                  style={{ background: '#1a1a1a', border: '1px solid #444', color: '#eee', padding: '0.6rem', borderRadius: '4px', outline: 'none' }}
+            <div className="flex gap-4">
+              <div className="flex-1 flex flex-col gap-2">
+                <label className="text-[0.8rem] text-[#888]">Width (px)</label>
+                <input
+                  type="number"
+                  value={width}
+                  onChange={(e) => setWidth(parseInt(e.target.value))}
+                  className="bg-bg-primary border border-border text-[#eee] p-2 rounded outline-none focus:border-accent"
                 />
               </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.8rem', color: '#888' }}>Height (px)</label>
-                <input 
-                  type="number" value={height} onChange={e => setHeight(parseInt(e.target.value))}
-                  style={{ background: '#1a1a1a', border: '1px solid #444', color: '#eee', padding: '0.6rem', borderRadius: '4px', outline: 'none' }}
+              <div className="flex-1 flex flex-col gap-2">
+                <label className="text-[0.8rem] text-[#888]">Height (px)</label>
+                <input
+                  type="number"
+                  value={height}
+                  onChange={(e) => setHeight(parseInt(e.target.value))}
+                  className="bg-bg-primary border border-border text-[#eee] p-2 rounded outline-none focus:border-accent"
                 />
               </div>
             </div>
 
-            <button 
+            <button
               onClick={handleCreate}
-              style={{
-                marginTop: '1rem', padding: '0.8rem', background: '#cc6d29', color: 'white',
-                border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold'
-              }}
+              className="mt-4 p-3 bg-accent text-white border-none rounded cursor-pointer font-bold hover:brightness-110 transition-all"
             >
               Create Project
             </button>

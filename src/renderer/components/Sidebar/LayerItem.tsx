@@ -23,33 +23,28 @@ const LayerItem: React.FC<LayerItemProps> = ({ layer, projectId, isActive }) => 
   };
 
   return (
-    <div 
-      className={`layer-item ${isActive ? 'active' : ''}`}
+    <div
+      className={`flex items-center p-2 cursor-pointer select-none border-b border-bg-tertiary transition-colors ${
+        isActive ? "bg-bg-tertiary" : "bg-transparent hover:bg-white/5"
+      }`}
       onClick={() => setActiveLayer(projectId, layer.id)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0.5rem',
-        background: isActive ? '#333' : 'transparent',
-        borderBottom: '1px solid #333',
-        cursor: 'pointer',
-        userSelect: 'none',
-      }}
     >
-      <button 
+      <button
         onClick={toggleVisibility}
-        style={{ background: 'none', border: 'none', color: layer.visible ? '#eee' : '#666', cursor: 'pointer', display: 'flex' }}
+        className={`bg-none border-none cursor-pointer flex transition-colors ${
+          layer.visible ? "text-[#eee]" : "text-[#666]"
+        }`}
       >
         {layer.visible ? <Eye size={16} /> : <EyeOff size={16} />}
       </button>
-      
-      <div style={{ flex: 1, marginLeft: '0.5rem', fontSize: '0.85rem' }}>
-        {layer.name}
-      </div>
 
-      <button 
+      <div className="flex-1 ml-2 text-[0.85rem]">{layer.name}</div>
+
+      <button
         onClick={toggleLock}
-        style={{ background: 'none', border: 'none', color: layer.locked ? '#ffcc00' : '#666', cursor: 'pointer', display: 'flex' }}
+        className={`bg-none border-none cursor-pointer flex transition-colors ${
+          layer.locked ? "text-[#ffcc00]" : "text-[#666]"
+        }`}
       >
         {layer.locked ? <Lock size={14} /> : <Unlock size={14} />}
       </button>

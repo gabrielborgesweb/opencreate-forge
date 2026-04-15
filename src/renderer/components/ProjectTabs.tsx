@@ -36,75 +36,32 @@ const ProjectTabs: React.FC = () => {
   };
 
   return (
-    <div className="project-tabs" style={{ 
-      display: 'flex', 
-      background: '#111', 
-      height: '35px', 
-      borderBottom: '1px solid #333',
-      padding: '0 5px',
-      alignItems: 'flex-end',
-      overflowX: 'auto'
-    }}>
-      <button 
-        onClick={() => handleTabClick('home')}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 15px',
-          height: '30px',
-          border: 'none',
-          background: activeTab === 'home' ? '#222' : 'transparent',
-          color: activeTab === 'home' ? '#eee' : '#666',
-          borderTopLeftRadius: '4px',
-          borderTopRightRadius: '4px',
-          cursor: 'pointer',
-          fontSize: '0.8rem',
-          gap: '8px',
-          flexShrink: 0
-        }}
+    <div className="flex bg-[#111] h-[35px] border-b border-bg-tertiary px-[5px] items-end overflow-x-auto">
+      <button
+        onClick={() => handleTabClick("home")}
+        className={`flex items-center px-[15px] h-[30px] border-none rounded-t-[4px] cursor-pointer text-[0.8rem] gap-2 flex-shrink-0 transition-colors ${
+          activeTab === "home" ? "bg-[#222] text-[#eee]" : "bg-transparent text-[#666] hover:bg-white/5"
+        }`}
       >
         <Home size={14} />
         Home
       </button>
 
       {projects.map((project) => (
-        <div 
+        <div
           key={project.id}
           onClick={() => handleTabClick(project.id)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 12px',
-            height: '30px',
-            background: activeTab === project.id ? '#1a1a1a' : 'transparent',
-            color: activeTab === project.id ? '#eee' : '#666',
-            borderTopLeftRadius: '4px',
-            borderTopRightRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '0.8rem',
-            gap: '8px',
-            borderRight: '1px solid #222',
-            minWidth: '150px',
-            justifyContent: 'space-between',
-            flexShrink: 0
-          }}
+          className={`flex items-center px-3 h-[30px] rounded-t-[4px] cursor-pointer text-[0.8rem] gap-2 border-r border-[#222] min-w-[150px] justify-between flex-shrink-0 transition-colors ${
+            activeTab === project.id ? "bg-bg-primary text-[#eee]" : "bg-transparent text-[#666] hover:bg-white/5"
+          }`}
         >
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {project.name}{project.isDirty ? '*' : ''}.ocfd
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+            {project.name}
+            {project.isDirty ? "*" : ""}.ocfd
           </span>
-          <button 
+          <button
             onClick={(e) => handleCloseTab(e, project.id)}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: 'inherit', 
-              display: 'flex', 
-              padding: '2px',
-              borderRadius: '2px',
-              cursor: 'pointer'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.background = '#444'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            className="bg-none border-none text-inherit flex p-[2px] rounded-[2px] cursor-pointer hover:bg-white/10 transition-colors"
           >
             <X size={12} />
           </button>

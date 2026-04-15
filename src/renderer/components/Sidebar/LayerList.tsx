@@ -8,18 +8,22 @@ const LayerList: React.FC = () => {
     state.projects.find((p) => p.id === activeProjectId) || null
   );
   
-  if (!project) return <div style={{ padding: '1rem', color: '#666' }}>No active project</div>;
+  if (!project)
+    return <div className="p-4 text-[#666]">No active project</div>;
 
   return (
-    <div className="layer-list" style={{ flex: 1, overflowY: 'auto' }}>
-      {project.layers.slice().reverse().map((layer) => (
-        <LayerItem 
-          key={layer.id} 
-          layer={layer} 
-          projectId={project.id}
-          isActive={project.activeLayerId === layer.id}
-        />
-      ))}
+    <div className="flex-1 overflow-y-auto">
+      {project.layers
+        .slice()
+        .reverse()
+        .map((layer) => (
+          <LayerItem
+            key={layer.id}
+            layer={layer}
+            projectId={project.id}
+            isActive={project.activeLayerId === layer.id}
+          />
+        ))}
     </div>
   );
 };

@@ -7,33 +7,17 @@ const Toolbar: React.FC = () => {
   const setActiveTool = useToolStore((state) => state.setActiveTool);
 
   return (
-    <div
-      className="toolbar"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        padding: "0.5rem",
-        gap: "0.5rem",
-      }}
-    >
+    <div className="flex flex-col p-2 gap-2 bg-bg-secondary border-r border-bg-tertiary">
       {TOOLS.map((tool) => (
         <button
           key={tool.id}
           onClick={() => setActiveTool(tool.id)}
           title={tool.label}
-          style={{
-            width: "32px",
-            height: "32px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: activeToolId === tool.id ? "#cc6d29" : "transparent",
-            color: activeToolId === tool.id ? "white" : "#ccc",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            transition: "background 0.2s",
-          }}
+          className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
+            activeToolId === tool.id
+              ? "bg-accent text-white"
+              : "bg-transparent text-[#ccc] hover:bg-white/5"
+          } border-none cursor-pointer`}
         >
           <tool.icon size={16} />
         </button>

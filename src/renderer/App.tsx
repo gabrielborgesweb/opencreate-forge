@@ -16,66 +16,32 @@ function App() {
   );
 
   return (
-    <div
-      className="app-container"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        background: "#1a1a1a",
-        color: "#eee",
-        overflow: "hidden",
-      }}
-    >
+    <div className="flex flex-col h-screen bg-bg-primary text-[#eee] overflow-hidden">
       {/* 1. Abas de Projeto */}
       <ProjectTabs />
 
       {/* 2. Cabeçalho Dinâmico (Opções da Ferramenta) */}
       {activeTab !== "home" && (
-        <header
-          style={{
-            height: "24px",
-            background: "#222",
-            borderBottom: "1px solid #333",
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
+        <header className="bg-[#222] border-b border-bg-tertiary flex items-center">
           <ToolOptions />
         </header>
       )}
 
       {/* 3. Área Principal */}
-      <main style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <main className="flex-1 flex overflow-hidden">
         {activeTab === "home" ? (
           <HomeScreen />
         ) : (
           <>
-            <aside
-              style={{ background: "#222", borderRight: "1px solid #333" }}
-            >
+            <aside className="bg-[#222] border-r border-bg-tertiary">
               <Toolbar />
             </aside>
 
             <CanvasViewport />
 
-            <aside
-              style={{
-                width: "250px",
-                background: "#222",
-                borderLeft: "1px solid #333",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <div
-                style={{
-                  padding: "0.5rem 1rem",
-                  borderBottom: "1px solid #333",
-                  background: "#2a2a2a",
-                }}
-              >
-                <h3 style={{ fontSize: "0.8rem", margin: 0, color: "#999" }}>
+            <aside className="w-[250px] bg-[#222] border-l border-bg-tertiary flex flex-col">
+              <div className="px-4 py-2 border-b border-bg-tertiary bg-bg-secondary">
+                <h3 className="text-[0.8rem] m-0 text-[#999] font-bold uppercase">
                   LAYERS
                 </h3>
               </div>
@@ -86,30 +52,18 @@ function App() {
       </main>
 
       {/* 4. Footer / Status Bar */}
-      <footer
-        style={{
-          height: "25px",
-          padding: "0 1rem",
-          background: "#222",
-          borderTop: "1px solid #333",
-          fontSize: "0.75rem",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          color: "#888",
-        }}
-      >
+      <footer className="h-[25px] px-4 bg-[#222] border-t border-bg-tertiary text-[0.75rem] flex items-center justify-between text-[#888]">
         <div>
           {activeTab === "home"
             ? "Welcome to OpenCreate Forge"
             : `Editing ${activeProject?.name || "Unknown"}.ocfd`}
         </div>
         {activeProject && (
-          <div style={{ display: "flex", gap: "1rem" }}>
+          <div className="flex gap-4">
             <span>
               {activeProject.width} x {activeProject.height} px
             </span>
-            <span style={{ color: "#cc6d29", fontWeight: "bold" }}>
+            <span className="text-accent font-bold">
               Zoom: {Math.round(activeProject.zoom * 100)}%
             </span>
           </div>

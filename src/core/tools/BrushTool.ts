@@ -9,6 +9,13 @@ export class BrushTool extends BaseTool {
   private offscreenCanvas: HTMLCanvasElement | null = null;
   private offscreenCtx: CanvasRenderingContext2D | null = null;
   private layerId: string | null = null;
+  private strokeOriginX = 0;
+  private strokeOriginY = 0;
+  private readonly STROKE_PADDING = 1000;
+
+  private mouseX = 0;
+  private mouseY = 0;
+  private isMouseOver = false;
 
   private brushCanvas: HTMLCanvasElement | null = null;
 
@@ -68,6 +75,8 @@ export class BrushTool extends BaseTool {
     this.layerId = activeLayerId;
 
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
+    this.mouseX = x;
+    this.mouseY = y;
     this.lastX = x;
     this.lastY = y;
 
@@ -85,9 +94,25 @@ export class BrushTool extends BaseTool {
   }
 
   onMouseMove(e: MouseEvent, context: ToolContext): void {
-    if (!this.isDrawing) return;
-
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
+    this.mouseX = x;
+    this.mouseY = y;
+
+    // Verifica se o mouse está sobre o canvas para mostrar/ocultar o preview
+    const rect = context.canvas.getBoundingClientRect();
+    this.isMouseOver =
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom;
+
+    if (this.isMouseOver) {
+      context.canvas.style.cursor = "none";
+    } else {
+      context.canvas.style.cursor = "default";
+    }
+
+    if (!this.isDrawing) return;
 
     const settings = useToolStore.getState().toolSettings.brush;
     const pad = settings.size;
@@ -108,14 +133,31 @@ export class BrushTool extends BaseTool {
     if (this.offscreenCanvas && this.layerId && this.offscreenCtx) {
       const layer = context.project.layers.find((l) => l.id === this.layerId)!;
 
-      // CORREÇÃO: Buscar a Bounding Box varrendo o canvas INTEIRO e não apenas a área do traço.
-      // Isso impede que dados fora do traço atual (como o próprio fundo da camada) sejam descartados.
+      // Otimização: Em vez de varrer o canvas todo (que agora tem STROKE_PADDING),
+      // varremos apenas a união da área original da camada com a área do novo traço.
+      const strokeLocalMinX = Math.floor(this.minX - this.strokeOriginX);
+      const strokeLocalMinY = Math.floor(this.minY - this.strokeOriginY);
+      const strokeLocalMaxX = Math.ceil(this.maxX - this.strokeOriginX);
+      const strokeLocalMaxY = Math.ceil(this.maxY - this.strokeOriginY);
+
       const searchBounds = {
-        x: 0,
-        y: 0,
-        width: this.offscreenCanvas.width,
-        height: this.offscreenCanvas.height,
+        x: Math.max(0, Math.min(this.STROKE_PADDING, strokeLocalMinX)),
+        y: Math.max(0, Math.min(this.STROKE_PADDING, strokeLocalMinY)),
+        width: 0,
+        height: 0,
       };
+
+      const searchMaxX = Math.min(
+        this.offscreenCanvas.width,
+        Math.max(this.STROKE_PADDING + layer.width, strokeLocalMaxX),
+      );
+      const searchMaxY = Math.min(
+        this.offscreenCanvas.height,
+        Math.max(this.STROKE_PADDING + layer.height, strokeLocalMaxY),
+      );
+
+      searchBounds.width = searchMaxX - searchBounds.x;
+      searchBounds.height = searchMaxY - searchBounds.y;
 
       const bounds = this.getOptimizedBoundingBox(
         this.offscreenCtx,
@@ -149,8 +191,8 @@ export class BrushTool extends BaseTool {
             return {
               ...l,
               data: dataUrl,
-              x: layer.x + bounds.x,
-              y: layer.y + bounds.y,
+              x: this.strokeOriginX + bounds.x,
+              y: this.strokeOriginY + bounds.y,
               width: bounds.width,
               height: bounds.height,
             };
@@ -207,9 +249,14 @@ export class BrushTool extends BaseTool {
   }
 
   private initOffscreen(layer: any) {
+    this.strokeOriginX = layer.x - this.STROKE_PADDING;
+    this.strokeOriginY = layer.y - this.STROKE_PADDING;
+    const width = layer.width + this.STROKE_PADDING * 2;
+    const height = layer.height + this.STROKE_PADDING * 2;
+
     this.offscreenCanvas = document.createElement("canvas");
-    this.offscreenCanvas.width = layer.width;
-    this.offscreenCanvas.height = layer.height;
+    this.offscreenCanvas.width = width;
+    this.offscreenCanvas.height = height;
     this.offscreenCtx = this.offscreenCanvas.getContext("2d", {
       willReadFrequently: true,
     })!;
@@ -221,7 +268,11 @@ export class BrushTool extends BaseTool {
           this.offscreenCtx.save();
           // CORREÇÃO: A imagem base deve carregar sempre "por baixo" dos traços frescos que o usuário já fez
           this.offscreenCtx.globalCompositeOperation = "destination-over";
-          this.offscreenCtx.drawImage(img, 0, 0);
+          this.offscreenCtx.drawImage(
+            img,
+            this.STROKE_PADDING,
+            this.STROKE_PADDING,
+          );
           this.offscreenCtx.restore();
         }
       };
@@ -229,14 +280,13 @@ export class BrushTool extends BaseTool {
     }
   }
 
-  private draw(x: number, y: number, context: ToolContext) {
+  private draw(x: number, y: number, _context: ToolContext) {
     if (!this.offscreenCtx || !this.layerId || !this.brushCanvas) return;
     const settings = useToolStore.getState().toolSettings.brush;
-    const layer = context.project.layers.find((l) => l.id === this.layerId)!;
-    const localX = x - layer.x;
-    const localY = y - layer.y;
-    const localLastX = this.lastX - layer.x;
-    const localLastY = this.lastY - layer.y;
+    const localX = x - this.strokeOriginX;
+    const localY = y - this.strokeOriginY;
+    const localLastX = this.lastX - this.strokeOriginX;
+    const localLastY = this.lastY - this.strokeOriginY;
 
     this.offscreenCtx.save();
     if (settings.hardness >= 1) {
@@ -266,7 +316,15 @@ export class BrushTool extends BaseTool {
     this.offscreenCtx.restore();
   }
 
+  onDeactivate(context: ToolContext): void {
+    context.canvas.style.cursor = "default";
+    this.isMouseOver = false;
+    this.isDrawing = false;
+  }
+
   onRender(ctx: CanvasRenderingContext2D, context: ToolContext): void {
+    const settings = useToolStore.getState().toolSettings.brush;
+
     if (this.isDrawing && this.offscreenCanvas && this.layerId) {
       const layer = context.project.layers.find((l) => l.id === this.layerId)!;
       ctx.save();
@@ -280,7 +338,55 @@ export class BrushTool extends BaseTool {
       );
       ctx.globalAlpha = layer.opacity / 100;
       ctx.globalCompositeOperation = layer.blendMode;
-      ctx.drawImage(this.offscreenCanvas, layer.x, layer.y);
+      ctx.drawImage(
+        this.offscreenCanvas,
+        this.strokeOriginX,
+        this.strokeOriginY,
+      );
+      ctx.restore();
+    }
+
+    // Brush Preview - Só desenha se o mouse estiver sobre o canvas
+    if (this.isMouseOver) {
+      ctx.save();
+      ctx.setTransform(
+        context.project.zoom,
+        0,
+        0,
+        context.project.zoom,
+        context.project.panX,
+        context.project.panY,
+      );
+
+      const effectiveSize = settings.size * (1 + (1 - settings.hardness) * 0.5);
+      const radius = effectiveSize / 2;
+
+      // Outline externa (branca)
+      ctx.beginPath();
+      ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+      ctx.lineWidth = 1 / context.project.zoom;
+      ctx.stroke();
+
+      // Outline interna (preta para contraste)
+      ctx.beginPath();
+      ctx.arc(
+        this.mouseX,
+        this.mouseY,
+        radius - 0.5 / context.project.zoom,
+        0,
+        Math.PI * 2,
+      );
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.lineWidth = 0.5 / context.project.zoom;
+      ctx.stroke();
+
+      // Ponto central
+      ctx.beginPath();
+      ctx.arc(this.mouseX, this.mouseY, 1 / context.project.zoom, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+      ctx.fill();
+
       ctx.restore();
     }
   }

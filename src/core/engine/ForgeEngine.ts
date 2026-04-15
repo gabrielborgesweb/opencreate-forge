@@ -32,6 +32,7 @@ export class ForgeEngine {
     brush: new BrushTool(),
   };
 
+  private currentToolId: string | null = null;
   private onViewportChange: (zoom: number, x: number, y: number) => void;
 
   constructor(
@@ -257,6 +258,24 @@ export class ForgeEngine {
 
   public render() {
     if (!this.project) return;
+
+    // Detectar mudança de ferramenta
+    const activeToolId = useToolStore.getState().activeToolId;
+    if (activeToolId !== this.currentToolId) {
+      const context = this.getToolContext();
+      if (context) {
+        if (this.currentToolId && this.tools[this.currentToolId]) {
+          this.tools[this.currentToolId].onDeactivate(context);
+        }
+        this.currentToolId = activeToolId;
+        if (this.currentToolId && this.tools[this.currentToolId]) {
+          this.tools[this.currentToolId].onActivate(context);
+        }
+        // Reset cursor default ao trocar
+        this.canvas.style.cursor = "default";
+      }
+    }
+
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.imageSmoothingEnabled = false;
 

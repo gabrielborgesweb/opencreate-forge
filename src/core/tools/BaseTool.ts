@@ -17,6 +17,9 @@ export abstract class BaseTool {
   onMouseMove(_e: MouseEvent, _context: ToolContext): void {}
   onMouseUp(_e: MouseEvent, _context: ToolContext): void {}
 
+  onActivate(_context: ToolContext): void {}
+  onDeactivate(_context: ToolContext): void {}
+
   // Opcional: Renderizar algo extra por cima (como o cursor do pincel)
   onRender(_ctx: CanvasRenderingContext2D, _context: ToolContext): void {}
 }

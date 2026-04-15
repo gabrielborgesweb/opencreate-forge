@@ -11,7 +11,7 @@ export class BrushTool extends BaseTool {
   private layerId: string | null = null;
   private strokeOriginX = 0;
   private strokeOriginY = 0;
-  private readonly STROKE_PADDING = 1000;
+  private readonly STROKE_PADDING = 2048;
 
   private mouseX = 0;
   private mouseY = 0;
@@ -35,7 +35,8 @@ export class BrushTool extends BaseTool {
 
   private initBrush(size: number, hardness: number, color: string) {
     const radius = size / 2;
-    const canvasSize = Math.ceil(size + 4);
+    // Padding extra para garantir que o blur não seja cortado
+    const canvasSize = Math.ceil(size * 1.5);
 
     this.brushCanvas = document.createElement("canvas");
     this.brushCanvas.width = canvasSize;
@@ -52,9 +53,15 @@ export class BrushTool extends BaseTool {
       radius,
     );
 
-    gradient.addColorStop(0, this.hexToRgba(color, 1));
-    gradient.addColorStop(hardness, this.hexToRgba(color, 1));
-    gradient.addColorStop(1, this.hexToRgba(color, 0));
+    const opaque = this.hexToRgba(color, 1);
+    const transparent = this.hexToRgba(color, 0);
+
+    // O centro é sempre opaco
+    gradient.addColorStop(0, opaque);
+    // O núcleo opaco se estende até o valor de hardness
+    gradient.addColorStop(Math.max(0, Math.min(0.99, hardness)), opaque);
+    // Queda linear para transparente a partir do hardness
+    gradient.addColorStop(1, transparent);
 
     ctx.fillStyle = gradient;
     ctx.beginPath();
@@ -289,30 +296,23 @@ export class BrushTool extends BaseTool {
     const localLastY = this.lastY - this.strokeOriginY;
 
     this.offscreenCtx.save();
-    if (settings.hardness >= 1) {
-      this.offscreenCtx.strokeStyle = settings.color;
-      this.offscreenCtx.lineWidth = settings.size;
-      this.offscreenCtx.lineCap = "round";
-      this.offscreenCtx.lineJoin = "round";
-      this.offscreenCtx.beginPath();
-      this.offscreenCtx.moveTo(localLastX, localLastY);
-      this.offscreenCtx.lineTo(localX, localY);
-      this.offscreenCtx.stroke();
-    } else {
-      const dist = Math.hypot(localX - localLastX, localY - localLastY);
-      const angle = Math.atan2(localY - localLastY, localX - localLastX);
-      const spacing = Math.max(1, (settings.size / 2) * 0.1);
 
-      for (let i = 0; i <= dist; i += spacing) {
-        const px = localLastX + Math.cos(angle) * i;
-        const py = localLastY + Math.sin(angle) * i;
-        this.offscreenCtx.drawImage(
-          this.brushCanvas,
-          px - this.brushCanvas.width / 2,
-          py - this.brushCanvas.height / 2,
-        );
-      }
+    const dist = Math.hypot(localX - localLastX, localY - localLastY);
+    const angle = Math.atan2(localY - localLastY, localX - localLastX);
+
+    // Espaçamento de 10% do tamanho para um traço fluido
+    const spacing = Math.max(1, settings.size * 0.1);
+
+    for (let i = 0; i <= dist; i += spacing) {
+      const px = localLastX + Math.cos(angle) * i;
+      const py = localLastY + Math.sin(angle) * i;
+      this.offscreenCtx.drawImage(
+        this.brushCanvas,
+        px - this.brushCanvas.width / 2,
+        py - this.brushCanvas.height / 2,
+      );
     }
+
     this.offscreenCtx.restore();
   }
 
@@ -383,7 +383,13 @@ export class BrushTool extends BaseTool {
 
       // Ponto central
       ctx.beginPath();
-      ctx.arc(this.mouseX, this.mouseY, 1 / context.project.zoom, 0, Math.PI * 2);
+      ctx.arc(
+        this.mouseX,
+        this.mouseY,
+        1 / context.project.zoom,
+        0,
+        Math.PI * 2,
+      );
       ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
       ctx.fill();
 

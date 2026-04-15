@@ -11,7 +11,7 @@ export interface Layer {
   y: number;
   width: number;
   height: number;
-  data?: ImageData;
+  data?: string; // dataURL (Base64)
   text?: string;
   fontSize?: number;
   fontFamily?: string;

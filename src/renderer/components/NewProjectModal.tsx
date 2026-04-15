@@ -29,7 +29,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
   const handleCreate = () => {
     const id = Math.random().toString(36).substr(2, 9);
     
-    let imageData: ImageData | undefined = undefined;
+    let dataUrl: string | undefined = undefined;
     
     if (background !== 'transparent') {
       const canvas = document.createElement('canvas');
@@ -39,7 +39,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
       if (ctx) {
         ctx.fillStyle = background;
         ctx.fillRect(0, 0, width, height);
-        imageData = ctx.getImageData(0, 0, width, height);
+        dataUrl = canvas.toDataURL('image/png');
       }
     }
 
@@ -60,7 +60,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
           y: 0,
           width,
           height,
-          data: imageData,
+          data: dataUrl,
           blendMode: 'source-over',
         }
       ],

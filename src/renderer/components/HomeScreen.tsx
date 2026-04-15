@@ -8,7 +8,7 @@ const HomeScreen: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col items-center justify-center bg-bg-primary text-[#eee] gap-8">
       <div className="text-center">
-        <h2 className="text-[2rem] mb-2 font-bold">
+        <h2 className="text-[2rem] mb-2 font-bold text-text">
           OpenCreate <span className="text-accent">Forge</span>
         </h2>
         <p className="text-[#888]">

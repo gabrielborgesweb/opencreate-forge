@@ -1,22 +1,6 @@
 import React from "react";
-import { useToolStore, ToolId } from "@store/toolStore";
-import {
-  MousePointer2,
-  Square,
-  Brush,
-  Pencil,
-  Eraser,
-  Type,
-} from "lucide-react";
-
-const tools = [
-  { id: "move" as ToolId, icon: MousePointer2, label: "Move (V)" },
-  { id: "select" as ToolId, icon: Square, label: "Select (M)" },
-  { id: "brush" as ToolId, icon: Brush, label: "Brush (B)" },
-  { id: "pencil" as ToolId, icon: Pencil, label: "Pencil (P)" },
-  { id: "eraser" as ToolId, icon: Eraser, label: "Eraser (E)" },
-  { id: "text" as ToolId, icon: Type, label: "Text (T)" },
-];
+import { useToolStore } from "@store/toolStore";
+import { TOOLS } from "../constants/tools";
 
 const Toolbar: React.FC = () => {
   const activeToolId = useToolStore((state) => state.activeToolId);
@@ -32,7 +16,7 @@ const Toolbar: React.FC = () => {
         gap: "0.5rem",
       }}
     >
-      {tools.map((tool) => (
+      {TOOLS.map((tool) => (
         <button
           key={tool.id}
           onClick={() => setActiveTool(tool.id)}

@@ -1,38 +1,15 @@
 import React from "react";
-import { useToolStore, ToolId } from "@store/toolStore";
-import {
-  MousePointer2,
-  Square,
-  Brush,
-  Pencil,
-  Eraser,
-  Type,
-  Settings2,
-} from "lucide-react";
+import { useToolStore } from "@store/toolStore";
+import { TOOLS } from "../constants/tools";
+import { Settings2 } from "lucide-react";
 
 const ToolOptions: React.FC = () => {
   const activeToolId = useToolStore((state) => state.activeToolId);
   const toolSettings = useToolStore((state) => state.toolSettings);
   const updateToolSettings = useToolStore((state) => state.updateToolSettings);
 
-  const getToolIcon = (id: ToolId) => {
-    switch (id) {
-      case "move":
-        return <MousePointer2 size={16} color="#cc6d29" />;
-      case "select":
-        return <Square size={16} color="#cc6d29" />;
-      case "brush":
-        return <Brush size={16} color="#cc6d29" />;
-      case "pencil":
-        return <Pencil size={16} color="#cc6d29" />;
-      case "eraser":
-        return <Eraser size={16} color="#cc6d29" />;
-      case "text":
-        return <Type size={16} color="#cc6d29" />;
-      default:
-        return <Settings2 size={16} color="#cc6d29" />;
-    }
-  };
+  const activeTool = TOOLS.find((tool) => tool.id === activeToolId);
+  const ToolIcon = activeTool?.icon || Settings2;
 
   const renderOptions = () => {
     switch (activeToolId) {
@@ -110,7 +87,7 @@ const ToolOptions: React.FC = () => {
           paddingRight: "1rem",
         }}
       >
-        {getToolIcon(activeToolId)}
+        <ToolIcon size={16} color="#cc6d29" />
         <span
           style={{
             fontSize: "0.85rem",
@@ -118,7 +95,7 @@ const ToolOptions: React.FC = () => {
             textTransform: "uppercase",
           }}
         >
-          {activeToolId}
+          {activeTool?.name || activeToolId}
         </span>
       </div>
       {renderOptions()}

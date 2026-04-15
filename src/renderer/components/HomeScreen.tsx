@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Plus, FolderOpen } from 'lucide-react';
-import NewProjectModal from './NewProjectModal';
+import React, { useState } from "react";
+import { Plus, FolderOpen } from "lucide-react";
+import NewProjectModal from "./NewProjectModal";
 
 const HomeScreen: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -8,7 +8,9 @@ const HomeScreen: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col items-center justify-center bg-bg-primary text-[#eee] gap-8">
       <div className="text-center">
-        <h2 className="text-[2rem] mb-2 text-accent">OpenCreate Forge</h2>
+        <h2 className="text-[2rem] mb-2 font-bold">
+          OpenCreate <span className="text-accent">Forge</span>
+        </h2>
         <p className="text-[#888]">
           Modern Image Editor powered by React & Electron
         </p>

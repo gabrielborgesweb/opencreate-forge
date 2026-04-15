@@ -40,7 +40,7 @@ function App() {
             <CanvasViewport />
 
             <aside className="w-[250px] bg-[#222] border-l border-bg-tertiary flex flex-col">
-              <div className="px-4 py-2 border-b border-bg-tertiary bg-bg-secondary">
+              <div className="px-4 py-2 border-b border-bg-tertiary">
                 <h3 className="text-[0.8rem] m-0 text-[#999] font-bold uppercase">
                   LAYERS
                 </h3>

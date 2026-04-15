@@ -1,7 +1,7 @@
-import React from 'react';
-import { useProjectStore } from '@store/projectStore';
-import { useUIStore } from '@store/uiStore';
-import { Home, X } from 'lucide-react';
+import React from "react";
+import { useProjectStore } from "@store/projectStore";
+import { useUIStore } from "@store/uiStore";
+import { Home, X } from "lucide-react";
 
 const ProjectTabs: React.FC = () => {
   const { projects, removeProject, setActiveProject } = useProjectStore();
@@ -28,10 +28,10 @@ const ProjectTabs: React.FC = () => {
         console.log("Saving project before close...");
       }
     }
-    
+
     removeProject(id);
     if (activeTab === id) {
-      setActiveTab('home');
+      setActiveTab("home");
     }
   };
 
@@ -40,11 +40,12 @@ const ProjectTabs: React.FC = () => {
       <button
         onClick={() => handleTabClick("home")}
         className={`flex items-center px-[15px] h-[30px] border-none rounded-t-[4px] cursor-pointer text-[0.8rem] gap-2 flex-shrink-0 transition-colors ${
-          activeTab === "home" ? "bg-[#222] text-[#eee]" : "bg-transparent text-[#666] hover:bg-white/5"
+          activeTab === "home"
+            ? "bg-[#222] text-[#eee]"
+            : "bg-transparent text-[#666] hover:bg-white/5"
         }`}
       >
         <Home size={14} />
-        Home
       </button>
 
       {projects.map((project) => (
@@ -52,7 +53,9 @@ const ProjectTabs: React.FC = () => {
           key={project.id}
           onClick={() => handleTabClick(project.id)}
           className={`flex items-center px-3 h-[30px] rounded-t-[4px] cursor-pointer text-[0.8rem] gap-2 border-r border-[#222] min-w-[150px] justify-between flex-shrink-0 transition-colors ${
-            activeTab === project.id ? "bg-bg-primary text-[#eee]" : "bg-transparent text-[#666] hover:bg-white/5"
+            activeTab === project.id
+              ? "bg-bg-primary text-[#eee]"
+              : "bg-transparent text-[#666] hover:bg-white/5"
           }`}
         >
           <span className="overflow-hidden text-ellipsis whitespace-nowrap">

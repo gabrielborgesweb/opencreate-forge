@@ -116,8 +116,8 @@ const ToolOptions: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center gap-6 px-4 py-1 pr-[calc(0.5rem-1px)]">
-      <div className="flex items-center gap-2 border-r border-border pr-4 h-full py-1">
+    <div className="flex items-center gap-4 px-4 py-1 pr-[calc(0.5rem-1px)]">
+      <div className="flex items-center gap-4 border-r border-border pr-4 h-full py-1">
         <ToolIcon size={16} className="text-accent" />
         <span className="text-[0.85rem] font-bold uppercase">
           {activeTool?.name || activeToolId}

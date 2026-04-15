@@ -137,6 +137,7 @@ export class ForgeEngine {
       patternCanvas.width = size * 2;
       patternCanvas.height = size * 2;
       const pctx = patternCanvas.getContext('2d')!;
+      pctx.imageSmoothingEnabled = false;
 
       pctx.fillStyle = '#333';
       pctx.fillRect(0, 0, patternCanvas.width, patternCanvas.height);
@@ -189,11 +190,16 @@ export class ForgeEngine {
     if (!this.project) return;
 
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    // Set global smoothing to false for pixelated look
+    this.ctx.imageSmoothingEnabled = false;
 
     // 1. Draw Checkerboard Background
     this.ctx.save();
     this.ctx.setTransform(this.project.zoom, 0, 0, this.project.zoom, this.project.panX, this.project.panY);
-    this.ctx.fillStyle = this.getCheckerPattern();
+    
+    const pattern = this.getCheckerPattern();
+    this.ctx.fillStyle = pattern;
     this.ctx.fillRect(0, 0, this.project.width, this.project.height);
     this.ctx.restore();
 

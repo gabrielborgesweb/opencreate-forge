@@ -34,9 +34,8 @@ export class BrushTool extends BaseTool {
   }
 
   private initBrush(size: number, hardness: number, color: string) {
-    const radius = size / 2;
-    // Padding extra para garantir que o blur não seja cortado
-    const canvasSize = Math.ceil(size * 1.5);
+    const radius = (size / 2) * (2 - hardness);
+    const canvasSize = Math.ceil(size * 1.5 * (2 - hardness));
 
     this.brushCanvas = document.createElement("canvas");
     this.brushCanvas.width = canvasSize;
@@ -53,15 +52,33 @@ export class BrushTool extends BaseTool {
       radius,
     );
 
+    // 1. Centro e início do falloff (totalmente opaco)
     const opaque = this.hexToRgba(color, 1);
-    const transparent = this.hexToRgba(color, 0);
-
-    // O centro é sempre opaco
     gradient.addColorStop(0, opaque);
-    // O núcleo opaco se estende até o valor de hardness
-    gradient.addColorStop(Math.max(0, Math.min(0.99, hardness)), opaque);
-    // Queda linear para transparente a partir do hardness
-    gradient.addColorStop(1, transparent);
+
+    const hardnessStop = Math.max(0, Math.min(0.99, hardness));
+    gradient.addColorStop(hardnessStop, opaque);
+
+    // 2. Transição Suave (Smoothstep) entre hardness e a borda (1)
+    // Usamos 10 passos para aproximar a curva; é leve para o processamento
+    const steps = 10;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps; // Vai de 0 a 1
+
+      // Fórmula Smoothstep: interpolação não-linear
+      const tSmooth = t * t * (3 - 2 * t);
+
+      // Invertemos para o Alpha (começa em 1 no hardness e vai para 0 na borda)
+      const alpha = 1 - tSmooth;
+
+      // Mapeamos a posição do stop entre o hardness e o final (1.0)
+      const stopPosition = hardnessStop + t * (1 - hardnessStop);
+
+      gradient.addColorStop(
+        Math.min(0.999, stopPosition),
+        this.hexToRgba(color, alpha),
+      );
+    }
 
     ctx.fillStyle = gradient;
     ctx.beginPath();

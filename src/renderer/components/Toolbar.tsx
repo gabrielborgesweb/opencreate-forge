@@ -7,7 +7,7 @@ const Toolbar: React.FC = () => {
   const setActiveTool = useToolStore((state) => state.setActiveTool);
 
   return (
-    <div className="flex flex-col p-2 gap-2 bg-bg-secondary border-r border-bg-tertiary">
+    <div className="flex flex-col p-2 pr-[calc(0.5rem-1px)] gap-2">
       {TOOLS.map((tool) => (
         <button
           key={tool.id}

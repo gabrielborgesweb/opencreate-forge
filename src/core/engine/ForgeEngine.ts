@@ -212,6 +212,19 @@ export class ForgeEngine {
       this.renderLayer(layer);
     }
     
+    // 3. Draw Active Layer Border
+    if (this.project.activeLayerId) {
+      const activeLayer = this.project.layers.find(l => l.id === this.project?.activeLayerId);
+      if (activeLayer && activeLayer.visible) {
+        this.ctx.save();
+        this.ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
+        this.ctx.lineWidth = 1 / this.project.zoom;
+        this.ctx.setLineDash([4 / this.project.zoom, 2 / this.project.zoom]);
+        this.ctx.strokeRect(activeLayer.x, activeLayer.y, activeLayer.width, activeLayer.height);
+        this.ctx.restore();
+      }
+    }
+    
     this.ctx.restore();
   }
 

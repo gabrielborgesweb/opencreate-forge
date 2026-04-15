@@ -19,6 +19,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
   const [name, setName] = useState('Untitled');
   const [width, setWidth] = useState(1080);
   const [height, setHeight] = useState(1080);
+  const [background, setBackground] = useState<'white' | 'black' | 'transparent'>('white');
   
   const addProject = useProjectStore((state) => state.addProject);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
@@ -27,6 +28,21 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
 
   const handleCreate = () => {
     const id = Math.random().toString(36).substr(2, 9);
+    
+    let imageData: ImageData | undefined = undefined;
+    
+    if (background !== 'transparent') {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, width, height);
+        imageData = ctx.getImageData(0, 0, width, height);
+      }
+    }
+
     const newProject: Project = {
       id,
       name,
@@ -44,6 +60,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
           y: 0,
           width,
           height,
+          data: imageData,
           blendMode: 'source-over',
         }
       ],
@@ -134,6 +151,25 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
                   onChange={(e) => setHeight(parseInt(e.target.value))}
                   className="bg-bg-primary border border-border text-[#eee] p-2 rounded outline-none focus:border-accent"
                 />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-[0.8rem] text-[#888]">Background</label>
+              <div className="flex gap-2">
+                {(['white', 'black', 'transparent'] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setBackground(type)}
+                    className={`flex-1 p-2 rounded border text-[0.8rem] capitalize transition-all ${
+                      background === type 
+                        ? 'bg-accent border-accent text-white' 
+                        : 'bg-bg-primary border-border text-[#888] hover:border-[#666]'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
               </div>
             </div>
 

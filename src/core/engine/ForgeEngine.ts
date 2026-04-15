@@ -230,9 +230,6 @@ export class ForgeEngine {
         this.ctx.fillStyle = layer.color || '#ffffff';
         this.ctx.font = `${layer.fontSize}px ${layer.fontFamily}`;
         this.ctx.fillText(layer.text || '', layer.x, layer.y + (layer.fontSize || 0));
-    } else if (layer.type === 'raster' && !layer.data) {
-        this.ctx.fillStyle = 'rgba(100, 100, 100, 0.2)';
-        this.ctx.fillRect(layer.x, layer.y, layer.width, layer.height);
     }
     this.ctx.restore();
   }

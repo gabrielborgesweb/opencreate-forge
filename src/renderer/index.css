@@ -73,7 +73,7 @@ body {
   user-select: none;
   -webkit-user-select: none;
   overflow: hidden;
-  font-family: sans-serif;
+  /* font-family: sans-serif; */
 }
 
 *:focus {
@@ -81,15 +81,16 @@ body {
 }
 
 #root {
-  width: 100vw;
-  height: 100vh;
+  /* width: 100vw;
+  height: 100vh; */
   display: flex;
-  place-items: center;
+  flex-direction: column;
+  align-items: stretch;
   min-width: 320px;
   min-height: 100vh;
   user-select: none;
   -webkit-user-select: none;
-  overflow: hidden;
+  /* overflow: hidden; */
   /* Prevent default focus ring on Chromium */
   outline: none;
 }

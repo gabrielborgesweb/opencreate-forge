@@ -48,7 +48,6 @@ export class EraserTool extends BaseTool {
 
     // Na borracha (Brush mode), desenhamos com PRETO sólido no canvas auxiliar
     // e depois usamos destination-out no canvas principal.
-    const color = "#000000";
     const opaque = "rgba(0,0,0,1)";
     gradient.addColorStop(0, opaque);
 
@@ -88,7 +87,7 @@ export class EraserTool extends BaseTool {
 
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
     const settings = useToolStore.getState().toolSettings.eraser;
-    
+
     // Se for modo lápis, snap to pixel
     const drawX = settings.mode === "pencil" ? Math.floor(x) : x;
     const drawY = settings.mode === "pencil" ? Math.floor(y) : y;
@@ -101,7 +100,7 @@ export class EraserTool extends BaseTool {
     if (settings.mode === "brush") {
       this.initBrush(settings.size, settings.hardness);
     }
-    
+
     this.initOffscreen(layer, context);
 
     const pad = settings.size;
@@ -116,10 +115,10 @@ export class EraserTool extends BaseTool {
   onMouseMove(e: MouseEvent, context: ToolContext): void {
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
     const settings = useToolStore.getState().toolSettings.eraser;
-    
+
     const drawX = settings.mode === "pencil" ? Math.floor(x) : x;
     const drawY = settings.mode === "pencil" ? Math.floor(y) : y;
-    
+
     this.mouseX = drawX;
     this.mouseY = drawY;
 
@@ -131,7 +130,7 @@ export class EraserTool extends BaseTool {
       e.clientY <= rect.bottom;
 
     if (this.isMouseOver) {
-      context.canvas.style.cursor = "none";
+      context.canvas.style.cursor = "crosshair";
     } else {
       context.canvas.style.cursor = "default";
     }
@@ -300,7 +299,7 @@ export class EraserTool extends BaseTool {
     this.offscreenCtx = this.offscreenCanvas.getContext("2d", {
       willReadFrequently: true,
     })!;
-    
+
     const settings = useToolStore.getState().toolSettings.eraser;
     if (settings.mode === "pencil") {
       this.offscreenCtx.imageSmoothingEnabled = false;
@@ -340,7 +339,7 @@ export class EraserTool extends BaseTool {
   private draw(x: number, y: number) {
     if (!this.offscreenCtx || !this.layerId) return;
     const settings = useToolStore.getState().toolSettings.eraser;
-    
+
     const localX = x - this.strokeOriginX;
     const localY = y - this.strokeOriginY;
     const localLastX = this.lastX - this.strokeOriginX;
@@ -379,7 +378,7 @@ export class EraserTool extends BaseTool {
 
       while (true) {
         this.drawPixel(x0, y0, settings.size, settings.shape);
-        
+
         if (x0 === x1 && y0 === y1) break;
         const e2 = 2 * err;
         if (e2 >= dy) {
@@ -396,7 +395,12 @@ export class EraserTool extends BaseTool {
     this.offscreenCtx.restore();
   }
 
-  private drawPixel(x: number, y: number, size: number, shape: "circle" | "square") {
+  private drawPixel(
+    x: number,
+    y: number,
+    size: number,
+    shape: "circle" | "square",
+  ) {
     if (!this.offscreenCtx) return;
 
     if (shape === "square") {
@@ -404,7 +408,7 @@ export class EraserTool extends BaseTool {
         x - Math.floor(size / 2),
         y - Math.floor(size / 2),
         size,
-        size
+        size,
       );
     } else {
       // Circle shape (pixelated)
@@ -433,7 +437,12 @@ export class EraserTool extends BaseTool {
           const x_max = Math.floor(max_dist_x + radius - 0.5);
           const draw_width = x_max - x_min + 1;
           if (draw_width > 0) {
-            this.offscreenCtx.fillRect(topLeftX + x_min, topLeftY + py, draw_width, 1);
+            this.offscreenCtx.fillRect(
+              topLeftX + x_min,
+              topLeftY + py,
+              draw_width,
+              1,
+            );
           }
         }
       }
@@ -500,7 +509,7 @@ export class EraserTool extends BaseTool {
           this.mouseX - Math.floor(size / 2),
           this.mouseY - Math.floor(size / 2),
           size,
-          size
+          size,
         );
       } else {
         // Modo Brush ou Modo Pencil com círculo
@@ -518,11 +527,17 @@ export class EraserTool extends BaseTool {
           this.mouseX - Math.floor(size / 2) + offset,
           this.mouseY - Math.floor(size / 2) + offset,
           size - offset * 2,
-          size - offset * 2
+          size - offset * 2,
         );
       } else {
         ctx.beginPath();
-        ctx.arc(this.mouseX, this.mouseY, Math.max(0, size / 2 - offset), 0, Math.PI * 2);
+        ctx.arc(
+          this.mouseX,
+          this.mouseY,
+          Math.max(0, size / 2 - offset),
+          0,
+          Math.PI * 2,
+        );
         ctx.stroke();
       }
 

@@ -1,7 +1,7 @@
 import React from "react";
 import { useToolStore } from "@store/toolStore";
 import { TOOLS } from "../constants/tools";
-import { Settings2 } from "lucide-react";
+import { Brush, Circle, Pencil, Settings2, Square } from "lucide-react";
 import ToolSettingInput from "./ui/ToolSettingInput";
 import TransformOptions from "./TransformOptions";
 
@@ -83,25 +83,27 @@ const ToolOptions: React.FC = () => {
                   onClick={() =>
                     updateToolSettings("pencil", { shape: "square" })
                   }
-                  className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded ${
+                  className={`p-1 text-[10px] uppercase font-bold rounded ${
                     toolSettings.pencil.shape === "square"
                       ? "bg-accent text-white shadow-sm"
                       : "text-[#999] hover:text-white"
                   } transition-all`}
+                  title="Square"
                 >
-                  Square
+                  <Square size={16} />
                 </button>
                 <button
                   onClick={() =>
                     updateToolSettings("pencil", { shape: "circle" })
                   }
-                  className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded ${
+                  className={`p-1 text-[10px] uppercase font-bold rounded ${
                     toolSettings.pencil.shape === "circle"
                       ? "bg-accent text-white shadow-sm"
                       : "text-[#999] hover:text-white"
                   } transition-all`}
+                  title="Circle"
                 >
-                  Circle
+                  <Circle size={16} />
                 </button>
               </div>
             </div>
@@ -110,6 +112,39 @@ const ToolOptions: React.FC = () => {
       case "eraser":
         return (
           <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <label className="text-[0.75rem] text-[#999] font-medium">
+                Mode
+              </label>
+              <div className="flex items-center bg-black/20 rounded p-0.5">
+                <button
+                  onClick={() =>
+                    updateToolSettings("eraser", { mode: "brush" })
+                  }
+                  className={`p-1 text-[10px] uppercase font-bold rounded ${
+                    toolSettings.eraser.mode === "brush"
+                      ? "bg-accent text-white shadow-sm"
+                      : "text-[#999] hover:text-white"
+                  } transition-all`}
+                  title="Brush"
+                >
+                  <Brush size={16} />
+                </button>
+                <button
+                  onClick={() =>
+                    updateToolSettings("eraser", { mode: "pencil" })
+                  }
+                  className={`p-1 text-[10px] uppercase font-bold rounded ${
+                    toolSettings.eraser.mode === "pencil"
+                      ? "bg-accent text-white shadow-sm"
+                      : "text-[#999] hover:text-white"
+                  } transition-all`}
+                  title="Pencil"
+                >
+                  <Pencil size={16} />
+                </button>
+              </div>
+            </div>
             <ToolSettingInput
               label="Size"
               unit="px"
@@ -141,60 +176,31 @@ const ToolOptions: React.FC = () => {
                     onClick={() =>
                       updateToolSettings("eraser", { shape: "square" })
                     }
-                    className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded ${
+                    className={`p-1 text-[10px] uppercase font-bold rounded ${
                       toolSettings.eraser.shape === "square"
                         ? "bg-accent text-white shadow-sm"
                         : "text-[#999] hover:text-white"
                     } transition-all`}
+                    title="Square"
                   >
-                    Square
+                    <Square size={16} />
                   </button>
                   <button
                     onClick={() =>
                       updateToolSettings("eraser", { shape: "circle" })
                     }
-                    className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded ${
+                    className={`p-1 text-[10px] uppercase font-bold rounded ${
                       toolSettings.eraser.shape === "circle"
                         ? "bg-accent text-white shadow-sm"
                         : "text-[#999] hover:text-white"
                     } transition-all`}
+                    title="Circle"
                   >
-                    Circle
+                    <Circle size={16} />
                   </button>
                 </div>
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <label className="text-[0.75rem] text-[#999] font-medium">
-                Mode
-              </label>
-              <div className="flex items-center bg-black/20 rounded p-0.5">
-                <button
-                  onClick={() =>
-                    updateToolSettings("eraser", { mode: "brush" })
-                  }
-                  className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded ${
-                    toolSettings.eraser.mode === "brush"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-[#999] hover:text-white"
-                  } transition-all`}
-                >
-                  Brush
-                </button>
-                <button
-                  onClick={() =>
-                    updateToolSettings("eraser", { mode: "pencil" })
-                  }
-                  className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded ${
-                    toolSettings.eraser.mode === "pencil"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-[#999] hover:text-white"
-                  } transition-all`}
-                >
-                  Pencil
-                </button>
-              </div>
-            </div>
           </div>
         );
       case "transform":

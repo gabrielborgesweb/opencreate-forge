@@ -27,6 +27,11 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 
 let win: BrowserWindow | null;
 
+app.commandLine.appendSwitch("ignore-gpu-blacklist"); // Garante uso da GPU em mais máquinas
+app.commandLine.appendSwitch("enable-gpu-rasterization"); // Melhora o render de formas vetoriais e desenhos
+app.commandLine.appendSwitch("enable-zero-copy"); // Melhora a velocidade de escrita de texturas (bom para Canvas)
+app.commandLine.appendSwitch("enable-features", "SharedArrayBuffer"); // Crucial para WASM multithread
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1400,
@@ -40,6 +45,9 @@ function createWindow() {
       preload: path.join(__dirname, "preload.mjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      additionalArguments: [
+        "--disable-pinch", // Próprio sistema de zoom
+      ],
     },
   });
 

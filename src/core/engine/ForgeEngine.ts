@@ -3,6 +3,7 @@ import { BaseTool, ToolContext } from "../tools/BaseTool";
 import { MoveTool } from "../tools/MoveTool";
 import { BrushTool } from "../tools/BrushTool";
 import { PencilTool } from "../tools/PencilTool";
+import { EraserTool } from "../tools/EraserTool";
 import { TransformTool } from "../tools/TransformTool";
 import { useToolStore } from "@/renderer/store/toolStore";
 
@@ -34,6 +35,7 @@ export class ForgeEngine {
     move: new MoveTool(),
     brush: new BrushTool(),
     pencil: new PencilTool(),
+    eraser: new EraserTool(),
     transform: new TransformTool(),
   };
 

@@ -1,0 +1,537 @@
+import { BaseTool, ToolContext } from "./BaseTool";
+import { useToolStore } from "@/renderer/store/toolStore";
+
+export class EraserTool extends BaseTool {
+  id = "eraser";
+  private isDrawing = false;
+  private lastX = 0;
+  private lastY = 0;
+  private offscreenCanvas: HTMLCanvasElement | null = null;
+  private offscreenCtx: CanvasRenderingContext2D | null = null;
+  private layerId: string | null = null;
+  private strokeOriginX = 0;
+  private strokeOriginY = 0;
+  private readonly STROKE_PADDING = 2048;
+
+  private mouseX = 0;
+  private mouseY = 0;
+  private isMouseOver = false;
+
+  private brushCanvas: HTMLCanvasElement | null = null;
+
+  // Para otimização de bounding box
+  private minX = Infinity;
+  private minY = Infinity;
+  private maxX = -Infinity;
+  private maxY = -Infinity;
+
+  private isLoadingBaseImage = false;
+
+  private initBrush(size: number, hardness: number) {
+    const radius = (size / 2) * (2 - hardness);
+    const canvasSize = Math.ceil(size * 1.5 * (2 - hardness));
+
+    this.brushCanvas = document.createElement("canvas");
+    this.brushCanvas.width = canvasSize;
+    this.brushCanvas.height = canvasSize;
+    const ctx = this.brushCanvas.getContext("2d")!;
+
+    const center = canvasSize / 2;
+    const gradient = ctx.createRadialGradient(
+      center,
+      center,
+      0,
+      center,
+      center,
+      radius,
+    );
+
+    // Na borracha (Brush mode), desenhamos com PRETO sólido no canvas auxiliar
+    // e depois usamos destination-out no canvas principal.
+    const color = "#000000";
+    const opaque = "rgba(0,0,0,1)";
+    gradient.addColorStop(0, opaque);
+
+    const hardnessStop = Math.max(0, Math.min(0.99, hardness));
+    gradient.addColorStop(hardnessStop, opaque);
+
+    const steps = 10;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const tSmooth = t * t * (3 - 2 * t);
+      const alpha = 1 - tSmooth;
+      const stopPosition = hardnessStop + t * (1 - hardnessStop);
+
+      gradient.addColorStop(
+        Math.min(0.999, stopPosition),
+        `rgba(0,0,0,${alpha})`,
+      );
+    }
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(center, center, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  onMouseDown(e: MouseEvent, context: ToolContext): void {
+    if (e.button !== 0) return;
+
+    const activeLayerId = context.project.activeLayerId;
+    if (!activeLayerId) return;
+
+    const layer = context.project.layers.find((l) => l.id === activeLayerId);
+    if (!layer || layer.locked || !layer.visible) return;
+
+    this.isDrawing = true;
+    this.layerId = activeLayerId;
+
+    const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
+    const settings = useToolStore.getState().toolSettings.eraser;
+    
+    // Se for modo lápis, snap to pixel
+    const drawX = settings.mode === "pencil" ? Math.floor(x) : x;
+    const drawY = settings.mode === "pencil" ? Math.floor(y) : y;
+
+    this.mouseX = drawX;
+    this.mouseY = drawY;
+    this.lastX = drawX;
+    this.lastY = drawY;
+
+    if (settings.mode === "brush") {
+      this.initBrush(settings.size, settings.hardness);
+    }
+    
+    this.initOffscreen(layer, context);
+
+    const pad = settings.size;
+    this.minX = drawX - pad;
+    this.minY = drawY - pad;
+    this.maxX = drawX + pad;
+    this.maxY = drawY + pad;
+
+    this.draw(drawX, drawY);
+  }
+
+  onMouseMove(e: MouseEvent, context: ToolContext): void {
+    const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
+    const settings = useToolStore.getState().toolSettings.eraser;
+    
+    const drawX = settings.mode === "pencil" ? Math.floor(x) : x;
+    const drawY = settings.mode === "pencil" ? Math.floor(y) : y;
+    
+    this.mouseX = drawX;
+    this.mouseY = drawY;
+
+    const rect = context.canvas.getBoundingClientRect();
+    this.isMouseOver =
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom;
+
+    if (this.isMouseOver) {
+      context.canvas.style.cursor = "none";
+    } else {
+      context.canvas.style.cursor = "default";
+    }
+
+    if (!this.isDrawing) return;
+
+    const pad = settings.size;
+    this.minX = Math.min(this.minX, drawX - pad);
+    this.minY = Math.min(this.minY, drawY - pad);
+    this.maxX = Math.max(this.maxX, drawX + pad);
+    this.maxY = Math.max(this.maxY, drawY + pad);
+
+    this.draw(drawX, drawY);
+    this.lastX = drawX;
+    this.lastY = drawY;
+  }
+
+  onMouseUp(e: MouseEvent, context: ToolContext): void {
+    if (!this.isDrawing) return;
+
+    if (this.isLoadingBaseImage) {
+      setTimeout(() => this.onMouseUp(e, context), 10);
+      return;
+    }
+
+    this.isDrawing = false;
+
+    if (this.offscreenCanvas && this.layerId && this.offscreenCtx) {
+      const layer = context.project.layers.find((l) => l.id === this.layerId)!;
+
+      const strokeLocalMinX = Math.floor(this.minX - this.strokeOriginX);
+      const strokeLocalMinY = Math.floor(this.minY - this.strokeOriginY);
+      const strokeLocalMaxX = Math.ceil(this.maxX - this.strokeOriginX);
+      const strokeLocalMaxY = Math.ceil(this.maxY - this.strokeOriginY);
+
+      const searchBounds = {
+        x: Math.max(0, Math.min(this.STROKE_PADDING, strokeLocalMinX)),
+        y: Math.max(0, Math.min(this.STROKE_PADDING, strokeLocalMinY)),
+        width: 0,
+        height: 0,
+      };
+
+      const searchMaxX = Math.min(
+        this.offscreenCanvas.width,
+        Math.max(this.STROKE_PADDING + layer.width, strokeLocalMaxX),
+      );
+      const searchMaxY = Math.min(
+        this.offscreenCanvas.height,
+        Math.max(this.STROKE_PADDING + layer.height, strokeLocalMaxY),
+      );
+
+      searchBounds.width = searchMaxX - searchBounds.x;
+      searchBounds.height = searchMaxY - searchBounds.y;
+
+      const bounds = this.getOptimizedBoundingBox(
+        this.offscreenCtx,
+        searchBounds,
+      );
+
+      if (bounds) {
+        const croppedCanvas = document.createElement("canvas");
+        croppedCanvas.width = bounds.width;
+        croppedCanvas.height = bounds.height;
+        const croppedCtx = croppedCanvas.getContext("2d")!;
+
+        croppedCtx.drawImage(
+          this.offscreenCanvas,
+          bounds.x,
+          bounds.y,
+          bounds.width,
+          bounds.height,
+          0,
+          0,
+          bounds.width,
+          bounds.height,
+        );
+
+        const dataUrl = croppedCanvas.toDataURL("image/png");
+        context.setLayerCache(this.layerId, croppedCanvas);
+
+        const layers = context.project.layers.map((l) => {
+          if (l.id === this.layerId) {
+            return {
+              ...l,
+              data: dataUrl,
+              x: this.strokeOriginX + bounds.x,
+              y: this.strokeOriginY + bounds.y,
+              width: bounds.width,
+              height: bounds.height,
+            };
+          }
+          return l;
+        });
+
+        context.updateProject({ layers, isDirty: true });
+      } else {
+        // Camada ficou totalmente vazia
+        const layers = context.project.layers.map((l) => {
+          if (l.id === this.layerId) {
+            return {
+              ...l,
+              data: "",
+              width: 1,
+              height: 1,
+            };
+          }
+          return l;
+        });
+        context.updateProject({ layers, isDirty: true });
+      }
+    }
+
+    this.offscreenCanvas = null;
+    this.offscreenCtx = null;
+    this.brushCanvas = null;
+  }
+
+  private getOptimizedBoundingBox(
+    ctx: CanvasRenderingContext2D,
+    search: { x: number; y: number; width: number; height: number },
+  ) {
+    if (search.width <= 0 || search.height <= 0) return null;
+    const imageData = ctx.getImageData(
+      search.x,
+      search.y,
+      search.width,
+      search.height,
+    );
+    const data = imageData.data;
+    let minX = search.width,
+      minY = search.height,
+      maxX = -1,
+      maxY = -1;
+    let found = false;
+
+    for (let y = 0; y < search.height; y++) {
+      for (let x = 0; x < search.width; x++) {
+        const alpha = data[(y * search.width + x) * 4 + 3];
+        if (alpha > 0) {
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+          found = true;
+        }
+      }
+    }
+    if (!found) return null;
+    return {
+      x: search.x + minX,
+      y: search.y + minY,
+      width: maxX - minX + 1,
+      height: maxY - minY + 1,
+    };
+  }
+
+  private initOffscreen(layer: any, context: ToolContext) {
+    this.strokeOriginX = layer.x - this.STROKE_PADDING;
+    this.strokeOriginY = layer.y - this.STROKE_PADDING;
+    const width = layer.width + this.STROKE_PADDING * 2;
+    const height = layer.height + this.STROKE_PADDING * 2;
+
+    this.offscreenCanvas = document.createElement("canvas");
+    this.offscreenCanvas.width = width;
+    this.offscreenCanvas.height = height;
+    this.offscreenCtx = this.offscreenCanvas.getContext("2d", {
+      willReadFrequently: true,
+    })!;
+    
+    const settings = useToolStore.getState().toolSettings.eraser;
+    if (settings.mode === "pencil") {
+      this.offscreenCtx.imageSmoothingEnabled = false;
+    }
+
+    const cachedResult = context.getLayerCanvas(layer.id);
+    if (cachedResult) {
+      this.offscreenCtx.clearRect(0, 0, width, height);
+      this.offscreenCtx.drawImage(
+        cachedResult.canvas,
+        this.STROKE_PADDING,
+        this.STROKE_PADDING,
+      );
+      if (cachedResult.ready) return;
+    }
+
+    if (layer.data) {
+      this.isLoadingBaseImage = true;
+      const img = new Image();
+      img.onload = () => {
+        if (this.offscreenCtx) {
+          this.offscreenCtx.save();
+          this.offscreenCtx.globalCompositeOperation = "destination-over";
+          this.offscreenCtx.drawImage(
+            img,
+            this.STROKE_PADDING,
+            this.STROKE_PADDING,
+          );
+          this.offscreenCtx.restore();
+        }
+        this.isLoadingBaseImage = false;
+      };
+      img.src = layer.data;
+    }
+  }
+
+  private draw(x: number, y: number) {
+    if (!this.offscreenCtx || !this.layerId) return;
+    const settings = useToolStore.getState().toolSettings.eraser;
+    
+    const localX = x - this.strokeOriginX;
+    const localY = y - this.strokeOriginY;
+    const localLastX = this.lastX - this.strokeOriginX;
+    const localLastY = this.lastY - this.strokeOriginY;
+
+    this.offscreenCtx.save();
+    this.offscreenCtx.globalCompositeOperation = "destination-out";
+
+    if (settings.mode === "brush" && this.brushCanvas) {
+      const dist = Math.hypot(localX - localLastX, localY - localLastY);
+      const angle = Math.atan2(localY - localLastY, localX - localLastX);
+      const spacing = Math.max(1, settings.size * 0.1);
+
+      for (let i = 0; i <= dist; i += spacing) {
+        const px = localLastX + Math.cos(angle) * i;
+        const py = localLastY + Math.sin(angle) * i;
+        this.offscreenCtx.drawImage(
+          this.brushCanvas,
+          px - this.brushCanvas.width / 2,
+          py - this.brushCanvas.height / 2,
+        );
+      }
+    } else {
+      // Pencil mode (Bresenham)
+      this.offscreenCtx.fillStyle = "black"; // Alpha matters, color doesn't for destination-out
+      let x0 = Math.floor(localLastX);
+      let y0 = Math.floor(localLastY);
+      const x1 = Math.floor(localX);
+      const y1 = Math.floor(localY);
+
+      const dx = Math.abs(x1 - x0);
+      const sx = x0 < x1 ? 1 : -1;
+      const dy = -Math.abs(y1 - y0);
+      const sy = y0 < y1 ? 1 : -1;
+      let err = dx + dy;
+
+      while (true) {
+        this.drawPixel(x0, y0, settings.size, settings.shape);
+        
+        if (x0 === x1 && y0 === y1) break;
+        const e2 = 2 * err;
+        if (e2 >= dy) {
+          err += dy;
+          x0 += sx;
+        }
+        if (e2 <= dx) {
+          err += dx;
+          y0 += sy;
+        }
+      }
+    }
+
+    this.offscreenCtx.restore();
+  }
+
+  private drawPixel(x: number, y: number, size: number, shape: "circle" | "square") {
+    if (!this.offscreenCtx) return;
+
+    if (shape === "square") {
+      this.offscreenCtx.fillRect(
+        x - Math.floor(size / 2),
+        y - Math.floor(size / 2),
+        size,
+        size
+      );
+    } else {
+      // Circle shape (pixelated)
+      if (size === 1) {
+        this.offscreenCtx.fillRect(x, y, 1, 1);
+        return;
+      }
+
+      if (size % 2 !== 0) {
+        const r = (size - 1) / 2;
+        for (let dy = -r; dy <= r; dy++) {
+          const dx = Math.floor(Math.sqrt(r * r - dy * dy));
+          this.offscreenCtx.fillRect(x - dx, y + dy, 2 * dx + 1, 1);
+        }
+      } else {
+        const radius = size / 2;
+        const topLeftX = x - radius;
+        const topLeftY = y - radius;
+
+        for (let py = 0; py < size; py++) {
+          const dist_y = py + 0.5 - radius;
+          const max_dist_x_sq = radius * radius - dist_y * dist_y;
+          if (max_dist_x_sq < 0) continue;
+          const max_dist_x = Math.sqrt(max_dist_x_sq);
+          const x_min = Math.ceil(-max_dist_x + radius - 0.5);
+          const x_max = Math.floor(max_dist_x + radius - 0.5);
+          const draw_width = x_max - x_min + 1;
+          if (draw_width > 0) {
+            this.offscreenCtx.fillRect(topLeftX + x_min, topLeftY + py, draw_width, 1);
+          }
+        }
+      }
+    }
+  }
+
+  onDeactivate(context: ToolContext): void {
+    context.canvas.style.cursor = "default";
+    this.isMouseOver = false;
+    this.isDrawing = false;
+  }
+
+  getEditingLayerId(): string | null {
+    return this.isDrawing ? this.layerId : null;
+  }
+
+  onRender(ctx: CanvasRenderingContext2D, context: ToolContext): void {
+    const settings = useToolStore.getState().toolSettings.eraser;
+
+    if (this.isDrawing && this.offscreenCanvas && this.layerId) {
+      const layer = context.project.layers.find((l) => l.id === this.layerId)!;
+      ctx.save();
+      ctx.setTransform(
+        context.project.zoom,
+        0,
+        0,
+        context.project.zoom,
+        context.project.panX,
+        context.project.panY,
+      );
+      ctx.globalAlpha = layer.opacity / 100;
+      ctx.globalCompositeOperation = layer.blendMode;
+      if (settings.mode === "pencil") {
+        ctx.imageSmoothingEnabled = false;
+      }
+      ctx.drawImage(
+        this.offscreenCanvas,
+        this.strokeOriginX,
+        this.strokeOriginY,
+      );
+      ctx.restore();
+    }
+
+    if (this.isMouseOver) {
+      ctx.save();
+      ctx.setTransform(
+        context.project.zoom,
+        0,
+        0,
+        context.project.zoom,
+        context.project.panX,
+        context.project.panY,
+      );
+
+      const size = settings.size;
+      const zoom = context.project.zoom;
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+      ctx.lineWidth = 1 / zoom;
+
+      // Se for modo lápis e formato quadrado
+      if (settings.mode === "pencil" && settings.shape === "square") {
+        ctx.strokeRect(
+          this.mouseX - Math.floor(size / 2),
+          this.mouseY - Math.floor(size / 2),
+          size,
+          size
+        );
+      } else {
+        // Modo Brush ou Modo Pencil com círculo
+        ctx.beginPath();
+        ctx.arc(this.mouseX, this.mouseY, size / 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.lineWidth = 0.5 / zoom;
+      const offset = 0.5 / zoom;
+
+      if (settings.mode === "pencil" && settings.shape === "square") {
+        ctx.strokeRect(
+          this.mouseX - Math.floor(size / 2) + offset,
+          this.mouseY - Math.floor(size / 2) + offset,
+          size - offset * 2,
+          size - offset * 2
+        );
+      } else {
+        ctx.beginPath();
+        ctx.arc(this.mouseX, this.mouseY, Math.max(0, size / 2 - offset), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.beginPath();
+      ctx.arc(this.mouseX, this.mouseY, 1 / zoom, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
+}

@@ -7,7 +7,7 @@ interface ToolState {
   toolSettings: {
     brush: { size: number; color: string; hardness: number };
     pencil: { size: number; color: string; shape: 'circle' | 'square' };
-    eraser: { size: number; hardness: number };
+    eraser: { size: number; hardness: number; mode: 'brush' | 'pencil'; shape: 'circle' | 'square' };
     transform: {
       x: number;
       y: number;
@@ -31,7 +31,7 @@ export const useToolStore = create<ToolState>((set) => ({
   toolSettings: {
     brush: { size: 50, color: '#000000', hardness: 1.0 },
     pencil: { size: 1, color: '#000000', shape: 'square' },
-    eraser: { size: 100, hardness: 1.0 },
+    eraser: { size: 100, hardness: 1.0, mode: 'brush', shape: 'circle' },
     transform: {
       x: 0,
       y: 0,

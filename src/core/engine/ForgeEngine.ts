@@ -307,15 +307,14 @@ export class ForgeEngine {
   private updateSelectionEdges() {
     if (
       !this.project ||
-      !this.project.selection.hasSelection ||
-      !this.project.selection.bounds
+      !this.project.selection.hasSelection
     ) {
       this.selectionEdges = null;
       return;
     }
 
-    const w = this.project.selection.bounds.width;
-    const h = this.project.selection.bounds.height;
+    const w = this.selectionCanvas.width;
+    const h = this.selectionCanvas.height;
     if (w <= 0 || h <= 0) {
       this.selectionEdges = null;
       return;

@@ -57,7 +57,7 @@ const ToolOptions: React.FC = () => {
                       ? "bg-accent text-white shadow-sm"
                       : "text-[#999] hover:text-white"
                   } transition-all`}
-                  title="Add to Selection (Unite)"
+                  title="Unite (Shift)"
                 >
                   <SquaresUnite size={16} />
                 </button>
@@ -71,7 +71,7 @@ const ToolOptions: React.FC = () => {
                       ? "bg-accent text-white shadow-sm"
                       : "text-[#999] hover:text-white"
                   } transition-all`}
-                  title="Subtract from Selection"
+                  title="Subtract (Alt)"
                 >
                   <SquaresSubtract size={16} />
                 </button>
@@ -85,7 +85,7 @@ const ToolOptions: React.FC = () => {
                       ? "bg-accent text-white shadow-sm"
                       : "text-[#999] hover:text-white"
                   } transition-all`}
-                  title="Intersect with Selection"
+                  title="Intersect (Shift+Alt)"
                 >
                   <SquaresIntersect size={16} />
                 </button>

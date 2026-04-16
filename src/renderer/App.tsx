@@ -15,18 +15,51 @@ function App() {
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
   const setActiveTool = useToolStore((state) => state.setActiveTool);
   const activeToolId = useToolStore((state) => state.activeToolId);
+  const toolSettings = useToolStore((state) => state.toolSettings);
+  const updateToolSettings = useToolStore((state) => state.updateToolSettings);
   const transformSettings = useToolStore(
     (state) => state.toolSettings.transform,
   );
   const showToast = useUIStore((state) => state.showToast);
+  const isInteracting = useToolStore((state) => state.isInteracting);
+
+  const originalModeRef = React.useRef<any>(null);
+  const pendingRestoreRef = React.useRef<boolean>(false);
 
   const activeProject = useProjectStore((state) =>
     state.projects.find((p) => p.id === activeProjectId),
   );
 
+  // Restore mode when interaction ends
+  React.useEffect(() => {
+    if (!isInteracting && pendingRestoreRef.current && originalModeRef.current) {
+      updateToolSettings("select", { mode: originalModeRef.current });
+      originalModeRef.current = null;
+      pendingRestoreRef.current = false;
+    }
+  }, [isInteracting, updateToolSettings]);
+
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Handle SelectTool modifiers for visual feedback
+      if (activeToolId === "select") {
+        if ((e.shiftKey || e.altKey) && !originalModeRef.current) {
+          originalModeRef.current = toolSettings.select.mode;
+        }
+
+        if (!isInteracting) {
+          if (e.shiftKey && e.altKey) {
+            updateToolSettings("select", { mode: "intersect" });
+          } else if (e.shiftKey) {
+            updateToolSettings("select", { mode: "unite" });
+          } else if (e.altKey) {
+            updateToolSettings("select", { mode: "subtract" });
+          }
+        }
+      }
+
       const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+      // ... rest of existing keydown logic ...
 
       // 1. Atalhos Globais (Independente de foco em input se for Cmd/Ctrl)
       if (isCmdOrCtrl && e.key.toLowerCase() === "d") {
@@ -87,9 +120,42 @@ function App() {
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (activeToolId === "select" && originalModeRef.current) {
+        if (!e.shiftKey && !e.altKey) {
+          if (isInteracting) {
+            pendingRestoreRef.current = true;
+          } else {
+            updateToolSettings("select", { mode: originalModeRef.current });
+            originalModeRef.current = null;
+            pendingRestoreRef.current = false;
+          }
+        } else if (!isInteracting) {
+          if (e.shiftKey && !e.altKey) {
+            updateToolSettings("select", { mode: "unite" });
+          } else if (!e.shiftKey && e.altKey) {
+            updateToolSettings("select", { mode: "subtract" });
+          }
+        }
+      }
+    };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [setActiveTool, activeToolId, transformSettings.isDirty, showToast]);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, [
+    setActiveTool,
+    activeToolId,
+    transformSettings.isDirty,
+    showToast,
+    toolSettings.select.mode,
+    updateToolSettings,
+    activeProjectId,
+    isInteracting,
+  ]);
 
   return (
     <div className="flex flex-col h-screen bg-bg-primary text-[#eee] overflow-hidden relative">

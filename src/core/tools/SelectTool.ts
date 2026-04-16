@@ -1,5 +1,5 @@
 import { BaseTool, ToolContext } from "./BaseTool";
-import { useToolStore, SelectMode } from "@/renderer/store/toolStore";
+import { useToolStore } from "@/renderer/store/toolStore";
 
 export class SelectTool extends BaseTool {
   id = "select";
@@ -17,18 +17,10 @@ export class SelectTool extends BaseTool {
     if (e.button !== 0) return;
 
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
-    let { mode } = useToolStore.getState().toolSettings.select;
-
-    // Modificadores mudam o modo se segurados ANTES do clique
-    if (e.shiftKey && e.altKey) {
-      mode = "intersect";
-    } else if (e.shiftKey) {
-      mode = "unite";
-    } else if (e.altKey) {
-      mode = "subtract";
-    }
-
-    // Armazenar o modo efetivo para o MouseUp
+    
+    // O modo já deve estar correto no store graças aos listeners no App.tsx
+    // mas capturamos aqui para manter o mesmo modo até o final do clique
+    const { mode } = useToolStore.getState().toolSettings.select;
     (this as any).effectiveMode = mode;
 
     // Verificar se clicou dentro da seleção existente para mover
@@ -41,6 +33,7 @@ export class SelectTool extends BaseTool {
 
       if (canMove && this.isPointInSelection(context, x, y)) {
         this.isMovingSelection = true;
+        useToolStore.getState().setInteracting(true);
         this.selectionMoveStart = { x, y };
         this.selectionMoveStartBounds = { ...bounds };
         return;
@@ -48,6 +41,7 @@ export class SelectTool extends BaseTool {
     }
 
     this.isSelecting = true;
+    useToolStore.getState().setInteracting(true);
     this.startX = Math.floor(x);
     this.startY = Math.floor(y);
     this.currentX = this.startX;
@@ -98,8 +92,6 @@ export class SelectTool extends BaseTool {
 
       // Alt: Draw from center
       if (e.altKey) {
-        const dx = curX - this.startX;
-        const dy = curY - this.startY;
         // We redefine start and current to be centered around original start
         // But for rectangle calculation we just need the corners
       }
@@ -123,17 +115,19 @@ export class SelectTool extends BaseTool {
   onMouseUp(e: MouseEvent, context: ToolContext): void {
     if (this.isMovingSelection) {
       this.isMovingSelection = false;
+      useToolStore.getState().setInteracting(false);
       context.updateSelectionEdges();
       return;
     }
 
     if (this.isSelecting) {
       this.isSelecting = false;
+      useToolStore.getState().setInteracting(false);
 
       let startX = this.startX;
       let startY = this.startY;
-      let currentX = this.currentX;
-      let currentY = this.currentY;
+      const currentX = this.currentX;
+      const currentY = this.currentY;
 
       if (e.altKey) {
         const dx = currentX - startX;
@@ -323,20 +317,10 @@ export class SelectTool extends BaseTool {
         context.project.panY,
       );
 
-      let startX = this.startX;
-      let startY = this.startY;
-      let currentX = this.currentX;
-      let currentY = this.currentY;
-
-      const { mode } = useToolStore.getState().toolSettings.select;
-
-      if (useToolStore.getState().activeToolId === "select") {
-        // Alt: Draw from center logic for preview
-        const ctrl = (window as any).event; // Hacky way to check for Alt during render if needed, but we have currentX/Y already
-        // Actually we already handled it in MouseMove if we wanted, but let's do it here for render
-        // If Alt is held now
-        // if (altKey) { ... }
-      }
+      const startX = this.startX;
+      const startY = this.startY;
+      const currentX = this.currentX;
+      const currentY = this.currentY;
 
       // Para o preview, vamos apenas desenhar o retângulo do mouse
       const x = Math.min(startX, currentX);
@@ -371,8 +355,9 @@ export class SelectTool extends BaseTool {
     }
   }
 
-  onDeactivate(context: ToolContext): void {
+  onDeactivate(_context: ToolContext): void {
     this.isSelecting = false;
     this.isMovingSelection = false;
+    useToolStore.getState().setInteracting(false);
   }
 }

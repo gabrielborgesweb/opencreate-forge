@@ -7,6 +7,7 @@ export type SelectShape = 'rectangle' | 'ellipse' | 'lasso' | 'wand';
 
 interface ToolState {
   activeToolId: ToolId;
+  isInteracting: boolean;
   toolSettings: {
     select: { mode: SelectMode; shape: SelectShape };
     brush: { size: number; color: string; hardness: number };
@@ -27,11 +28,13 @@ interface ToolState {
   
   // Actions
   setActiveTool: (id: ToolId) => void;
+  setInteracting: (isInteracting: boolean) => void;
   updateToolSettings: (id: ToolId, settings: any) => void;
 }
 
 export const useToolStore = create<ToolState>((set) => ({
   activeToolId: 'move',
+  isInteracting: false,
   toolSettings: {
     select: { mode: 'replace', shape: 'rectangle' },
     brush: { size: 50, color: '#000000', hardness: 1.0 },
@@ -51,6 +54,8 @@ export const useToolStore = create<ToolState>((set) => ({
   },
 
   setActiveTool: (id) => set({ activeToolId: id }),
+
+  setInteracting: (isInteracting) => set({ isInteracting }),
 
   updateToolSettings: (id, settings) => set((state) => ({
     toolSettings: {

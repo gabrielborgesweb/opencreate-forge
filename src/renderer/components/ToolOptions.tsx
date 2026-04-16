@@ -74,6 +74,33 @@ const ToolOptions: React.FC = () => {
                 className="border-none bg-none w-5 h-5 cursor-pointer rounded overflow-hidden"
               />
             </div>
+            <div className="flex items-center gap-2">
+              <label className="text-[0.75rem] text-[#999] font-medium">
+                Shape
+              </label>
+              <div className="flex items-center bg-black/20 rounded p-0.5">
+                <button
+                  onClick={() => updateToolSettings("pencil", { shape: "square" })}
+                  className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded ${
+                    toolSettings.pencil.shape === "square"
+                      ? "bg-accent text-white shadow-sm"
+                      : "text-[#999] hover:text-white"
+                  } transition-all`}
+                >
+                  Square
+                </button>
+                <button
+                  onClick={() => updateToolSettings("pencil", { shape: "circle" })}
+                  className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded ${
+                    toolSettings.pencil.shape === "circle"
+                      ? "bg-accent text-white shadow-sm"
+                      : "text-[#999] hover:text-white"
+                  } transition-all`}
+                >
+                  Circle
+                </button>
+              </div>
+            </div>
           </div>
         );
       case "eraser":

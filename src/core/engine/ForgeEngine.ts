@@ -2,6 +2,7 @@ import { Layer, Project, useProjectStore } from "@/renderer/store/projectStore";
 import { BaseTool, ToolContext } from "../tools/BaseTool";
 import { MoveTool } from "../tools/MoveTool";
 import { BrushTool } from "../tools/BrushTool";
+import { PencilTool } from "../tools/PencilTool";
 import { TransformTool } from "../tools/TransformTool";
 import { useToolStore } from "@/renderer/store/toolStore";
 
@@ -32,6 +33,7 @@ export class ForgeEngine {
   private tools: Record<string, BaseTool> = {
     move: new MoveTool(),
     brush: new BrushTool(),
+    pencil: new PencilTool(),
     transform: new TransformTool(),
   };
 

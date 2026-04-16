@@ -67,6 +67,8 @@ function App() {
         if (checkDirty("brush")) setActiveTool("brush");
       } else if (e.key.toLowerCase() === "e") {
         if (checkDirty("eraser")) setActiveTool("eraser");
+      } else if (e.key.toLowerCase() === "p") {
+        if (checkDirty("pencil")) setActiveTool("pencil");
       }
     };
 

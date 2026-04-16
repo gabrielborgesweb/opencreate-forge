@@ -7,7 +7,9 @@ const TransformOptions: React.FC = () => {
   const transform = useToolStore((state) => state.toolSettings.transform);
 
   const updateSettings = (updates: any) => {
-    useToolStore.getState().updateToolSettings("transform", { ...updates, isDirty: true });
+    useToolStore
+      .getState()
+      .updateToolSettings("transform", { ...updates, isDirty: true });
   };
 
   const handleApply = () => {
@@ -108,9 +110,9 @@ const TransformOptions: React.FC = () => {
         />
       </div>
 
-      <div className="flex-1" />
+      <div className="w-[1px] h-4 bg-bg-tertiary" />
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <button
           onClick={handleCancel}
           className="p-1 hover:bg-[#444] rounded text-red-400 transition-colors"

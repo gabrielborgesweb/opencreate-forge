@@ -89,12 +89,15 @@ export class TransformTool extends BaseTool {
     this.activeHandle = null;
     this.context = null;
     window.removeEventListener("forge:transform-apply", this.handleApplyEvent);
-    window.removeEventListener("forge:transform-cancel", this.handleCancelEvent);
+    window.removeEventListener(
+      "forge:transform-cancel",
+      this.handleCancelEvent,
+    );
     if (this.unsubscribeStore) {
       this.unsubscribeStore();
       this.unsubscribeStore = null;
     }
-    
+
     // Reset dirty state on deactivate
     useToolStore.getState().updateToolSettings("transform", { isDirty: false });
   }
@@ -156,7 +159,12 @@ export class TransformTool extends BaseTool {
       { name: "center-right", x: left + width, y: midY, cursor: "ew-resize" },
       { name: "bottom-left", x: left, y: top + height, cursor: "nesw-resize" },
       { name: "bottom-middle", x: midX, y: top + height, cursor: "ns-resize" },
-      { name: "bottom-right", x: left + width, y: top + height, cursor: "nwse-resize" },
+      {
+        name: "bottom-right",
+        x: left + width,
+        y: top + height,
+        cursor: "nwse-resize",
+      },
       { name: "rotate", x: midX, y: top - 20 / scale, cursor: "crosshair" },
     ];
 
@@ -170,14 +178,14 @@ export class TransformTool extends BaseTool {
 
   private getRotatedCursor(handleName: string, rotation: number): string {
     const directions = ["n", "ne", "e", "se", "s", "sw", "w", "nw"];
-    
+
     if (handleName === "rotate") return "crosshair";
     if (handleName === "move") return "move";
 
     let baseDir = "";
     if (handleName.includes("top")) baseDir += "n";
     else if (handleName.includes("bottom")) baseDir += "s";
-    
+
     if (handleName.includes("left")) baseDir += "w";
     else if (handleName.includes("right")) baseDir += "e";
 
@@ -205,11 +213,15 @@ export class TransformTool extends BaseTool {
     // 360 degrees / 8 directions = 45 degrees per step
     const steps = Math.round(rotation / 45);
     const newIndex = (index + steps + directions.length) % directions.length;
-    
+
     return `${directions[newIndex]}-resize`;
   }
 
-  private getHandleAtPoint(px: number, py: number, context: ToolContext): Handle | { name: string; cursor: string } | null {
+  private getHandleAtPoint(
+    px: number,
+    py: number,
+    context: ToolContext,
+  ): Handle | { name: string; cursor: string } | null {
     if (!this.currentTransform) return null;
     const handles = this.getTransformHandles(context, false);
     const scale = context.project.zoom;
@@ -223,7 +235,7 @@ export class TransformTool extends BaseTool {
       if (dist <= checkRadius) {
         return {
           ...h,
-          cursor: this.getRotatedCursor(h.name, rotation)
+          cursor: this.getRotatedCursor(h.name, rotation),
         };
       }
     }
@@ -231,7 +243,7 @@ export class TransformTool extends BaseTool {
     // Move hit test
     const localPos = this.worldToLocal(px, py);
     const t = this.currentTransform;
-    
+
     // Bounds check in local space (rotated but unscaled)
     // We must compare against the absolute bounds even if scale is negative
     const x1 = -t.width * t.anchor.x * t.scaleX;
@@ -271,22 +283,37 @@ export class TransformTool extends BaseTool {
     if (handle.name !== "move" && handle.name !== "rotate") {
       let oppositeHandleName = handle.name;
       // Find opposite handle for scaling
-      if (oppositeHandleName.includes("top")) oppositeHandleName = oppositeHandleName.replace("top", "bottom");
-      else if (oppositeHandleName.includes("bottom")) oppositeHandleName = oppositeHandleName.replace("bottom", "top");
-      if (oppositeHandleName.includes("left")) oppositeHandleName = oppositeHandleName.replace("left", "right");
-      else if (oppositeHandleName.includes("right")) oppositeHandleName = oppositeHandleName.replace("right", "left");
+      if (oppositeHandleName.includes("top"))
+        oppositeHandleName = oppositeHandleName.replace("top", "bottom");
+      else if (oppositeHandleName.includes("bottom"))
+        oppositeHandleName = oppositeHandleName.replace("bottom", "top");
+      if (oppositeHandleName.includes("left"))
+        oppositeHandleName = oppositeHandleName.replace("left", "right");
+      else if (oppositeHandleName.includes("right"))
+        oppositeHandleName = oppositeHandleName.replace("right", "left");
 
-      const oppositeHandle = this.getTransformHandles(context, true).find((h) => h.name === oppositeHandleName);
+      const oppositeHandle = this.getTransformHandles(context, true).find(
+        (h) => h.name === oppositeHandleName,
+      );
       if (oppositeHandle) {
-        this.scaleAnchor = this.localToWorld(oppositeHandle.x, oppositeHandle.y);
+        this.scaleAnchor = this.localToWorld(
+          oppositeHandle.x,
+          oppositeHandle.y,
+        );
       } else {
-        this.scaleAnchor = { x: this.currentTransform!.x, y: this.currentTransform!.y };
+        this.scaleAnchor = {
+          x: this.currentTransform!.x,
+          y: this.currentTransform!.y,
+        };
       }
     }
   }
 
   onMouseMove(e: MouseEvent, context: ToolContext): void {
-    const { x: raw_px, y: raw_py } = context.screenToProject(e.offsetX, e.offsetY);
+    const { x: raw_px, y: raw_py } = context.screenToProject(
+      e.offsetX,
+      e.offsetY,
+    );
 
     if (!this.activeHandle) {
       const hoverHandle = this.getHandleAtPoint(raw_px, raw_py, context);
@@ -295,12 +322,17 @@ export class TransformTool extends BaseTool {
     }
 
     // Keep cursor correct during drag
-    context.canvas.style.cursor = this.getRotatedCursor(this.activeHandle.name, this.currentTransform!.rotation);
+    context.canvas.style.cursor = this.getRotatedCursor(
+      this.activeHandle.name,
+      this.currentTransform!.rotation,
+    );
 
     const t = this.currentTransform!;
     const startT = this.dragStartTransform!;
-    const px = this.activeHandle.name === "rotate" ? raw_px : Math.round(raw_px);
-    const py = this.activeHandle.name === "rotate" ? raw_py : Math.round(raw_py);
+    const px =
+      this.activeHandle.name === "rotate" ? raw_px : Math.round(raw_px);
+    const py =
+      this.activeHandle.name === "rotate" ? raw_py : Math.round(raw_py);
 
     const dx = px - this.dragStartCoords.x;
     const dy = py - this.dragStartCoords.y;
@@ -315,9 +347,13 @@ export class TransformTool extends BaseTool {
         break;
       }
       case "rotate": {
-        const startAngle = Math.atan2(this.dragStartCoords.y - startT.y, this.dragStartCoords.x - startT.x);
+        const startAngle = Math.atan2(
+          this.dragStartCoords.y - startT.y,
+          this.dragStartCoords.x - startT.x,
+        );
         const currentAngle = Math.atan2(py - startT.y, px - startT.x);
-        let newRotation = startT.rotation + ((currentAngle - startAngle) * 180) / Math.PI;
+        let newRotation =
+          startT.rotation + ((currentAngle - startAngle) * 180) / Math.PI;
         if (e.shiftKey) {
           newRotation = Math.round(newRotation / 15) * 15;
         }
@@ -328,7 +364,9 @@ export class TransformTool extends BaseTool {
       }
       default: {
         const scaleFromCenter = e.altKey;
-        const scaleAnchor = scaleFromCenter ? { x: startT.x, y: startT.y } : this.scaleAnchor;
+        const scaleAnchor = scaleFromCenter
+          ? { x: startT.x, y: startT.y }
+          : this.scaleAnchor;
         const keepAspect = e.shiftKey;
 
         const rot = (startT.rotation * Math.PI) / 180;
@@ -337,23 +375,39 @@ export class TransformTool extends BaseTool {
         const world_axis_x = { x: cos, y: sin };
         const world_axis_y = { x: -sin, y: cos };
 
-        const vec_start = { x: this.dragStartCoords.x - scaleAnchor.x, y: this.dragStartCoords.y - scaleAnchor.y };
+        const vec_start = {
+          x: this.dragStartCoords.x - scaleAnchor.x,
+          y: this.dragStartCoords.y - scaleAnchor.y,
+        };
         const vec_current = { x: px - scaleAnchor.x, y: py - scaleAnchor.y };
 
-        const start_proj_x = vec_start.x * world_axis_x.x + vec_start.y * world_axis_x.y;
-        const start_proj_y = vec_start.x * world_axis_y.x + vec_start.y * world_axis_y.y;
-        const current_proj_x = vec_current.x * world_axis_x.x + vec_current.y * world_axis_x.y;
-        const current_proj_y = vec_current.x * world_axis_y.x + vec_current.y * world_axis_y.y;
+        const start_proj_x =
+          vec_start.x * world_axis_x.x + vec_start.y * world_axis_x.y;
+        const start_proj_y =
+          vec_start.x * world_axis_y.x + vec_start.y * world_axis_y.y;
+        const current_proj_x =
+          vec_current.x * world_axis_x.x + vec_current.y * world_axis_x.y;
+        const current_proj_y =
+          vec_current.x * world_axis_y.x + vec_current.y * world_axis_y.y;
 
-        let scaleFactorX = start_proj_x === 0 ? 1 : current_proj_x / start_proj_x;
-        let scaleFactorY = start_proj_y === 0 ? 1 : current_proj_y / start_proj_y;
+        let scaleFactorX =
+          start_proj_x === 0 ? 1 : current_proj_x / start_proj_x;
+        let scaleFactorY =
+          start_proj_y === 0 ? 1 : current_proj_y / start_proj_y;
 
-        const applyScaleX = this.activeHandle.name.includes("left") || this.activeHandle.name.includes("right");
-        const applyScaleY = this.activeHandle.name.includes("top") || this.activeHandle.name.includes("bottom");
+        const applyScaleX =
+          this.activeHandle.name.includes("left") ||
+          this.activeHandle.name.includes("right");
+        const applyScaleY =
+          this.activeHandle.name.includes("top") ||
+          this.activeHandle.name.includes("bottom");
 
         if (keepAspect) {
           if (applyScaleX && applyScaleY) {
-            const globalScale = Math.abs(scaleFactorX) > Math.abs(scaleFactorY) ? scaleFactorX : scaleFactorY;
+            const globalScale =
+              Math.abs(scaleFactorX) > Math.abs(scaleFactorY)
+                ? scaleFactorX
+                : scaleFactorY;
             scaleFactorX = globalScale;
             scaleFactorY = globalScale;
           } else if (applyScaleX) scaleFactorY = scaleFactorX;
@@ -363,24 +417,43 @@ export class TransformTool extends BaseTool {
         const oldScaleX = t.scaleX;
         const oldScaleY = t.scaleY;
 
-        if (applyScaleX || (keepAspect && applyScaleY)) t.scaleX = startT.scaleX * scaleFactorX;
-        if (applyScaleY || (keepAspect && applyScaleX)) t.scaleY = startT.scaleY * scaleFactorY;
+        if (applyScaleX || (keepAspect && applyScaleY))
+          t.scaleX = startT.scaleX * scaleFactorX;
+        if (applyScaleY || (keepAspect && applyScaleX))
+          t.scaleY = startT.scaleY * scaleFactorY;
 
-        const vec_anchor_to_center = { x: startT.x - scaleAnchor.x, y: startT.y - scaleAnchor.y };
-        const center_proj_x = vec_anchor_to_center.x * world_axis_x.x + vec_anchor_to_center.y * world_axis_x.y;
-        const center_proj_y = vec_anchor_to_center.x * world_axis_y.x + vec_anchor_to_center.y * world_axis_y.y;
-        
-        const new_center_proj_x = center_proj_x * ( (applyScaleX || (keepAspect && applyScaleY)) ? scaleFactorX : 1);
-        const new_center_proj_y = center_proj_y * ( (applyScaleY || (keepAspect && applyScaleX)) ? scaleFactorY : 1);
+        const vec_anchor_to_center = {
+          x: startT.x - scaleAnchor.x,
+          y: startT.y - scaleAnchor.y,
+        };
+        const center_proj_x =
+          vec_anchor_to_center.x * world_axis_x.x +
+          vec_anchor_to_center.y * world_axis_x.y;
+        const center_proj_y =
+          vec_anchor_to_center.x * world_axis_y.x +
+          vec_anchor_to_center.y * world_axis_y.y;
 
-        t.x = scaleAnchor.x + (new_center_proj_x * world_axis_x.x + new_center_proj_y * world_axis_y.x);
-        t.y = scaleAnchor.y + (new_center_proj_x * world_axis_x.y + new_center_proj_y * world_axis_y.y);
-        
+        const new_center_proj_x =
+          center_proj_x *
+          (applyScaleX || (keepAspect && applyScaleY) ? scaleFactorX : 1);
+        const new_center_proj_y =
+          center_proj_y *
+          (applyScaleY || (keepAspect && applyScaleX) ? scaleFactorY : 1);
+
+        t.x =
+          scaleAnchor.x +
+          (new_center_proj_x * world_axis_x.x +
+            new_center_proj_y * world_axis_y.x);
+        t.y =
+          scaleAnchor.y +
+          (new_center_proj_x * world_axis_x.y +
+            new_center_proj_y * world_axis_y.y);
+
         changed = t.scaleX !== oldScaleX || t.scaleY !== oldScaleY;
         break;
       }
     }
-    
+
     if (changed) {
       t.isDirty = true;
     }
@@ -402,11 +475,15 @@ export class TransformTool extends BaseTool {
     ctx.translate(t.x, t.y);
     ctx.rotate((t.rotation * Math.PI) / 180);
     ctx.scale(t.scaleX, t.scaleY);
-    
+
     const layerCanvas = context.getLayerCanvas(this.originalLayer.id);
     if (layerCanvas?.ready) {
       ctx.globalAlpha = this.originalLayer.opacity / 100;
-      ctx.drawImage(layerCanvas.canvas, -t.width * t.anchor.x, -t.height * t.anchor.y);
+      ctx.drawImage(
+        layerCanvas.canvas,
+        -t.width * t.anchor.x,
+        -t.height * t.anchor.y,
+      );
     }
     ctx.restore();
 
@@ -415,10 +492,12 @@ export class TransformTool extends BaseTool {
     ctx.save();
     ctx.strokeStyle = "#0078ff";
     ctx.lineWidth = 1 / scale;
-    
+
     // Desenhar linhas conectando os cantos
     ctx.beginPath();
-    const corners = handles.filter(h => ["top-left", "top-right", "bottom-right", "bottom-left"].includes(h.name));
+    const corners = handles.filter((h) =>
+      ["top-left", "top-right", "bottom-right", "bottom-left"].includes(h.name),
+    );
     if (corners.length === 4) {
       ctx.moveTo(corners[0].x, corners[0].y);
       ctx.lineTo(corners[1].x, corners[1].y);
@@ -429,8 +508,8 @@ export class TransformTool extends BaseTool {
     }
 
     // Desenhar linha de rotação
-    const rotateHandle = handles.find(h => h.name === "rotate");
-    const topMiddle = handles.find(h => h.name === "top-middle");
+    const rotateHandle = handles.find((h) => h.name === "rotate");
+    const topMiddle = handles.find((h) => h.name === "top-middle");
     if (rotateHandle && topMiddle) {
       ctx.beginPath();
       ctx.moveTo(topMiddle.x, topMiddle.y);
@@ -440,7 +519,7 @@ export class TransformTool extends BaseTool {
 
     // Desenhar os handles
     const handleSize = this.TRANSFORM_HANDLE_SIZE / scale;
-    handles.forEach(h => {
+    handles.forEach((h) => {
       ctx.fillStyle = "white";
       ctx.strokeStyle = "#0078ff";
       ctx.lineWidth = 1 / scale;
@@ -450,8 +529,18 @@ export class TransformTool extends BaseTool {
         ctx.fill();
         ctx.stroke();
       } else {
-        ctx.fillRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+        ctx.fillRect(
+          h.x - handleSize / 2,
+          h.y - handleSize / 2,
+          handleSize,
+          handleSize,
+        );
+        ctx.strokeRect(
+          h.x - handleSize / 2,
+          h.y - handleSize / 2,
+          handleSize,
+          handleSize,
+        );
       }
     });
     ctx.restore();
@@ -460,7 +549,9 @@ export class TransformTool extends BaseTool {
   async apply(context: ToolContext) {
     if (!this.currentTransform || !this.originalLayer) return;
     const t = this.currentTransform;
-    const layer = context.project.layers.find(l => l.id === this.originalLayer?.id);
+    const layer = context.project.layers.find(
+      (l) => l.id === this.originalLayer?.id,
+    );
     if (!layer) return;
 
     const rot = (t.rotation * Math.PI) / 180;
@@ -468,21 +559,33 @@ export class TransformTool extends BaseTool {
     const sin = Math.sin(rot);
 
     const corners = [
-      { x: -t.width * t.anchor.x * t.scaleX, y: -t.height * t.anchor.y * t.scaleY },
-      { x: t.width * (1 - t.anchor.x) * t.scaleX, y: -t.height * t.anchor.y * t.scaleY },
-      { x: t.width * (1 - t.anchor.x) * t.scaleX, y: t.height * (1 - t.anchor.y) * t.scaleY },
-      { x: -t.width * t.anchor.x * t.scaleX, y: t.height * (1 - t.anchor.y) * t.scaleY },
+      {
+        x: -t.width * t.anchor.x * t.scaleX,
+        y: -t.height * t.anchor.y * t.scaleY,
+      },
+      {
+        x: t.width * (1 - t.anchor.x) * t.scaleX,
+        y: -t.height * t.anchor.y * t.scaleY,
+      },
+      {
+        x: t.width * (1 - t.anchor.x) * t.scaleX,
+        y: t.height * (1 - t.anchor.y) * t.scaleY,
+      },
+      {
+        x: -t.width * t.anchor.x * t.scaleX,
+        y: t.height * (1 - t.anchor.y) * t.scaleY,
+      },
     ];
 
-    const transformedCorners = corners.map(c => ({
+    const transformedCorners = corners.map((c) => ({
       x: t.x + (c.x * cos - c.y * sin),
       y: t.y + (c.x * sin + c.y * cos),
     }));
 
-    const minX = Math.min(...transformedCorners.map(c => c.x));
-    const minY = Math.min(...transformedCorners.map(c => c.y));
-    const maxX = Math.max(...transformedCorners.map(c => c.x));
-    const maxY = Math.max(...transformedCorners.map(c => c.y));
+    const minX = Math.min(...transformedCorners.map((c) => c.x));
+    const minY = Math.min(...transformedCorners.map((c) => c.y));
+    const maxX = Math.max(...transformedCorners.map((c) => c.x));
+    const maxY = Math.max(...transformedCorners.map((c) => c.y));
 
     const newWidth = Math.ceil(maxX - minX);
     const newHeight = Math.ceil(maxY - minY);
@@ -500,17 +603,25 @@ export class TransformTool extends BaseTool {
       octx.translate(t.x, t.y);
       octx.rotate(rot);
       octx.scale(t.scaleX, t.scaleY);
-      octx.drawImage(layerCanvas.canvas, -t.width * t.anchor.x, -t.height * t.anchor.y);
+      octx.drawImage(
+        layerCanvas.canvas,
+        -t.width * t.anchor.x,
+        -t.height * t.anchor.y,
+      );
 
       context.updateProject({
-        layers: context.project.layers.map(l => l.id === layer.id ? {
-          ...l,
-          x: newX,
-          y: newY,
-          width: newWidth,
-          height: newHeight,
-          data: offCanvas.toDataURL(),
-        } : l)
+        layers: context.project.layers.map((l) =>
+          l.id === layer.id
+            ? {
+                ...l,
+                x: newX,
+                y: newY,
+                width: newWidth,
+                height: newHeight,
+                data: offCanvas.toDataURL(),
+              }
+            : l,
+        ),
       });
       context.invalidateCache(layer.id);
     }

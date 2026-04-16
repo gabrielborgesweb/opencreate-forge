@@ -2,9 +2,13 @@ import { create } from 'zustand';
 
 export type ToolId = 'move' | 'select' | 'brush' | 'pencil' | 'eraser' | 'text' | 'transform';
 
+export type SelectMode = 'replace' | 'unite' | 'subtract' | 'intersect';
+export type SelectShape = 'rectangle' | 'ellipse' | 'lasso' | 'wand';
+
 interface ToolState {
   activeToolId: ToolId;
   toolSettings: {
+    select: { mode: SelectMode; shape: SelectShape };
     brush: { size: number; color: string; hardness: number };
     pencil: { size: number; color: string; shape: 'circle' | 'square' };
     eraser: { size: number; hardness: number; mode: 'brush' | 'pencil'; shape: 'circle' | 'square' };
@@ -29,6 +33,7 @@ interface ToolState {
 export const useToolStore = create<ToolState>((set) => ({
   activeToolId: 'move',
   toolSettings: {
+    select: { mode: 'replace', shape: 'rectangle' },
     brush: { size: 50, color: '#000000', hardness: 1.0 },
     pencil: { size: 1, color: '#000000', shape: 'square' },
     eraser: { size: 100, hardness: 1.0, mode: 'brush', shape: 'circle' },

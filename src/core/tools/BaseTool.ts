@@ -9,6 +9,9 @@ export interface ToolContext {
   setLayerCache: (layerId: string, canvas: HTMLCanvasElement) => void;
   getLayerCanvas: (layerId: string) => { canvas: HTMLCanvasElement; ready: boolean } | null;
   screenToProject: (x: number, y: number) => { x: number; y: number };
+  getSelectionCanvas: () => { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D };
+  updateSelectionEdges: () => void;
+  setLastSelectionMask: (mask: string | undefined) => void;
 }
 
 export abstract class BaseTool {

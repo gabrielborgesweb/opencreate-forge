@@ -1,7 +1,17 @@
 import React from "react";
 import { useToolStore } from "@store/toolStore";
 import { TOOLS } from "../constants/tools";
-import { Brush, Circle, Pencil, Settings2, Square } from "lucide-react";
+import {
+  Brush,
+  Circle,
+  Pencil,
+  Settings2,
+  Square,
+  MousePointer2,
+  SquaresUnite,
+  SquaresSubtract,
+  SquaresIntersect,
+} from "lucide-react";
 import ToolSettingInput from "./ui/ToolSettingInput";
 import TransformOptions from "./TransformOptions";
 
@@ -15,6 +25,103 @@ const ToolOptions: React.FC = () => {
 
   const renderOptions = () => {
     switch (activeToolId) {
+      case "select":
+        return (
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <label className="text-[0.75rem] text-[#999] font-medium">
+                Mode
+              </label>
+              <div className="flex items-center bg-black/20 rounded p-0.5">
+                <button
+                  onClick={() =>
+                    updateToolSettings("select", { mode: "replace" })
+                  }
+                  className={`p-1 rounded ${
+                    toolSettings.select.mode === "replace"
+                      ? "bg-accent text-white shadow-sm"
+                      : "text-[#999] hover:text-white"
+                  } transition-all`}
+                  title="New Selection"
+                >
+                  <MousePointer2 size={16} />
+                </button>
+                <button
+                  onClick={() =>
+                    updateToolSettings("select", { mode: "unite" })
+                  }
+                  className={`p-1 rounded ${
+                    toolSettings.select.mode === "unite"
+                      ? "bg-accent text-white shadow-sm"
+                      : "text-[#999] hover:text-white"
+                  } transition-all`}
+                  title="Add to Selection (Unite)"
+                >
+                  <SquaresUnite size={16} />
+                </button>
+                <button
+                  onClick={() =>
+                    updateToolSettings("select", { mode: "subtract" })
+                  }
+                  className={`p-1 rounded ${
+                    toolSettings.select.mode === "subtract"
+                      ? "bg-accent text-white shadow-sm"
+                      : "text-[#999] hover:text-white"
+                  } transition-all`}
+                  title="Subtract from Selection"
+                >
+                  <SquaresSubtract size={16} />
+                </button>
+                <button
+                  onClick={() =>
+                    updateToolSettings("select", { mode: "intersect" })
+                  }
+                  className={`p-1 rounded ${
+                    toolSettings.select.mode === "intersect"
+                      ? "bg-accent text-white shadow-sm"
+                      : "text-[#999] hover:text-white"
+                  } transition-all`}
+                  title="Intersect with Selection"
+                >
+                  <SquaresIntersect size={16} />
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-[0.75rem] text-[#999] font-medium">
+                Shape
+              </label>
+              <div className="flex items-center bg-black/20 rounded p-0.5">
+                <button
+                  onClick={() =>
+                    updateToolSettings("select", { shape: "rectangle" })
+                  }
+                  className={`p-1 rounded ${
+                    toolSettings.select.shape === "rectangle"
+                      ? "bg-accent text-white shadow-sm"
+                      : "text-[#999] hover:text-white"
+                  } transition-all`}
+                  title="Rectangular Marquee"
+                >
+                  <Square size={16} />
+                </button>
+                <button
+                  onClick={() =>
+                    updateToolSettings("select", { shape: "ellipse" })
+                  }
+                  className={`p-1 rounded ${
+                    toolSettings.select.shape === "ellipse"
+                      ? "bg-accent text-white shadow-sm"
+                      : "text-[#999] hover:text-white"
+                  } transition-all`}
+                  title="Elliptical Marquee"
+                >
+                  <Circle size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
       case "brush":
         return (
           <div className="flex items-center gap-6">

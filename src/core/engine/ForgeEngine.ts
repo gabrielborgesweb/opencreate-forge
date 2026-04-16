@@ -5,6 +5,7 @@ import { BrushTool } from "../tools/BrushTool";
 import { PencilTool } from "../tools/PencilTool";
 import { EraserTool } from "../tools/EraserTool";
 import { TransformTool } from "../tools/TransformTool";
+import { SelectTool } from "../tools/SelectTool";
 import { useToolStore } from "@/renderer/store/toolStore";
 
 export interface ViewportState {
@@ -31,13 +32,13 @@ export class ForgeEngine {
   private layerReadyCache: Map<string, boolean> = new Map();
   private imageCache: Map<string, HTMLImageElement> = new Map();
 
-  private tools: Record<string, BaseTool> = {
-    move: new MoveTool(),
-    brush: new BrushTool(),
-    pencil: new PencilTool(),
-    eraser: new EraserTool(),
-    transform: new TransformTool(),
-  };
+  private selectionCanvas: HTMLCanvasElement;
+  private selectionCtx: CanvasRenderingContext2D;
+  private selectionEdges: { horizontal: any[]; vertical: any[] } | null = null;
+  private marchingAntsOffset = 0;
+  private lastSelectionMask: string | undefined = undefined;
+
+  private tools: Record<string, BaseTool>;
 
   private currentToolId: string | null = null;
   private onViewportChange: (zoom: number, x: number, y: number) => void;
@@ -49,6 +50,18 @@ export class ForgeEngine {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
     this.onViewportChange = onViewportChange;
+
+    this.selectionCanvas = document.createElement("canvas");
+    this.selectionCtx = this.selectionCanvas.getContext("2d", { willReadFrequently: true })!;
+
+    this.tools = {
+      move: new MoveTool(),
+      select: new SelectTool(),
+      brush: new BrushTool(),
+      pencil: new PencilTool(),
+      eraser: new EraserTool(),
+      transform: new TransformTool(),
+    };
 
     this.handleWheel = this.handleWheel.bind(this);
     this.handleMouseDown = this.handleMouseDown.bind(this);
@@ -84,6 +97,9 @@ export class ForgeEngine {
       },
       invalidateCache: (layerId: string) => this.invalidateLayerCache(layerId),
       screenToProject: (x, y) => this.screenToProject(x, y),
+      getSelectionCanvas: () => ({ canvas: this.selectionCanvas, ctx: this.selectionCtx }),
+      updateSelectionEdges: () => this.updateSelectionEdges(),
+      setLastSelectionMask: (mask) => { this.lastSelectionMask = mask; },
       setLayerCache: (layerId: string, canvas: HTMLCanvasElement) => {
         this.layerCanvasCache.set(layerId, canvas);
         this.layerReadyCache.set(layerId, true);
@@ -247,7 +263,193 @@ export class ForgeEngine {
   }
 
   public setProject(project: Project) {
+    const prevProjectId = this.project?.id;
+    const maskChanged = project.selection.mask !== this.lastSelectionMask;
     this.project = project;
+
+    if (prevProjectId !== project.id) {
+      // Clear caches for new project
+      this.layerCanvasCache.clear();
+      this.layerReadyCache.clear();
+      this.imageCache.clear();
+    }
+
+    if (maskChanged || prevProjectId !== project.id) {
+      this.lastSelectionMask = project.selection.mask;
+      // Reset selection canvas
+      if (project.selection.bounds && project.selection.mask) {
+        this.selectionCanvas.width = project.selection.bounds.width;
+        this.selectionCanvas.height = project.selection.bounds.height;
+        const img = new Image();
+        img.onload = () => {
+          this.selectionCtx.clearRect(
+            0,
+            0,
+            this.selectionCanvas.width,
+            this.selectionCanvas.height,
+          );
+          this.selectionCtx.drawImage(img, 0, 0);
+          this.updateSelectionEdges();
+        };
+        img.src = project.selection.mask;
+      } else {
+        this.selectionCanvas.width = 1;
+        this.selectionCanvas.height = 1;
+        this.selectionCtx.clearRect(0, 0, 1, 1);
+        this.selectionEdges = null;
+      }
+    } else if (project.selection.hasSelection && !this.selectionEdges) {
+      // Caso a máscara não tenha mudado (já sincronizada pelo Tool), mas as bordas ainda não existam
+      this.updateSelectionEdges();
+    }
+  }
+
+  private updateSelectionEdges() {
+    if (
+      !this.project ||
+      !this.project.selection.hasSelection ||
+      !this.project.selection.bounds
+    ) {
+      this.selectionEdges = null;
+      return;
+    }
+
+    const w = this.project.selection.bounds.width;
+    const h = this.project.selection.bounds.height;
+    if (w <= 0 || h <= 0) {
+      this.selectionEdges = null;
+      return;
+    }
+
+    const imageData = this.selectionCtx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+
+    const horizontal: any[] = [];
+    const vertical: any[] = [];
+
+    const isSelected = (x: number, y: number) => {
+      if (x < 0 || x >= w || y < 0 || y >= h) return false;
+      return data[(y * w + x) * 4 + 3] > 0;
+    };
+
+    for (let y = -1; y < h; y++) {
+      for (let x = -1; x < w; x++) {
+        const current = isSelected(x, y);
+        if (current !== isSelected(x, y + 1)) {
+          horizontal.push({ x: x, y: y + 1, length: 1 });
+        }
+        if (current !== isSelected(x + 1, y)) {
+          vertical.push({ x: x + 1, y: y, length: 1 });
+        }
+      }
+    }
+
+    const mergeSegments = (
+      segments: any[],
+      orientation: "horizontal" | "vertical",
+    ) => {
+      if (segments.length === 0) return [];
+      const isHorizontal = orientation === "horizontal";
+      if (isHorizontal) {
+        segments.sort((a, b) => a.y - b.y || a.x - b.x);
+      } else {
+        segments.sort((a, b) => a.x - b.x || a.y - b.y);
+      }
+      const merged = [segments[0]];
+      for (let i = 1; i < segments.length; i++) {
+        const last = merged[merged.length - 1];
+        const current = segments[i];
+        if (isHorizontal) {
+          if (current.y === last.y && current.x === last.x + last.length) {
+            last.length += current.length;
+          } else {
+            merged.push(current);
+          }
+        } else {
+          if (current.x === last.x && current.y === last.y + last.length) {
+            last.length += current.length;
+          } else {
+            merged.push(current);
+          }
+        }
+      }
+      return merged;
+    };
+
+    this.selectionEdges = {
+      horizontal: mergeSegments(horizontal, "horizontal"),
+      vertical: mergeSegments(vertical, "vertical"),
+    };
+  }
+
+  private renderSelection() {
+    if (
+      !this.project ||
+      !this.project.selection.hasSelection ||
+      !this.selectionEdges ||
+      !this.project.selection.bounds
+    ) {
+      return;
+    }
+
+    this.ctx.save();
+    this.ctx.setTransform(
+      this.project.zoom,
+      0,
+      0,
+      this.project.zoom,
+      this.project.panX,
+      this.project.panY,
+    );
+
+    const { x: bx, y: by } = this.project.selection.bounds;
+    const zoom = this.project.zoom;
+
+    this.marchingAntsOffset = (Date.now() / 100) % 8;
+
+    this.ctx.lineWidth = 1 / zoom;
+
+    // Render horizontal edges
+    for (const seg of this.selectionEdges.horizontal) {
+      this.ctx.beginPath();
+      this.ctx.setLineDash([4 / zoom, 4 / zoom]);
+      this.ctx.lineDashOffset = -this.marchingAntsOffset / zoom;
+
+      // Desenha linha branca
+      this.ctx.strokeStyle = "white";
+      this.ctx.moveTo(bx + seg.x, by + seg.y);
+      this.ctx.lineTo(bx + seg.x + seg.length, by + seg.y);
+      this.ctx.stroke();
+
+      // Desenha linha preta intercalada (contraste)
+      this.ctx.beginPath();
+      this.ctx.strokeStyle = "black";
+      this.ctx.lineDashOffset = -(this.marchingAntsOffset + 4) / zoom;
+      this.ctx.moveTo(bx + seg.x, by + seg.y);
+      this.ctx.lineTo(bx + seg.x + seg.length, by + seg.y);
+      this.ctx.stroke();
+    }
+
+    // Render vertical edges
+    for (const seg of this.selectionEdges.vertical) {
+      this.ctx.beginPath();
+      this.ctx.setLineDash([4 / zoom, 4 / zoom]);
+      this.ctx.lineDashOffset = -this.marchingAntsOffset / zoom;
+
+      this.ctx.strokeStyle = "white";
+      this.ctx.moveTo(bx + seg.x, by + seg.y);
+      this.ctx.lineTo(bx + seg.x, by + seg.y + seg.length);
+      this.ctx.stroke();
+
+      this.ctx.beginPath();
+      this.ctx.strokeStyle = "black";
+      this.ctx.lineDashOffset = -(this.marchingAntsOffset + 4) / zoom;
+      this.ctx.moveTo(bx + seg.x, by + seg.y);
+      this.ctx.lineTo(bx + seg.x, by + seg.y + seg.length);
+      this.ctx.stroke();
+    }
+
+    this.ctx.restore();
   }
 
   public fitToScreen() {
@@ -327,6 +529,8 @@ export class ForgeEngine {
 
     const context = this.getToolContext();
     if (tool && context) tool.onRender(this.ctx, context);
+
+    this.renderSelection();
 
     if (this.project.activeLayerId) {
       const activeLayer = this.project.layers.find(

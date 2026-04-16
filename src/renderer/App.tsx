@@ -26,6 +26,19 @@ function App() {
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+
+      // 1. Atalhos Globais (Independente de foco em input se for Cmd/Ctrl)
+      if (isCmdOrCtrl && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        if (activeProjectId) {
+          useProjectStore.getState().updateProject(activeProjectId, {
+            selection: { hasSelection: false, bounds: null, mask: undefined },
+          });
+        }
+        return;
+      }
+
       // Ignore if typing in an input
       if (
         document.activeElement?.tagName === "INPUT" ||
@@ -69,6 +82,8 @@ function App() {
         if (checkDirty("eraser")) setActiveTool("eraser");
       } else if (e.key.toLowerCase() === "p") {
         if (checkDirty("pencil")) setActiveTool("pencil");
+      } else if (e.key.toLowerCase() === "m") {
+        if (checkDirty("select")) setActiveTool("select");
       }
     };
 

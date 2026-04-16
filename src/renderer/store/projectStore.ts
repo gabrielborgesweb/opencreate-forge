@@ -19,6 +19,12 @@ export interface Layer {
   blendMode: GlobalCompositeOperation;
 }
 
+export interface Selection {
+  hasSelection: boolean;
+  bounds: { x: number; y: number; width: number; height: number } | null;
+  mask?: string; // dataURL of the mask
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -26,6 +32,7 @@ export interface Project {
   height: number;
   layers: Layer[];
   activeLayerId: string | null;
+  selection: Selection;
   // Viewport isolada por projeto
   zoom: number;
   panX: number;

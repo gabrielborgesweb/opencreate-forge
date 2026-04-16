@@ -65,6 +65,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
         }
       ],
       activeLayerId: 'bg-' + id,
+      selection: { hasSelection: false, bounds: null },
       zoom: 1, // Será ajustado pelo engine no carregamento
       panX: 0,
       panY: 0,

@@ -5,6 +5,7 @@ import {
   Pencil,
   Eraser,
   Type,
+  Maximize2,
   LucideIcon,
 } from "lucide-react";
 import { ToolId } from "@store/toolStore";
@@ -19,6 +20,12 @@ export interface ToolDefinition {
 export const TOOLS: ToolDefinition[] = [
   { id: "move", icon: MousePointer2, label: "Move (V)", name: "Move" },
   { id: "select", icon: SquareDashed, label: "Select (M)", name: "Select" },
+  {
+    id: "transform",
+    icon: Maximize2,
+    label: "Transform (Ctrl+T)",
+    name: "Transform",
+  },
   { id: "brush", icon: Brush, label: "Brush (B)", name: "Brush" },
   { id: "pencil", icon: Pencil, label: "Pencil (P)", name: "Pencil" },
   { id: "eraser", icon: Eraser, label: "Eraser (E)", name: "Eraser" },

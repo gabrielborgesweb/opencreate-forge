@@ -2,6 +2,7 @@ import { Layer, Project, useProjectStore } from "@/renderer/store/projectStore";
 import { BaseTool, ToolContext } from "../tools/BaseTool";
 import { MoveTool } from "../tools/MoveTool";
 import { BrushTool } from "../tools/BrushTool";
+import { TransformTool } from "../tools/TransformTool";
 import { useToolStore } from "@/renderer/store/toolStore";
 
 export interface ViewportState {
@@ -31,6 +32,7 @@ export class ForgeEngine {
   private tools: Record<string, BaseTool> = {
     move: new MoveTool(),
     brush: new BrushTool(),
+    transform: new TransformTool(),
   };
 
   private currentToolId: string | null = null;

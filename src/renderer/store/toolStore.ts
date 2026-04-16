@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type ToolId = 'move' | 'select' | 'brush' | 'pencil' | 'eraser' | 'text';
+export type ToolId = 'move' | 'select' | 'brush' | 'pencil' | 'eraser' | 'text' | 'transform';
 
 interface ToolState {
   activeToolId: ToolId;
@@ -8,6 +8,17 @@ interface ToolState {
     brush: { size: number; color: string; hardness: number };
     pencil: { size: number; color: string };
     eraser: { size: number; hardness: number };
+    transform: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      scaleX: number;
+      scaleY: number;
+      rotation: number;
+      anchor: { x: number; y: number };
+      isDirty: boolean;
+    };
   };
   
   // Actions
@@ -21,6 +32,17 @@ export const useToolStore = create<ToolState>((set) => ({
     brush: { size: 50, color: '#000000', hardness: 1.0 },
     pencil: { size: 1, color: '#000000' },
     eraser: { size: 100, hardness: 1.0 },
+    transform: {
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      scaleX: 1,
+      scaleY: 1,
+      rotation: 0,
+      anchor: { x: 0.5, y: 0.5 },
+      isDirty: false,
+    },
   },
 
   setActiveTool: (id) => set({ activeToolId: id }),

@@ -3,6 +3,7 @@ import { useToolStore } from "@store/toolStore";
 import { TOOLS } from "../constants/tools";
 import { Settings2 } from "lucide-react";
 import ToolSettingInput from "./ui/ToolSettingInput";
+import TransformOptions from "./TransformOptions";
 
 const ToolOptions: React.FC = () => {
   const activeToolId = useToolStore((state) => state.activeToolId);
@@ -99,6 +100,8 @@ const ToolOptions: React.FC = () => {
             />
           </div>
         );
+      case "transform":
+        return <TransformOptions />;
       default:
         return (
           <span className="text-[0.75rem] text-[#666]">

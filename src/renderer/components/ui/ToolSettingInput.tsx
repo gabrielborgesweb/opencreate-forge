@@ -29,7 +29,9 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
   const startValue = useRef(0);
 
   // Valor convertido para exibição (ex: 0.5 * 100 = 50)
-  const displayValue = Math.round(value * displayMultiplier);
+  const displayValue = Number(
+    (value * displayMultiplier).toFixed(displayMultiplier === 1 ? 0 : 2)
+  );
 
   const clampAndSave = (newValue: number) => {
     const clamped = Math.min(max, Math.max(min, newValue));
@@ -105,15 +107,16 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
         <input
           type="number"
           value={displayValue}
+          step={step}
           onChange={(e) => {
-            const val = parseInt(e.target.value) || 0;
+            const val = parseFloat(e.target.value) || 0;
             onChange(val / displayMultiplier);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter") setIsOpen(false);
           }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-transparent border-none text-[0.75rem] w-8 text-center outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-white font-medium"
+          className="bg-transparent border-none text-[0.75rem] w-10 text-center outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-white font-medium"
         />
         <span className="text-[0.65rem] text-[#666] select-none font-bold">
           {unit}
@@ -147,7 +150,7 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
               step={step}
               value={displayValue}
               onChange={(e) => {
-                const val = parseInt(e.target.value);
+                const val = parseFloat(e.target.value);
                 onChange(val / displayMultiplier);
               }}
               className="w-full h-1.5 bg-[#333] rounded-lg appearance-none cursor-pointer accent-accent"

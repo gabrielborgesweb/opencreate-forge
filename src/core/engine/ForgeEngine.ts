@@ -25,6 +25,7 @@ export class ForgeEngine {
   private startY = 0;
 
   private layerCanvasCache: Map<string, HTMLCanvasElement> = new Map();
+  private layerReadyCache: Map<string, boolean> = new Map();
   private imageCache: Map<string, HTMLImageElement> = new Map();
 
   private tools: Record<string, BaseTool> = {
@@ -77,8 +78,15 @@ export class ForgeEngine {
       },
       invalidateCache: (layerId: string) => this.invalidateLayerCache(layerId),
       screenToProject: (x, y) => this.screenToProject(x, y),
-      setLayerCache: (layerId: string, canvas: HTMLCanvasElement) =>
-        this.layerCanvasCache.set(layerId, canvas),
+      setLayerCache: (layerId: string, canvas: HTMLCanvasElement) => {
+        this.layerCanvasCache.set(layerId, canvas);
+        this.layerReadyCache.set(layerId, true);
+      },
+      getLayerCanvas: (layerId: string) => {
+        const canvas = this.layerCanvasCache.get(layerId);
+        if (!canvas) return null;
+        return { canvas, ready: !!this.layerReadyCache.get(layerId) };
+      },
     };
   }
 
@@ -301,11 +309,16 @@ export class ForgeEngine {
       this.project.panX,
       this.project.panY,
     );
-    for (const layer of this.project.layers) {
-      if (layer.visible) this.renderLayer(layer);
-    }
 
     const tool = this.getActiveTool();
+    const editingLayerId = tool?.getEditingLayerId();
+
+    for (const layer of this.project.layers) {
+      if (layer.visible && layer.id !== editingLayerId) {
+        this.renderLayer(layer);
+      }
+    }
+
     const context = this.getToolContext();
     if (tool && context) tool.onRender(this.ctx, context);
 
@@ -360,13 +373,18 @@ export class ForgeEngine {
                 const ctx = cachedCanvas.getContext("2d")!;
                 ctx.clearRect(0, 0, cachedCanvas.width, cachedCanvas.height);
                 ctx.drawImage(img, 0, 0);
+                this.layerReadyCache.set(layer.id, true);
               }
               this.render();
             };
           } else if (img.complete) {
             const lCtx = lCanvas.getContext("2d")!;
             lCtx.drawImage(img, 0, 0);
+            this.layerReadyCache.set(layer.id, true);
           }
+        } else {
+          // Camada sem data (vazia) está "pronta"
+          this.layerReadyCache.set(layer.id, true);
         }
       }
       this.ctx.drawImage(lCanvas, layer.x, layer.y);
@@ -384,5 +402,6 @@ export class ForgeEngine {
 
   public invalidateLayerCache(layerId: string) {
     this.layerCanvasCache.delete(layerId);
+    this.layerReadyCache.delete(layerId);
   }
 }

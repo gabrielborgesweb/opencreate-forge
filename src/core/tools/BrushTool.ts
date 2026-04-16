@@ -86,6 +86,8 @@ export class BrushTool extends BaseTool {
     ctx.fill();
   }
 
+  private isLoadingBaseImage = false;
+
   onMouseDown(e: MouseEvent, context: ToolContext): void {
     if (e.button !== 0) return;
 
@@ -106,7 +108,7 @@ export class BrushTool extends BaseTool {
 
     const settings = useToolStore.getState().toolSettings.brush;
     this.initBrush(settings.size, settings.hardness, settings.color);
-    this.initOffscreen(layer);
+    this.initOffscreen(layer, context);
 
     const pad = settings.size;
     this.minX = x - pad;
@@ -152,6 +154,16 @@ export class BrushTool extends BaseTool {
 
   onMouseUp(e: MouseEvent, context: ToolContext): void {
     if (!this.isDrawing) return;
+
+    // Se ainda estiver carregando a imagem base (ex: camada gigante ou internet lenta se fosse o caso),
+    // vamos esperar um pouco ou forçar a finalização.
+    // Mas na maioria das vezes com o cache já vai estar pronto.
+    if (this.isLoadingBaseImage) {
+      // Pequeno delay para dar tempo do onload disparar se estiver quase pronto
+      setTimeout(() => this.onMouseUp(e, context), 10);
+      return;
+    }
+
     this.isDrawing = false;
 
     if (this.offscreenCanvas && this.layerId && this.offscreenCtx) {
@@ -272,7 +284,7 @@ export class BrushTool extends BaseTool {
     };
   }
 
-  private initOffscreen(layer: any) {
+  private initOffscreen(layer: any, context: ToolContext) {
     this.strokeOriginX = layer.x - this.STROKE_PADDING;
     this.strokeOriginY = layer.y - this.STROKE_PADDING;
     const width = layer.width + this.STROKE_PADDING * 2;
@@ -285,12 +297,32 @@ export class BrushTool extends BaseTool {
       willReadFrequently: true,
     })!;
 
+    // Tentar pegar do cache primeiro (sincronamente) para rapidez
+    const cachedResult = context.getLayerCanvas(layer.id);
+    if (cachedResult) {
+      // Limpa para evitar sobreposição caso o motor tente desenhar a camada base de novo
+      this.offscreenCtx.clearRect(0, 0, width, height);
+      this.offscreenCtx.drawImage(
+        cachedResult.canvas,
+        this.STROKE_PADDING,
+        this.STROKE_PADDING,
+      );
+      
+      // Se o cache já estava pronto, não precisamos carregar do data URL
+      if (cachedResult.ready) {
+        return;
+      }
+    }
+
+    // Se o cache não estava pronto ou não existia, carregar da data URL original
     if (layer.data) {
+      this.isLoadingBaseImage = true;
       const img = new Image();
       img.onload = () => {
         if (this.offscreenCtx) {
           this.offscreenCtx.save();
-          // CORREÇÃO: A imagem base deve carregar sempre "por baixo" dos traços frescos que o usuário já fez
+          // Como vamos carregar a imagem real, limpamos o que quer que tenha vindo do cache incompleto
+          // para evitar o efeito de "duplicação" de opacidade
           this.offscreenCtx.globalCompositeOperation = "destination-over";
           this.offscreenCtx.drawImage(
             img,
@@ -299,6 +331,7 @@ export class BrushTool extends BaseTool {
           );
           this.offscreenCtx.restore();
         }
+        this.isLoadingBaseImage = false;
       };
       img.src = layer.data;
     }
@@ -337,6 +370,10 @@ export class BrushTool extends BaseTool {
     context.canvas.style.cursor = "default";
     this.isMouseOver = false;
     this.isDrawing = false;
+  }
+
+  getEditingLayerId(): string | null {
+    return this.isDrawing ? this.layerId : null;
   }
 
   onRender(ctx: CanvasRenderingContext2D, context: ToolContext): void {

@@ -7,6 +7,7 @@ export interface ToolContext {
   updateProject: (updates: Partial<Project>) => void;
   invalidateCache: (layerId: string) => void;
   setLayerCache: (layerId: string, canvas: HTMLCanvasElement) => void;
+  getLayerCanvas: (layerId: string) => { canvas: HTMLCanvasElement; ready: boolean } | null;
   screenToProject: (x: number, y: number) => { x: number; y: number };
 }
 
@@ -19,6 +20,10 @@ export abstract class BaseTool {
 
   onActivate(_context: ToolContext): void {}
   onDeactivate(_context: ToolContext): void {}
+
+  getEditingLayerId(): string | null {
+    return null;
+  }
 
   // Opcional: Renderizar algo extra por cima (como o cursor do pincel)
   onRender(_ctx: CanvasRenderingContext2D, _context: ToolContext): void {}

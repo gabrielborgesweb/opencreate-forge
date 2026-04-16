@@ -67,13 +67,45 @@
 .animate-fade-out {
   animation: fade-out 0.3s ease-in forwards;
 }
-
 body {
   margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+  font-family: sans-serif;
+}
+
+*:focus {
+  outline: none;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
   display: flex;
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+  /* Prevent default focus ring on Chromium */
+  outline: none;
+}
+
+*:focus {
+  outline: none !important;
+}
+
+button {
+  cursor: default;
+}
+
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 #root {

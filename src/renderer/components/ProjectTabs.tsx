@@ -39,6 +39,7 @@ const ProjectTabs: React.FC = () => {
     <div className="flex bg-[#111] h-[35px] border-b border-bg-tertiary px-[5px] items-end overflow-x-auto">
       <button
         onClick={() => handleTabClick("home")}
+        tabIndex={-1}
         className={`flex items-center px-[15px] h-[30px] border-none rounded-t-[4px] cursor-pointer text-[0.8rem] gap-2 flex-shrink-0 transition-colors ${
           activeTab === "home"
             ? "bg-[#222] text-[#eee]"
@@ -64,6 +65,7 @@ const ProjectTabs: React.FC = () => {
           </span>
           <button
             onClick={(e) => handleCloseTab(e, project.id)}
+            tabIndex={-1}
             className="bg-none border-none text-inherit flex p-[2px] rounded-[2px] cursor-pointer hover:bg-white/10 transition-colors"
           >
             <X size={12} />

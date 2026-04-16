@@ -115,6 +115,7 @@ const TransformOptions: React.FC = () => {
       <div className="flex items-center gap-1">
         <button
           onClick={handleCancel}
+          tabIndex={-1}
           className="p-1 hover:bg-[#444] rounded text-red-400 transition-colors"
           title="Cancel (Esc)"
         >
@@ -122,6 +123,7 @@ const TransformOptions: React.FC = () => {
         </button>
         <button
           onClick={handleApply}
+          tabIndex={-1}
           className="p-1 hover:bg-[#444] rounded text-green-400 transition-colors"
           title="Apply (Enter)"
         >

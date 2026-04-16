@@ -1,6 +1,6 @@
-import React from 'react';
-import { useProjectStore, Layer } from '@store/projectStore';
-import { Eye, EyeOff, Lock, Unlock } from 'lucide-react';
+import React from "react";
+import { useProjectStore, Layer } from "@store/projectStore";
+import { Eye, EyeOff, Lock, Unlock } from "lucide-react";
 
 interface LayerItemProps {
   layer: Layer;
@@ -8,7 +8,11 @@ interface LayerItemProps {
   isActive: boolean;
 }
 
-const LayerItem: React.FC<LayerItemProps> = ({ layer, projectId, isActive }) => {
+const LayerItem: React.FC<LayerItemProps> = ({
+  layer,
+  projectId,
+  isActive,
+}) => {
   const updateLayer = useProjectStore((state) => state.updateLayer);
   const setActiveLayer = useProjectStore((state) => state.setActiveLayer);
 
@@ -31,6 +35,7 @@ const LayerItem: React.FC<LayerItemProps> = ({ layer, projectId, isActive }) => 
     >
       <button
         onClick={toggleVisibility}
+        tabIndex={-1}
         className={`bg-none border-none cursor-pointer flex transition-colors ${
           layer.visible ? "text-[#eee]" : "text-[#666]"
         }`}
@@ -42,6 +47,7 @@ const LayerItem: React.FC<LayerItemProps> = ({ layer, projectId, isActive }) => 
 
       <button
         onClick={toggleLock}
+        tabIndex={-1}
         className={`bg-none border-none cursor-pointer flex transition-colors ${
           layer.locked ? "text-[#ffcc00]" : "text-[#666]"
         }`}

@@ -34,6 +34,7 @@ const Toolbar: React.FC = () => {
           key={tool.id}
           onClick={() => handleToolClick(tool.id)}
           title={tool.label}
+          tabIndex={-1}
           className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
             activeToolId === tool.id
               ? "bg-accent text-white"

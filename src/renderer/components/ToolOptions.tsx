@@ -37,6 +37,7 @@ const ToolOptions: React.FC = () => {
                   onClick={() =>
                     updateToolSettings("select", { mode: "replace" })
                   }
+                  tabIndex={-1}
                   className={`p-1 rounded ${
                     toolSettings.select.mode === "replace"
                       ? "bg-accent text-white shadow-sm"
@@ -50,6 +51,7 @@ const ToolOptions: React.FC = () => {
                   onClick={() =>
                     updateToolSettings("select", { mode: "unite" })
                   }
+                  tabIndex={-1}
                   className={`p-1 rounded ${
                     toolSettings.select.mode === "unite"
                       ? "bg-accent text-white shadow-sm"
@@ -63,6 +65,7 @@ const ToolOptions: React.FC = () => {
                   onClick={() =>
                     updateToolSettings("select", { mode: "subtract" })
                   }
+                  tabIndex={-1}
                   className={`p-1 rounded ${
                     toolSettings.select.mode === "subtract"
                       ? "bg-accent text-white shadow-sm"
@@ -76,6 +79,7 @@ const ToolOptions: React.FC = () => {
                   onClick={() =>
                     updateToolSettings("select", { mode: "intersect" })
                   }
+                  tabIndex={-1}
                   className={`p-1 rounded ${
                     toolSettings.select.mode === "intersect"
                       ? "bg-accent text-white shadow-sm"
@@ -96,6 +100,7 @@ const ToolOptions: React.FC = () => {
                   onClick={() =>
                     updateToolSettings("select", { shape: "rectangle" })
                   }
+                  tabIndex={-1}
                   className={`p-1 rounded ${
                     toolSettings.select.shape === "rectangle"
                       ? "bg-accent text-white shadow-sm"
@@ -109,6 +114,7 @@ const ToolOptions: React.FC = () => {
                   onClick={() =>
                     updateToolSettings("select", { shape: "ellipse" })
                   }
+                  tabIndex={-1}
                   className={`p-1 rounded ${
                     toolSettings.select.shape === "ellipse"
                       ? "bg-accent text-white shadow-sm"
@@ -190,6 +196,7 @@ const ToolOptions: React.FC = () => {
                   onClick={() =>
                     updateToolSettings("pencil", { shape: "square" })
                   }
+                  tabIndex={-1}
                   className={`p-1 text-[10px] uppercase font-bold rounded ${
                     toolSettings.pencil.shape === "square"
                       ? "bg-accent text-white shadow-sm"
@@ -203,6 +210,7 @@ const ToolOptions: React.FC = () => {
                   onClick={() =>
                     updateToolSettings("pencil", { shape: "circle" })
                   }
+                  tabIndex={-1}
                   className={`p-1 text-[10px] uppercase font-bold rounded ${
                     toolSettings.pencil.shape === "circle"
                       ? "bg-accent text-white shadow-sm"
@@ -228,6 +236,7 @@ const ToolOptions: React.FC = () => {
                   onClick={() =>
                     updateToolSettings("eraser", { mode: "brush" })
                   }
+                  tabIndex={-1}
                   className={`p-1 text-[10px] uppercase font-bold rounded ${
                     toolSettings.eraser.mode === "brush"
                       ? "bg-accent text-white shadow-sm"
@@ -241,6 +250,7 @@ const ToolOptions: React.FC = () => {
                   onClick={() =>
                     updateToolSettings("eraser", { mode: "pencil" })
                   }
+                  tabIndex={-1}
                   className={`p-1 text-[10px] uppercase font-bold rounded ${
                     toolSettings.eraser.mode === "pencil"
                       ? "bg-accent text-white shadow-sm"
@@ -283,6 +293,7 @@ const ToolOptions: React.FC = () => {
                     onClick={() =>
                       updateToolSettings("eraser", { shape: "square" })
                     }
+                    tabIndex={-1}
                     className={`p-1 text-[10px] uppercase font-bold rounded ${
                       toolSettings.eraser.shape === "square"
                         ? "bg-accent text-white shadow-sm"
@@ -296,6 +307,7 @@ const ToolOptions: React.FC = () => {
                     onClick={() =>
                       updateToolSettings("eraser", { shape: "circle" })
                     }
+                    tabIndex={-1}
                     className={`p-1 text-[10px] uppercase font-bold rounded ${
                       toolSettings.eraser.shape === "circle"
                         ? "bg-accent text-white shadow-sm"

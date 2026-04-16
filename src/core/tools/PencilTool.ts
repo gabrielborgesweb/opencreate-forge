@@ -41,7 +41,7 @@ export class PencilTool extends BaseTool {
     // Snap to pixel grid
     const snapX = Math.floor(x);
     const snapY = Math.floor(y);
-    
+
     this.mouseX = snapX;
     this.mouseY = snapY;
     this.lastX = snapX;
@@ -63,7 +63,7 @@ export class PencilTool extends BaseTool {
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
     const snapX = Math.floor(x);
     const snapY = Math.floor(y);
-    
+
     this.mouseX = snapX;
     this.mouseY = snapY;
 
@@ -75,7 +75,7 @@ export class PencilTool extends BaseTool {
       e.clientY <= rect.bottom;
 
     if (this.isMouseOver) {
-      context.canvas.style.cursor = "none";
+      context.canvas.style.cursor = "crosshair";
     } else {
       context.canvas.style.cursor = "default";
     }
@@ -84,7 +84,7 @@ export class PencilTool extends BaseTool {
 
     const settings = useToolStore.getState().toolSettings.pencil;
     const pad = settings.size;
-    
+
     this.minX = Math.min(this.minX, snapX - pad);
     this.minY = Math.min(this.minY, snapY - pad);
     this.maxX = Math.max(this.maxX, snapX + pad);
@@ -231,7 +231,7 @@ export class PencilTool extends BaseTool {
     this.offscreenCtx = this.offscreenCanvas.getContext("2d", {
       willReadFrequently: true,
     })!;
-    
+
     // Pencil needs crisp pixels
     this.offscreenCtx.imageSmoothingEnabled = false;
 
@@ -269,14 +269,14 @@ export class PencilTool extends BaseTool {
   private draw(x: number, y: number) {
     if (!this.offscreenCtx || !this.layerId) return;
     const settings = useToolStore.getState().toolSettings.pencil;
-    
+
     const localX = x - this.strokeOriginX;
     const localY = y - this.strokeOriginY;
     const localLastX = this.lastX - this.strokeOriginX;
     const localLastY = this.lastY - this.strokeOriginY;
 
     this.offscreenCtx.fillStyle = settings.color;
-    
+
     // Bresenham's line algorithm
     let x0 = Math.floor(localLastX);
     let y0 = Math.floor(localLastY);
@@ -291,7 +291,7 @@ export class PencilTool extends BaseTool {
 
     while (true) {
       this.drawPixel(x0, y0, settings.size, settings.shape);
-      
+
       if (x0 === x1 && y0 === y1) break;
       const e2 = 2 * err;
       if (e2 >= dy) {
@@ -305,7 +305,12 @@ export class PencilTool extends BaseTool {
     }
   }
 
-  private drawPixel(x: number, y: number, size: number, shape: 'circle' | 'square') {
+  private drawPixel(
+    x: number,
+    y: number,
+    size: number,
+    shape: "circle" | "square",
+  ) {
     if (!this.offscreenCtx) return;
 
     if (shape === "square") {
@@ -313,7 +318,7 @@ export class PencilTool extends BaseTool {
         x - Math.floor(size / 2),
         y - Math.floor(size / 2),
         size,
-        size
+        size,
       );
     } else {
       // Circle shape (pixelated)
@@ -342,7 +347,12 @@ export class PencilTool extends BaseTool {
           const x_max = Math.floor(max_dist_x + radius - 0.5);
           const draw_width = x_max - x_min + 1;
           if (draw_width > 0) {
-            this.offscreenCtx.fillRect(topLeftX + x_min, topLeftY + py, draw_width, 1);
+            this.offscreenCtx.fillRect(
+              topLeftX + x_min,
+              topLeftY + py,
+              draw_width,
+              1,
+            );
           }
         }
       }
@@ -410,7 +420,7 @@ export class PencilTool extends BaseTool {
           x - Math.floor(size / 2),
           y - Math.floor(size / 2),
           size,
-          size
+          size,
         );
       } else {
         ctx.beginPath();
@@ -428,7 +438,7 @@ export class PencilTool extends BaseTool {
           x - Math.floor(size / 2) + offset,
           y - Math.floor(size / 2) + offset,
           size - offset * 2,
-          size - offset * 2
+          size - offset * 2,
         );
       } else {
         ctx.beginPath();
@@ -436,11 +446,11 @@ export class PencilTool extends BaseTool {
         ctx.stroke();
       }
 
-      // 3. Ponto central (estilo Brush)
-      ctx.beginPath();
-      ctx.arc(x, y, 1 / zoom, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-      ctx.fill();
+      // 3. Ponto central
+      // ctx.beginPath();
+      // ctx.arc(x, y, 1 / zoom, 0, Math.PI * 2);
+      // ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+      // ctx.fill();
 
       ctx.restore();
     }

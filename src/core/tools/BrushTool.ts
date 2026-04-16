@@ -133,7 +133,7 @@ export class BrushTool extends BaseTool {
       e.clientY <= rect.bottom;
 
     if (this.isMouseOver) {
-      context.canvas.style.cursor = "none";
+      context.canvas.style.cursor = "crosshair";
     } else {
       context.canvas.style.cursor = "default";
     }
@@ -307,7 +307,7 @@ export class BrushTool extends BaseTool {
         this.STROKE_PADDING,
         this.STROKE_PADDING,
       );
-      
+
       // Se o cache já estava pronto, não precisamos carregar do data URL
       if (cachedResult.ready) {
         return;
@@ -436,16 +436,16 @@ export class BrushTool extends BaseTool {
       ctx.stroke();
 
       // Ponto central
-      ctx.beginPath();
-      ctx.arc(
-        this.mouseX,
-        this.mouseY,
-        1 / context.project.zoom,
-        0,
-        Math.PI * 2,
-      );
-      ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-      ctx.fill();
+      // ctx.beginPath();
+      // ctx.arc(
+      //   this.mouseX,
+      //   this.mouseY,
+      //   1 / context.project.zoom,
+      //   0,
+      //   Math.PI * 2,
+      // );
+      // ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+      // ctx.fill();
 
       ctx.restore();
     }

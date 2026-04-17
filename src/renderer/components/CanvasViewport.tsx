@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useProjectStore } from '@store/projectStore';
 import { ForgeEngine } from '@core/engine/ForgeEngine';
 
@@ -9,6 +9,8 @@ const CanvasViewport: React.FC = () => {
   const project = useProjectStore((state) => 
     state.projects.find((p) => p.id === activeProjectId) || null
   );
+
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   // 1. Inicializa o Engine apenas uma vez
   useEffect(() => {
@@ -85,8 +87,80 @@ const CanvasViewport: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+
+    if (!activeProjectId || !project) return;
+
+    const files = Array.from(e.dataTransfer.files);
+    for (const file of files) {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target?.result as string;
+          const img = new Image();
+          img.onload = () => {
+            // Coordenadas do centro da tela (viewport)
+            const viewportWidth = canvasRef.current?.width || 0;
+            const viewportHeight = canvasRef.current?.height || 0;
+
+            // Converte o centro da tela para coordenadas dentro do projeto
+            // levando em conta o zoom e o pan atual
+            const projCenterX = (viewportWidth / 2 - project.panX) / project.zoom;
+            const projCenterY = (viewportHeight / 2 - project.panY) / project.zoom;
+
+            // Posiciona a imagem centralizada nesse ponto do projeto
+            const x = Math.round(projCenterX - (img.naturalWidth / 2));
+            const y = Math.round(projCenterY - (img.naturalHeight / 2));
+
+            useProjectStore.getState().addLayer(activeProjectId, {
+              name: file.name.replace(/\.[^/.]+$/, ""),
+              type: 'raster',
+              data: dataUrl,
+              width: img.naturalWidth,
+              height: img.naturalHeight,
+              x: x,
+              y: y,
+              visible: true,
+              opacity: 100,
+            });
+          };
+          img.src = dataUrl;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  };
+
   return (
-    <div className="flex-1 relative overflow-hidden bg-[#111]">
+    <div 
+      className={`flex-1 relative overflow-hidden bg-[#111] transition-colors duration-200 ${
+        isDraggingOver ? 'ring-2 ring-blue-500 ring-inset bg-[#1a1a1a]' : ''
+      }`}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <canvas ref={canvasRef} className="block w-full h-full" />
     </div>
   );

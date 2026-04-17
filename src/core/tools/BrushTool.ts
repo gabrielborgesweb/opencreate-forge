@@ -337,6 +337,9 @@ export class BrushTool extends BaseTool {
     }
   }
 
+  private scratchCanvas: HTMLCanvasElement | null = null;
+  private scratchCtx: CanvasRenderingContext2D | null = null;
+
   private draw(x: number, y: number, context: ToolContext) {
     if (!this.offscreenCtx || !this.layerId || !this.brushCanvas) return;
     const settings = context.settings.brush;
@@ -345,25 +348,78 @@ export class BrushTool extends BaseTool {
     const localLastX = this.lastX - this.strokeOriginX;
     const localLastY = this.lastY - this.strokeOriginY;
 
-    this.offscreenCtx.save();
+    // Paint only within selection if it exists
+    const selection = context.getSelectionCanvas();
+    if (context.project.selection.hasSelection && context.project.selection.bounds && selection.canvas) {
+      const { bounds } = context.project.selection;
+      
+      // 1. Prepare or reuse scratch canvas
+      if (!this.scratchCanvas) {
+        this.scratchCanvas = document.createElement("canvas");
+        this.scratchCanvas.width = this.offscreenCanvas!.width;
+        this.scratchCanvas.height = this.offscreenCanvas!.height;
+        this.scratchCtx = this.scratchCanvas.getContext("2d")!;
+      }
+      
+      const sctx = this.scratchCtx!;
+      const brushSize = this.brushCanvas.width;
+      
+      // 2. Calculate bounding box of the current segment to limit the area
+      const minSegmentX = Math.floor(Math.min(localX, localLastX) - brushSize);
+      const minSegmentY = Math.floor(Math.min(localY, localLastY) - brushSize);
+      const segmentWidth = Math.ceil(Math.abs(localX - localLastX) + brushSize * 2);
+      const segmentHeight = Math.ceil(Math.abs(localY - localLastY) + brushSize * 2);
 
-    const dist = Math.hypot(localX - localLastX, localY - localLastY);
-    const angle = Math.atan2(localY - localLastY, localX - localLastX);
+      // 3. Clear only the segment area in scratch
+      sctx.clearRect(minSegmentX, minSegmentY, segmentWidth, segmentHeight);
 
-    // Espaçamento de 10% do tamanho para um traço fluido
-    const spacing = Math.max(1, settings.size * 0.1);
+      // 4. Draw stroke segments into scratch
+      const dist = Math.hypot(localX - localLastX, localY - localLastY);
+      const angle = Math.atan2(localY - localLastY, localX - localLastX);
+      const spacing = Math.max(1, settings.size * 0.1);
 
-    for (let i = 0; i <= dist; i += spacing) {
-      const px = localLastX + Math.cos(angle) * i;
-      const py = localLastY + Math.sin(angle) * i;
-      this.offscreenCtx.drawImage(
-        this.brushCanvas,
-        px - this.brushCanvas.width / 2,
-        py - this.brushCanvas.height / 2,
+      for (let i = 0; i <= dist; i += spacing) {
+        const px = localLastX + Math.cos(angle) * i;
+        const py = localLastY + Math.sin(angle) * i;
+        sctx.drawImage(
+          this.brushCanvas,
+          px - this.brushCanvas.width / 2,
+          py - this.brushCanvas.height / 2,
+        );
+      }
+
+      // 5. Clip scratch with selection mask (only in the segment area)
+      sctx.save();
+      sctx.globalCompositeOperation = "destination-in";
+      sctx.drawImage(
+        selection.canvas,
+        bounds.x - this.strokeOriginX,
+        bounds.y - this.strokeOriginY
       );
-    }
+      sctx.restore();
 
-    this.offscreenCtx.restore();
+      // 6. Draw the clipped scratch onto offscreen
+      this.offscreenCtx.drawImage(
+        this.scratchCanvas,
+        minSegmentX, minSegmentY, segmentWidth, segmentHeight,
+        minSegmentX, minSegmentY, segmentWidth, segmentHeight
+      );
+    } else {
+      // Normal draw without selection
+      const dist = Math.hypot(localX - localLastX, localY - localLastY);
+      const angle = Math.atan2(localY - localLastY, localX - localLastX);
+      const spacing = Math.max(1, settings.size * 0.1);
+
+      for (let i = 0; i <= dist; i += spacing) {
+        const px = localLastX + Math.cos(angle) * i;
+        const py = localLastY + Math.sin(angle) * i;
+        this.offscreenCtx.drawImage(
+          this.brushCanvas,
+          px - this.brushCanvas.width / 2,
+          py - this.brushCanvas.height / 2,
+        );
+      }
+    }
   }
 
   onDeactivate(context: ToolContext): void {

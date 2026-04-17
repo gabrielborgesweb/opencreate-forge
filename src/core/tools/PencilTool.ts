@@ -178,6 +178,8 @@ export class PencilTool extends BaseTool {
 
     this.offscreenCanvas = null;
     this.offscreenCtx = null;
+    this.scratchCanvas = null;
+    this.scratchCtx = null;
   }
 
   private getOptimizedBoundingBox(
@@ -266,6 +268,9 @@ export class PencilTool extends BaseTool {
     }
   }
 
+  private scratchCanvas: HTMLCanvasElement | null = null;
+  private scratchCtx: CanvasRenderingContext2D | null = null;
+
   private draw(x: number, y: number, context: ToolContext) {
     if (!this.offscreenCtx || !this.layerId) return;
     const settings = context.settings.pencil;
@@ -275,32 +280,155 @@ export class PencilTool extends BaseTool {
     const localLastX = this.lastX - this.strokeOriginX;
     const localLastY = this.lastY - this.strokeOriginY;
 
-    this.offscreenCtx.fillStyle = settings.color;
-
-    // Bresenham's line algorithm
-    let x0 = Math.floor(localLastX);
-    let y0 = Math.floor(localLastY);
-    const x1 = Math.floor(localX);
-    const y1 = Math.floor(localY);
-
-    const dx = Math.abs(x1 - x0);
-    const sx = x0 < x1 ? 1 : -1;
-    const dy = -Math.abs(y1 - y0);
-    const sy = y0 < y1 ? 1 : -1;
-    let err = dx + dy;
-
-    while (true) {
-      this.drawPixel(x0, y0, settings.size, settings.shape);
-
-      if (x0 === x1 && y0 === y1) break;
-      const e2 = 2 * err;
-      if (e2 >= dy) {
-        err += dy;
-        x0 += sx;
+    // Paint only within selection if it exists
+    const selection = context.getSelectionCanvas();
+    if (context.project.selection.hasSelection && context.project.selection.bounds && selection.canvas) {
+      const { bounds } = context.project.selection;
+      
+      // 1. Prepare or reuse scratch canvas
+      if (!this.scratchCanvas) {
+        this.scratchCanvas = document.createElement("canvas");
+        this.scratchCanvas.width = this.offscreenCanvas!.width;
+        this.scratchCanvas.height = this.offscreenCanvas!.height;
+        this.scratchCtx = this.scratchCanvas.getContext("2d")!;
       }
-      if (e2 <= dx) {
-        err += dx;
-        y0 += sy;
+      
+      const sctx = this.scratchCtx!;
+      const size = settings.size;
+      
+      // 2. Calculate bounding box of the current segment
+      const minSegmentX = Math.floor(Math.min(localX, localLastX) - size);
+      const minSegmentY = Math.floor(Math.min(localY, localLastY) - size);
+      const segmentWidth = Math.ceil(Math.abs(localX - localLastX) + size * 2);
+      const segmentHeight = Math.ceil(Math.abs(localY - localLastY) + size * 2);
+
+      // 3. Clear only segment area
+      sctx.clearRect(minSegmentX, minSegmentY, segmentWidth, segmentHeight);
+      sctx.imageSmoothingEnabled = false;
+      sctx.fillStyle = settings.color;
+
+      // 4. Bresenham's line algorithm on sctx
+      let x0 = Math.floor(localLastX);
+      let y0 = Math.floor(localLastY);
+      const x1 = Math.floor(localX);
+      const y1 = Math.floor(localY);
+
+      const dx = Math.abs(x1 - x0);
+      const sx = x0 < x1 ? 1 : -1;
+      const dy = -Math.abs(y1 - y0);
+      const sy = y0 < y1 ? 1 : -1;
+      let err = dx + dy;
+
+      while (true) {
+        this.drawPixelOnCtx(sctx, x0, y0, settings.size, settings.shape);
+        if (x0 === x1 && y0 === y1) break;
+        const e2 = 2 * err;
+        if (e2 >= dy) {
+          err += dy;
+          x0 += sx;
+        }
+        if (e2 <= dx) {
+          err += dx;
+          y0 += sy;
+        }
+      }
+
+      // 5. Clip scratch with selection mask
+      sctx.save();
+      sctx.globalCompositeOperation = "destination-in";
+      sctx.drawImage(
+        selection.canvas,
+        bounds.x - this.strokeOriginX,
+        bounds.y - this.strokeOriginY
+      );
+      sctx.restore();
+
+      // 6. Draw the clipped scratch onto offscreen
+      this.offscreenCtx.drawImage(
+        this.scratchCanvas,
+        minSegmentX, minSegmentY, segmentWidth, segmentHeight,
+        minSegmentX, minSegmentY, segmentWidth, segmentHeight
+      );
+    } else {
+      this.offscreenCtx.save();
+      this.offscreenCtx.fillStyle = settings.color;
+
+      // Bresenham's line algorithm
+      let x0 = Math.floor(localLastX);
+      let y0 = Math.floor(localLastY);
+      const x1 = Math.floor(localX);
+      const y1 = Math.floor(localY);
+
+      const dx = Math.abs(x1 - x0);
+      const sx = x0 < x1 ? 1 : -1;
+      const dy = -Math.abs(y1 - y0);
+      const sy = y0 < y1 ? 1 : -1;
+      let err = dx + dy;
+
+      while (true) {
+        this.drawPixel(x0, y0, settings.size, settings.shape);
+
+        if (x0 === x1 && y0 === y1) break;
+        const e2 = 2 * err;
+        if (e2 >= dy) {
+          err += dy;
+          x0 += sx;
+        }
+        if (e2 <= dx) {
+          err += dx;
+          y0 += sy;
+        }
+      }
+      this.offscreenCtx.restore();
+    }
+  }
+
+  private drawPixelOnCtx(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    size: number,
+    shape: "circle" | "square",
+  ) {
+    if (shape === "square") {
+      ctx.fillRect(
+        x - Math.floor(size / 2),
+        y - Math.floor(size / 2),
+        size,
+        size,
+      );
+    } else {
+      if (size === 1) {
+        ctx.fillRect(x, y, 1, 1);
+        return;
+      }
+      if (size % 2 !== 0) {
+        const r = (size - 1) / 2;
+        for (let dy = -r; dy <= r; dy++) {
+          const dx = Math.floor(Math.sqrt(r * r - dy * dy));
+          ctx.fillRect(x - dx, y + dy, 2 * dx + 1, 1);
+        }
+      } else {
+        const radius = size / 2;
+        const topLeftX = x - radius;
+        const topLeftY = y - radius;
+        for (let py = 0; py < size; py++) {
+          const dist_y = py + 0.5 - radius;
+          const max_dist_x_sq = radius * radius - dist_y * dist_y;
+          if (max_dist_x_sq < 0) continue;
+          const max_dist_x = Math.sqrt(max_dist_x_sq);
+          const x_min = Math.ceil(-max_dist_x + radius - 0.5);
+          const x_max = Math.floor(max_dist_x + radius - 0.5);
+          const draw_width = x_max - x_min + 1;
+          if (draw_width > 0) {
+            ctx.fillRect(
+              topLeftX + x_min,
+              topLeftY + py,
+              draw_width,
+              1,
+            );
+          }
+        }
       }
     }
   }

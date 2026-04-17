@@ -77,69 +77,73 @@ export class ForgeEngine {
 
     this.setupEventListeners();
     this.startRenderLoop();
-    }
+  }
 
-    private setupEventListeners() {
+  private setupEventListeners() {
     this.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
     this.canvas.addEventListener("mousedown", this.handleMouseDown);
     window.addEventListener("mousemove", this.handleMouseMove);
     window.addEventListener("mouseup", this.handleMouseUp);
     window.addEventListener("keydown", this.handleKeyDown);
+  }
+
+  private handleKeyDown(e: KeyboardEvent) {
+    const isCtrl = e.ctrlKey || e.metaKey;
+
+    if (isCtrl && e.key.toLowerCase() === "c") {
+      this.copyToClipboard();
+    } else if (isCtrl && e.key.toLowerCase() === "v") {
+      this.pasteFromClipboard();
+    } else if (isCtrl && e.key.toLowerCase() === "x") {
+      this.cutToClipboard();
     }
+  }
 
-    private handleKeyDown(e: KeyboardEvent) {
-      const isCtrl = e.ctrlKey || e.metaKey;
+  public async cutToClipboard() {
+    if (!this.project || !this.project.activeLayerId) return;
 
-      if (isCtrl && e.key.toLowerCase() === "c") {
-        this.copyToClipboard();
-      } else if (isCtrl && e.key.toLowerCase() === "v") {
-        this.pasteFromClipboard();
-      } else if (isCtrl && e.key.toLowerCase() === "x") {
-        this.cutToClipboard();
-      }
-    }
+    // 1. Copy first
+    await this.copyToClipboard();
 
-    public async cutToClipboard() {
-      if (!this.project || !this.project.activeLayerId) return;
+    // 2. Clear selection
+    const activeLayer = this.project.layers.find(
+      (l) => l.id === this.project?.activeLayerId,
+    );
+    if (!activeLayer || activeLayer.type !== "raster" || !activeLayer.data)
+      return;
 
-      // 1. Copy first
-      await this.copyToClipboard();
+    const layerCanvas = this.layerCanvasCache.get(activeLayer.id);
+    if (!layerCanvas) return;
 
-      // 2. Clear selection
-      const activeLayer = this.project.layers.find(
-        (l) => l.id === this.project?.activeLayerId,
+    if (this.project.selection.hasSelection && this.project.selection.bounds) {
+      const { bounds } = this.project.selection;
+      const ctx = layerCanvas.getContext("2d")!;
+      ctx.save();
+      ctx.globalCompositeOperation = "destination-out";
+
+      // Draw selection mask relative to layer
+      ctx.drawImage(
+        this.selectionCanvas,
+        bounds.x - activeLayer.x,
+        bounds.y - activeLayer.y,
       );
-      if (!activeLayer || activeLayer.type !== "raster" || !activeLayer.data)
-        return;
+      ctx.restore();
 
-      const layerCanvas = this.layerCanvasCache.get(activeLayer.id);
-      if (!layerCanvas) return;
-
-      if (this.project.selection.hasSelection && this.project.selection.bounds) {
-        const { bounds } = this.project.selection;
-        const ctx = layerCanvas.getContext("2d")!;
-        ctx.save();
-        ctx.globalCompositeOperation = "destination-out";
-
-        // Draw selection mask relative to layer
-        ctx.drawImage(this.selectionCanvas, bounds.x - activeLayer.x, bounds.y - activeLayer.y);
-        ctx.restore();
-
-        // Update project store
-        useProjectStore.getState().updateLayer(this.project.id, activeLayer.id, {
-          data: layerCanvas.toDataURL(),
-        });
-        this.invalidateLayerCache(activeLayer.id);
-      } else {
-        // If no selection, maybe clear whole layer? 
-        // Most editors "Cut" whole layer if no selection, but let's just do nothing for safety or clear it.
-        // Standard behavior: Cut entire layer.
-        useProjectStore.getState().updateLayer(this.project.id, activeLayer.id, {
-          data: undefined,
-        });
-        this.invalidateLayerCache(activeLayer.id);
-      }
+      // Update project store
+      useProjectStore.getState().updateLayer(this.project.id, activeLayer.id, {
+        data: layerCanvas.toDataURL(),
+      });
+      this.invalidateLayerCache(activeLayer.id);
+    } else {
+      // If no selection, maybe clear whole layer?
+      // Most editors "Cut" whole layer if no selection, but let's just do nothing for safety or clear it.
+      // Standard behavior: Cut entire layer.
+      useProjectStore.getState().updateLayer(this.project.id, activeLayer.id, {
+        data: undefined,
+      });
+      this.invalidateLayerCache(activeLayer.id);
     }
+  }
 
   public async copyToClipboard() {
     if (!this.project || !this.project.activeLayerId) return;
@@ -152,12 +156,16 @@ export class ForgeEngine {
 
     // Check if layer is visible or locked
     if (!activeLayer.visible) {
-      useUIStore.getState().showToast("Cannot copy from a hidden layer", "warning");
+      useUIStore
+        .getState()
+        .showToast("Cannot copy from a hidden layer", "warning");
       return;
     }
     if (activeLayer.locked) {
       // For copy it might be okay, but user asked to prevent it for both
-      useUIStore.getState().showToast("Cannot copy from a locked layer", "warning");
+      useUIStore
+        .getState()
+        .showToast("Cannot copy from a locked layer", "warning");
       return;
     }
 
@@ -168,7 +176,10 @@ export class ForgeEngine {
     const layerCanvas = this.layerCanvasCache.get(activeLayer.id);
     if (!layerCanvas) return;
 
-    if (!this.project.selection.hasSelection || !this.project.selection.bounds) {
+    if (
+      !this.project.selection.hasSelection ||
+      !this.project.selection.bounds
+    ) {
       sourceCanvas = layerCanvas;
     } else {
       const { bounds } = this.project.selection;
@@ -195,7 +206,9 @@ export class ForgeEngine {
 
       // Selection is empty for this layer
       if (!optimizedBounds) {
-        useUIStore.getState().showToast("The selection is empty on this layer", "warning");
+        useUIStore
+          .getState()
+          .showToast("The selection is empty on this layer", "warning");
         return;
       }
 
@@ -258,11 +271,12 @@ export class ForgeEngine {
       // If the selection has NO pixels it's redundant to keep it.
       // Most users actually want to paste as new layer and ignore selection if it's just a rectangle.
       useProjectStore.getState().updateProject(this.project.id, {
-        selection: { hasSelection: false, bounds: null, mask: undefined }
+        selection: { hasSelection: false, bounds: null, mask: undefined },
       });
     }
 
-    try {      const clipboardItems = await navigator.clipboard.read();
+    try {
+      const clipboardItems = await navigator.clipboard.read();
       for (const item of clipboardItems) {
         const imageType = item.types.find((t) => t.startsWith("image/"));
         if (!imageType) continue;
@@ -294,8 +308,10 @@ export class ForgeEngine {
               // Center in viewport
               const viewportWidth = this.canvas.width;
               const viewportHeight = this.canvas.height;
-              const projCenterX = (viewportWidth / 2 - this.project!.panX) / this.project!.zoom;
-              const projCenterY = (viewportHeight / 2 - this.project!.panY) / this.project!.zoom;
+              const projCenterX =
+                (viewportWidth / 2 - this.project!.panX) / this.project!.zoom;
+              const projCenterY =
+                (viewportHeight / 2 - this.project!.panY) / this.project!.zoom;
               pasteX = Math.round(projCenterX - img.naturalWidth / 2);
               pasteY = Math.round(projCenterY - img.naturalHeight / 2);
             }
@@ -723,7 +739,11 @@ export class ForgeEngine {
     this.onViewportChange(scale, originX, originY);
   }
 
-  private intersects(layer: Layer, projectWidth: number, projectHeight: number): boolean {
+  private intersects(
+    layer: Layer,
+    projectWidth: number,
+    projectHeight: number,
+  ): boolean {
     return !(
       layer.x >= projectWidth ||
       layer.x + layer.width <= 0 ||
@@ -809,15 +829,21 @@ export class ForgeEngine {
     const context = this.getToolContext();
     if (tool && context) tool.onRender(this.ctx, context);
 
-    this.renderSelection();
-
     if (this.project.activeLayerId) {
       const activeLayer = this.project.layers.find(
         (l) => l.id === this.project?.activeLayerId,
       );
-      if (activeLayer && activeLayer.visible) {
+      if (activeLayer) {
         this.ctx.save();
-        this.ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
+
+        if (!activeLayer.visible) {
+          this.ctx.strokeStyle = "rgba(150, 150, 150, 0.7)"; // Gray for hidden
+        } else if (activeLayer.locked) {
+          this.ctx.strokeStyle = "rgba(255, 204, 0, 0.9)"; // Yellow for locked
+        } else {
+          this.ctx.strokeStyle = "rgba(0, 120, 255, 0.9)"; // Default blue
+        }
+
         this.ctx.lineWidth = 1 / this.project.zoom;
         this.ctx.setLineDash([4 / this.project.zoom, 2 / this.project.zoom]);
         this.ctx.strokeRect(
@@ -830,6 +856,8 @@ export class ForgeEngine {
       }
     }
     this.ctx.restore();
+
+    this.renderSelection();
   }
 
   private renderLayer(layer: Layer) {

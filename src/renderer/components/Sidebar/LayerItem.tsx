@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useProjectStore, Layer } from "@store/projectStore";
+import { useUIStore } from "@store/uiStore";
+import { getOptimizedBoundingBox } from "@/core/utils/imageUtils";
 import {
   Eye,
   EyeOff,
@@ -30,8 +32,8 @@ const LayerItem: React.FC<LayerItemProps> = ({
 }) => {
   const updateLayer = useProjectStore((state) => state.updateLayer);
   const setActiveLayer = useProjectStore((state) => state.setActiveLayer);
-  // const removeLayer = useProjectStore((state) => state.removeLayer);
-  // const duplicateLayer = useProjectStore((state) => state.duplicateLayer);
+  const updateProject = useProjectStore((state) => state.updateProject);
+  const showToast = useUIStore((state) => state.showToast);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(layer.name);
@@ -53,6 +55,72 @@ const LayerItem: React.FC<LayerItemProps> = ({
   const toggleLock = (e: React.MouseEvent) => {
     e.stopPropagation();
     updateLayer(projectId, layer.id, { locked: !layer.locked });
+  };
+
+  const handleThumbnailClick = (e: React.MouseEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.stopPropagation();
+      if (!layer.data) {
+        showToast("Layer is empty", "warning");
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = layer.width;
+        canvas.height = layer.height;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+        ctx.drawImage(img, 0, 0);
+
+        const bounds = getOptimizedBoundingBox(canvas, {
+          x: 0,
+          y: 0,
+          width: canvas.width,
+          height: canvas.height,
+        });
+
+        if (!bounds) {
+          showToast("Layer is empty", "warning");
+          return;
+        }
+
+        // Create mask (white on black)
+        const maskCanvas = document.createElement("canvas");
+        maskCanvas.width = bounds.width;
+        maskCanvas.height = bounds.height;
+        const mctx = maskCanvas.getContext("2d")!;
+        
+        mctx.drawImage(
+          canvas,
+          bounds.x,
+          bounds.y,
+          bounds.width,
+          bounds.height,
+          0,
+          0,
+          bounds.width,
+          bounds.height
+        );
+        mctx.globalCompositeOperation = "source-in";
+        mctx.fillStyle = "white";
+        mctx.fillRect(0, 0, bounds.width, bounds.height);
+
+        updateProject(projectId, {
+          selection: {
+            hasSelection: true,
+            bounds: {
+              x: layer.x + bounds.x,
+              y: layer.y + bounds.y,
+              width: bounds.width,
+              height: bounds.height,
+            },
+            mask: maskCanvas.toDataURL(),
+          },
+        });
+      };
+      img.src = layer.data;
+    }
   };
 
   const handleRename = () => {
@@ -113,15 +181,16 @@ const LayerItem: React.FC<LayerItemProps> = ({
       {/* Thumbnail */}
       <div
         className={`w-6 h-6 bg-[#333] rounded border flex items-center justify-center overflow-hidden mr-2 shrink-0 transition-colors ${isActive ? "border-accent" : "border-white/10"}`}
+        onClick={handleThumbnailClick}
       >
         {layer.data ? (
           <img
             src={layer.data}
             alt=""
-            className="max-w-full max-h-full object-contain"
+            className="max-w-full max-h-full object-contain pointer-events-none"
           />
         ) : (
-          <div className="text-[0.6rem] text-[#555]">
+          <div className="text-[0.6rem] text-[#555] pointer-events-none">
             {layer.type[0].toUpperCase()}
           </div>
         )}

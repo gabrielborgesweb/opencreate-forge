@@ -1,8 +1,8 @@
-import { BaseTool, ToolContext } from "./BaseTool";
-import { useToolStore } from "@/renderer/store/toolStore";
+import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 
 export class PencilTool extends BaseTool {
-  id = "pencil";
+  id: ToolId = "pencil";
+
   private isDrawing = false;
   private lastX = 0;
   private lastY = 0;
@@ -47,7 +47,7 @@ export class PencilTool extends BaseTool {
     this.lastX = snapX;
     this.lastY = snapY;
 
-    const settings = useToolStore.getState().toolSettings.pencil;
+    const settings = context.settings.pencil;
     this.initOffscreen(layer, context);
 
     const pad = settings.size;
@@ -56,7 +56,7 @@ export class PencilTool extends BaseTool {
     this.maxX = snapX + pad;
     this.maxY = snapY + pad;
 
-    this.draw(snapX, snapY);
+    this.draw(snapX, snapY, context);
   }
 
   onMouseMove(e: MouseEvent, context: ToolContext): void {
@@ -82,7 +82,7 @@ export class PencilTool extends BaseTool {
 
     if (!this.isDrawing) return;
 
-    const settings = useToolStore.getState().toolSettings.pencil;
+    const settings = context.settings.pencil;
     const pad = settings.size;
 
     this.minX = Math.min(this.minX, snapX - pad);
@@ -90,7 +90,7 @@ export class PencilTool extends BaseTool {
     this.maxX = Math.max(this.maxX, snapX + pad);
     this.maxY = Math.max(this.maxY, snapY + pad);
 
-    this.draw(snapX, snapY);
+    this.draw(snapX, snapY, context);
     this.lastX = snapX;
     this.lastY = snapY;
   }
@@ -266,9 +266,9 @@ export class PencilTool extends BaseTool {
     }
   }
 
-  private draw(x: number, y: number) {
+  private draw(x: number, y: number, context: ToolContext) {
     if (!this.offscreenCtx || !this.layerId) return;
-    const settings = useToolStore.getState().toolSettings.pencil;
+    const settings = context.settings.pencil;
 
     const localX = x - this.strokeOriginX;
     const localY = y - this.strokeOriginY;
@@ -370,7 +370,7 @@ export class PencilTool extends BaseTool {
   }
 
   onRender(ctx: CanvasRenderingContext2D, context: ToolContext): void {
-    const settings = useToolStore.getState().toolSettings.pencil;
+    const settings = context.settings.pencil;
 
     if (this.isDrawing && this.offscreenCanvas && this.layerId) {
       const layer = context.project.layers.find((l) => l.id === this.layerId)!;

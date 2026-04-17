@@ -1,8 +1,8 @@
-import { BaseTool, ToolContext } from "./BaseTool";
-import { useToolStore } from "@/renderer/store/toolStore";
+import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 
 export class EraserTool extends BaseTool {
-  id = "eraser";
+  id: ToolId = "eraser";
+
   private isDrawing = false;
   private lastX = 0;
   private lastY = 0;
@@ -86,7 +86,7 @@ export class EraserTool extends BaseTool {
     this.layerId = activeLayerId;
 
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
-    const settings = useToolStore.getState().toolSettings.eraser;
+    const settings = context.settings.eraser;
 
     // Se for modo lápis, snap to pixel
     const drawX = settings.mode === "pencil" ? Math.floor(x) : x;
@@ -109,12 +109,12 @@ export class EraserTool extends BaseTool {
     this.maxX = drawX + pad;
     this.maxY = drawY + pad;
 
-    this.draw(drawX, drawY);
+    this.draw(drawX, drawY, context);
   }
 
   onMouseMove(e: MouseEvent, context: ToolContext): void {
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
-    const settings = useToolStore.getState().toolSettings.eraser;
+    const settings = context.settings.eraser;
 
     const drawX = settings.mode === "pencil" ? Math.floor(x) : x;
     const drawY = settings.mode === "pencil" ? Math.floor(y) : y;
@@ -143,7 +143,7 @@ export class EraserTool extends BaseTool {
     this.maxX = Math.max(this.maxX, drawX + pad);
     this.maxY = Math.max(this.maxY, drawY + pad);
 
-    this.draw(drawX, drawY);
+    this.draw(drawX, drawY, context);
     this.lastX = drawX;
     this.lastY = drawY;
   }
@@ -300,7 +300,7 @@ export class EraserTool extends BaseTool {
       willReadFrequently: true,
     })!;
 
-    const settings = useToolStore.getState().toolSettings.eraser;
+    const settings = context.settings.eraser;
     if (settings.mode === "pencil") {
       this.offscreenCtx.imageSmoothingEnabled = false;
     }
@@ -336,9 +336,9 @@ export class EraserTool extends BaseTool {
     }
   }
 
-  private draw(x: number, y: number) {
+  private draw(x: number, y: number, context: ToolContext) {
     if (!this.offscreenCtx || !this.layerId) return;
-    const settings = useToolStore.getState().toolSettings.eraser;
+    const settings = context.settings.eraser;
 
     const localX = x - this.strokeOriginX;
     const localY = y - this.strokeOriginY;
@@ -460,7 +460,7 @@ export class EraserTool extends BaseTool {
   }
 
   onRender(ctx: CanvasRenderingContext2D, context: ToolContext): void {
-    const settings = useToolStore.getState().toolSettings.eraser;
+    const settings = context.settings.eraser;
 
     if (this.isDrawing && this.offscreenCanvas && this.layerId) {
       const layer = context.project.layers.find((l) => l.id === this.layerId)!;

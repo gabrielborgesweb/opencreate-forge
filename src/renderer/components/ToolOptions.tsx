@@ -1,340 +1,30 @@
 import React from "react";
-import { useToolStore } from "@store/toolStore";
+import { useToolStore, ToolId } from "@store/toolStore";
 import { TOOLS } from "../constants/tools";
-import {
-  Brush,
-  Circle,
-  Pencil,
-  Settings2,
-  Square,
-  MousePointer2,
-  SquaresUnite,
-  SquaresSubtract,
-  SquaresIntersect,
-} from "lucide-react";
-import ToolSettingInput from "./ui/ToolSettingInput";
-import TransformOptions from "./TransformOptions";
-import CropOptions from "./CropOptions";
+import { Settings2 } from "lucide-react";
+
+import { BrushOptions } from "./tools/BrushOptions";
+import { PencilOptions } from "./tools/PencilOptions";
+import { EraserOptions } from "./tools/EraserOptions";
+import { SelectOptions } from "./tools/SelectOptions";
+import { TransformOptions } from "./tools/TransformOptions";
+import { CropOptions } from "./tools/CropOptions";
+
+const TOOL_COMPONENTS: Partial<Record<ToolId, React.FC>> = {
+  brush: BrushOptions,
+  pencil: PencilOptions,
+  eraser: EraserOptions,
+  select: SelectOptions,
+  transform: TransformOptions,
+  crop: CropOptions,
+};
 
 const ToolOptions: React.FC = () => {
   const activeToolId = useToolStore((state) => state.activeToolId);
-  const toolSettings = useToolStore((state) => state.toolSettings);
-  const updateToolSettings = useToolStore((state) => state.updateToolSettings);
 
   const activeTool = TOOLS.find((tool) => tool.id === activeToolId);
   const ToolIcon = activeTool?.icon || Settings2;
-
-  const renderOptions = () => {
-    switch (activeToolId) {
-      case "select":
-        return (
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <label className="text-[0.75rem] text-[#999] font-medium">
-                Mode
-              </label>
-              <div className="flex items-center bg-black/20 rounded p-0.5">
-                <button
-                  onClick={() =>
-                    updateToolSettings("select", { mode: "replace" })
-                  }
-                  tabIndex={-1}
-                  className={`p-1 rounded ${
-                    toolSettings.select.mode === "replace"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-[#999] hover:text-white"
-                  } transition-all`}
-                  title="New Selection"
-                >
-                  <MousePointer2 size={16} />
-                </button>
-                <button
-                  onClick={() =>
-                    updateToolSettings("select", { mode: "unite" })
-                  }
-                  tabIndex={-1}
-                  className={`p-1 rounded ${
-                    toolSettings.select.mode === "unite"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-[#999] hover:text-white"
-                  } transition-all`}
-                  title="Unite (Shift)"
-                >
-                  <SquaresUnite size={16} />
-                </button>
-                <button
-                  onClick={() =>
-                    updateToolSettings("select", { mode: "subtract" })
-                  }
-                  tabIndex={-1}
-                  className={`p-1 rounded ${
-                    toolSettings.select.mode === "subtract"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-[#999] hover:text-white"
-                  } transition-all`}
-                  title="Subtract (Alt)"
-                >
-                  <SquaresSubtract size={16} />
-                </button>
-                <button
-                  onClick={() =>
-                    updateToolSettings("select", { mode: "intersect" })
-                  }
-                  tabIndex={-1}
-                  className={`p-1 rounded ${
-                    toolSettings.select.mode === "intersect"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-[#999] hover:text-white"
-                  } transition-all`}
-                  title="Intersect (Shift+Alt)"
-                >
-                  <SquaresIntersect size={16} />
-                </button>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-[0.75rem] text-[#999] font-medium">
-                Shape
-              </label>
-              <div className="flex items-center bg-black/20 rounded p-0.5">
-                <button
-                  onClick={() =>
-                    updateToolSettings("select", { shape: "rectangle" })
-                  }
-                  tabIndex={-1}
-                  className={`p-1 rounded ${
-                    toolSettings.select.shape === "rectangle"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-[#999] hover:text-white"
-                  } transition-all`}
-                  title="Rectangular Marquee"
-                >
-                  <Square size={16} />
-                </button>
-                <button
-                  onClick={() =>
-                    updateToolSettings("select", { shape: "ellipse" })
-                  }
-                  tabIndex={-1}
-                  className={`p-1 rounded ${
-                    toolSettings.select.shape === "ellipse"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-[#999] hover:text-white"
-                  } transition-all`}
-                  title="Elliptical Marquee"
-                >
-                  <Circle size={16} />
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      case "brush":
-        return (
-          <div className="flex items-center gap-6">
-            <ToolSettingInput
-              label="Size"
-              unit="px"
-              min={1}
-              max={500}
-              value={toolSettings.brush.size}
-              onChange={(val) => updateToolSettings("brush", { size: val })}
-            />
-            <ToolSettingInput
-              label="Hardness"
-              unit="%"
-              min={0}
-              max={1}
-              displayMultiplier={100}
-              value={toolSettings.brush.hardness}
-              onChange={(val) => updateToolSettings("brush", { hardness: val })}
-            />
-            <div className="flex items-center gap-2">
-              <label className="text-[0.75rem] text-[#999] font-medium">
-                Color
-              </label>
-              <input
-                type="color"
-                value={toolSettings.brush.color}
-                onChange={(e) =>
-                  updateToolSettings("brush", { color: e.target.value })
-                }
-                className="border-none bg-none w-5 h-5 cursor-pointer rounded overflow-hidden"
-              />
-            </div>
-          </div>
-        );
-      case "pencil":
-        return (
-          <div className="flex items-center gap-6">
-            <ToolSettingInput
-              label="Size"
-              unit="px"
-              min={1}
-              max={100}
-              value={toolSettings.pencil.size}
-              onChange={(val) => updateToolSettings("pencil", { size: val })}
-            />
-            <div className="flex items-center gap-2">
-              <label className="text-[0.75rem] text-[#999] font-medium">
-                Color
-              </label>
-              <input
-                type="color"
-                value={toolSettings.pencil.color}
-                onChange={(e) =>
-                  updateToolSettings("pencil", { color: e.target.value })
-                }
-                className="border-none bg-none w-5 h-5 cursor-pointer rounded overflow-hidden"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-[0.75rem] text-[#999] font-medium">
-                Shape
-              </label>
-              <div className="flex items-center bg-black/20 rounded p-0.5">
-                <button
-                  onClick={() =>
-                    updateToolSettings("pencil", { shape: "square" })
-                  }
-                  tabIndex={-1}
-                  className={`p-1 text-[10px] uppercase font-bold rounded ${
-                    toolSettings.pencil.shape === "square"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-[#999] hover:text-white"
-                  } transition-all`}
-                  title="Square"
-                >
-                  <Square size={16} />
-                </button>
-                <button
-                  onClick={() =>
-                    updateToolSettings("pencil", { shape: "circle" })
-                  }
-                  tabIndex={-1}
-                  className={`p-1 text-[10px] uppercase font-bold rounded ${
-                    toolSettings.pencil.shape === "circle"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-[#999] hover:text-white"
-                  } transition-all`}
-                  title="Circle"
-                >
-                  <Circle size={16} />
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      case "eraser":
-        return (
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <label className="text-[0.75rem] text-[#999] font-medium">
-                Mode
-              </label>
-              <div className="flex items-center bg-black/20 rounded p-0.5">
-                <button
-                  onClick={() =>
-                    updateToolSettings("eraser", { mode: "brush" })
-                  }
-                  tabIndex={-1}
-                  className={`p-1 text-[10px] uppercase font-bold rounded ${
-                    toolSettings.eraser.mode === "brush"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-[#999] hover:text-white"
-                  } transition-all`}
-                  title="Brush"
-                >
-                  <Brush size={16} />
-                </button>
-                <button
-                  onClick={() =>
-                    updateToolSettings("eraser", { mode: "pencil" })
-                  }
-                  tabIndex={-1}
-                  className={`p-1 text-[10px] uppercase font-bold rounded ${
-                    toolSettings.eraser.mode === "pencil"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-[#999] hover:text-white"
-                  } transition-all`}
-                  title="Pencil"
-                >
-                  <Pencil size={16} />
-                </button>
-              </div>
-            </div>
-            <ToolSettingInput
-              label="Size"
-              unit="px"
-              min={1}
-              max={500}
-              value={toolSettings.eraser.size}
-              onChange={(val) => updateToolSettings("eraser", { size: val })}
-            />
-            {toolSettings.eraser.mode === "brush" && (
-              <ToolSettingInput
-                label="Hardness"
-                unit="%"
-                min={0}
-                max={1}
-                displayMultiplier={100}
-                value={toolSettings.eraser.hardness}
-                onChange={(val) =>
-                  updateToolSettings("eraser", { hardness: val })
-                }
-              />
-            )}
-            {toolSettings.eraser.mode === "pencil" && (
-              <div className="flex items-center gap-2">
-                <label className="text-[0.75rem] text-[#999] font-medium">
-                  Shape
-                </label>
-                <div className="flex items-center bg-black/20 rounded p-0.5">
-                  <button
-                    onClick={() =>
-                      updateToolSettings("eraser", { shape: "square" })
-                    }
-                    tabIndex={-1}
-                    className={`p-1 text-[10px] uppercase font-bold rounded ${
-                      toolSettings.eraser.shape === "square"
-                        ? "bg-accent text-white shadow-sm"
-                        : "text-[#999] hover:text-white"
-                    } transition-all`}
-                    title="Square"
-                  >
-                    <Square size={16} />
-                  </button>
-                  <button
-                    onClick={() =>
-                      updateToolSettings("eraser", { shape: "circle" })
-                    }
-                    tabIndex={-1}
-                    className={`p-1 text-[10px] uppercase font-bold rounded ${
-                      toolSettings.eraser.shape === "circle"
-                        ? "bg-accent text-white shadow-sm"
-                        : "text-[#999] hover:text-white"
-                    } transition-all`}
-                    title="Circle"
-                  >
-                    <Circle size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      case "transform":
-        return <TransformOptions />;
-      case "crop":
-        return <CropOptions />;
-      default:
-        return (
-          <span className="text-[0.75rem] text-[#666]">
-            No options for this tool
-          </span>
-        );
-    }
-  };
+  const OptionsComponent = TOOL_COMPONENTS[activeToolId];
 
   return (
     <div className="flex items-center gap-4 px-4 py-1 pr-[calc(0.5rem-1px)]">
@@ -344,7 +34,13 @@ const ToolOptions: React.FC = () => {
           {activeTool?.name || activeToolId}
         </span>
       </div>
-      {renderOptions()}
+      {OptionsComponent ? (
+        <OptionsComponent />
+      ) : (
+        <span className="text-[0.75rem] text-[#666]">
+          No options for this tool
+        </span>
+      )}
     </div>
   );
 };

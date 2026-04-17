@@ -1,9 +1,9 @@
 import React from "react";
-import { useToolStore, CropMode } from "@store/toolStore";
-import ToolSettingInput from "./ui/ToolSettingInput";
 import { Check, X, RotateCcw } from "lucide-react";
+import { useToolStore, CropMode } from "@/renderer/store/toolStore";
+import ToolSettingInput from "@/renderer/components/ui/ToolSettingInput";
 
-const CropOptions: React.FC = () => {
+export const CropOptions: React.FC = () => {
   const crop = useToolStore((state) => state.toolSettings.crop);
   const updateSettings = useToolStore((state) => state.updateToolSettings);
 
@@ -28,7 +28,7 @@ const CropOptions: React.FC = () => {
           onChange={(e) =>
             updateSettings("crop", { mode: e.target.value as CropMode })
           }
-          className="bg-[#333] border border-bg-tertiary text-[#eee] rounded px-1 outline-none h-6"
+          className="bg-[#333] border border-white/10 text-[#eee] rounded px-1 outline-none h-6"
         >
           <option value="Free">Free</option>
           <option value="Original Ratio">Original Ratio</option>
@@ -64,13 +64,13 @@ const CropOptions: React.FC = () => {
             onChange={(e) =>
               updateSettings("crop", { deleteCropped: e.target.checked })
             }
-            className="w-3 h-3 rounded bg-[#333] border-bg-tertiary accent-accent"
+            className="w-3 h-3 rounded bg-[#333] border-white/10 accent-accent"
           />
           <span className="text-[#999] font-bold">DELETE PIXELS</span>
         </label>
       </div>
 
-      <div className="w-[1px] h-4 bg-bg-tertiary" />
+      <div className="w-[1px] h-4 bg-white/10" />
 
       <div className="flex items-center gap-1">
         <button
@@ -101,5 +101,3 @@ const CropOptions: React.FC = () => {
     </div>
   );
 };
-
-export default CropOptions;

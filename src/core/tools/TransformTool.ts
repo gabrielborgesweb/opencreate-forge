@@ -1,5 +1,4 @@
-import { BaseTool, ToolContext } from "./BaseTool";
-import { useToolStore } from "@/renderer/store/toolStore";
+import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 import { Layer } from "@/renderer/store/projectStore";
 
 interface TransformState {
@@ -22,7 +21,8 @@ interface Handle {
 }
 
 export class TransformTool extends BaseTool {
-  id = "transform";
+  id: ToolId = "transform";
+
   private originalLayer: Layer | null = null;
   private currentTransform: TransformState | null = null;
   private activeHandle: Handle | null = null;
@@ -51,25 +51,25 @@ export class TransformTool extends BaseTool {
         anchor: { x: 0.5, y: 0.5 },
         isDirty: false,
       };
-      this.syncStore();
+      this.syncStore(context);
     }
 
     window.addEventListener("forge:transform-apply", this.handleApplyEvent);
     window.addEventListener("forge:transform-cancel", this.handleCancelEvent);
 
-    this.unsubscribeStore = useToolStore.subscribe((state) => {
-      if (useToolStore.getState().activeToolId === "transform") {
-        const newSettings = state.toolSettings.transform;
-        if (this.currentTransform) {
-          if (
-            this.currentTransform.x !== newSettings.x ||
-            this.currentTransform.y !== newSettings.y ||
-            this.currentTransform.scaleX !== newSettings.scaleX ||
-            this.currentTransform.scaleY !== newSettings.scaleY ||
-            this.currentTransform.rotation !== newSettings.rotation
-          ) {
-            this.currentTransform = { ...newSettings };
-          }
+    this.unsubscribeStore = context.subscribe((settings) => {
+      // Only react if we are the active tool (the engine takes care of only calling active tool,
+      // but this listener is global once subscribed)
+      const newSettings = settings.transform;
+      if (this.currentTransform) {
+        if (
+          this.currentTransform.x !== newSettings.x ||
+          this.currentTransform.y !== newSettings.y ||
+          this.currentTransform.scaleX !== newSettings.scaleX ||
+          this.currentTransform.scaleY !== newSettings.scaleY ||
+          this.currentTransform.rotation !== newSettings.rotation
+        ) {
+          this.currentTransform = { ...newSettings };
         }
       }
     });
@@ -80,14 +80,13 @@ export class TransformTool extends BaseTool {
   };
 
   private handleCancelEvent = () => {
-    this.cancel();
+    if (this.context) this.cancel(this.context);
   };
 
-  onDeactivate(_context: ToolContext): void {
+  onDeactivate(context: ToolContext): void {
     this.originalLayer = null;
     this.currentTransform = null;
     this.activeHandle = null;
-    this.context = null;
     window.removeEventListener("forge:transform-apply", this.handleApplyEvent);
     window.removeEventListener(
       "forge:transform-cancel",
@@ -99,12 +98,13 @@ export class TransformTool extends BaseTool {
     }
 
     // Reset dirty state on deactivate
-    useToolStore.getState().updateToolSettings("transform", { isDirty: false });
+    context.updateToolSettings("transform", { isDirty: false });
+    this.context = null;
   }
 
-  private syncStore() {
+  private syncStore(context: ToolContext) {
     if (this.currentTransform) {
-      useToolStore.getState().updateToolSettings("transform", {
+      context.updateToolSettings("transform", {
         ...this.currentTransform,
       });
     }
@@ -457,7 +457,7 @@ export class TransformTool extends BaseTool {
     if (changed) {
       t.isDirty = true;
     }
-    this.syncStore();
+    this.syncStore(context);
   }
 
   onMouseUp(): void {
@@ -626,11 +626,11 @@ export class TransformTool extends BaseTool {
       context.invalidateCache(layer.id);
     }
 
-    useToolStore.getState().setActiveTool("move");
+    context.setActiveTool("move");
   }
 
-  cancel() {
-    useToolStore.getState().setActiveTool("move");
+  cancel(context: ToolContext) {
+    context.setActiveTool("move");
   }
 
   getEditingLayerId(): string | null {

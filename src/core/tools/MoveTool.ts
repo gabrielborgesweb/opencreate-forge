@@ -1,7 +1,8 @@
-import { BaseTool, ToolContext } from "./BaseTool";
+import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 
 export class MoveTool extends BaseTool {
-  id = 'move';
+  id: ToolId = "move";
+
   private isDragging = false;
   private startX = 0;
   private startY = 0;
@@ -15,12 +16,12 @@ export class MoveTool extends BaseTool {
     const activeLayerId = context.project.activeLayerId;
     if (!activeLayerId) return;
 
-    const layer = context.project.layers.find(l => l.id === activeLayerId);
+    const layer = context.project.layers.find((l) => l.id === activeLayerId);
     if (!layer || layer.locked) return;
 
     this.isDragging = true;
     this.layerId = activeLayerId;
-    
+
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
     this.startX = x;
     this.startY = y;
@@ -35,7 +36,7 @@ export class MoveTool extends BaseTool {
     const dx = x - this.startX;
     const dy = y - this.startY;
 
-    const layers = context.project.layers.map(l => {
+    const layers = context.project.layers.map((l) => {
       if (l.id === this.layerId) {
         return { ...l, x: this.initialLayerX + dx, y: this.initialLayerY + dy };
       }

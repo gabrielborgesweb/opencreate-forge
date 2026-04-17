@@ -1,5 +1,4 @@
-import { BaseTool, ToolContext } from "./BaseTool";
-import { useToolStore } from "@/renderer/store/toolStore";
+import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 import { Layer } from "@/renderer/store/projectStore";
 
 interface CropState {
@@ -21,19 +20,21 @@ interface Handle {
 }
 
 export class CropTool extends BaseTool {
-  id = "crop";
+  id: ToolId = "crop";
+
   private cropState: CropState | null = null;
   private activeHandle: Handle | { name: string; cursor: string } | null = null;
   private dragStartCoords = { x: 0, y: 0 };
   private dragStartCrop: CropState | null = null;
   private scaleAnchor = { x: 0, y: 0 };
   private isCropping = false;
+  private context: ToolContext | null = null;
 
   private readonly HANDLE_SIZE = 8;
 
-  private syncStore() {
+  private syncStore(context: ToolContext) {
     if (this.cropState) {
-      useToolStore.getState().updateToolSettings("crop", {
+      context.updateToolSettings("crop", {
         isDirty: true,
       });
     }
@@ -51,19 +52,26 @@ export class CropTool extends BaseTool {
       rotation: 0,
       anchor: { x: 0.5, y: 0.5 },
     };
-    useToolStore.getState().updateToolSettings("crop", { isDirty: false });
+    context.updateToolSettings("crop", { isDirty: false });
   }
 
   onActivate(context: ToolContext): void {
     if (this.isCropping) return;
 
+    this.context = context;
     this.isCropping = true;
     this.resetCrop(context);
 
     // Event listeners for UI actions
-    const handleApply = () => this.apply(context);
-    const handleCancel = () => this.cancel();
-    const handleReset = () => this.resetCrop(context);
+    const handleApply = () => {
+      if (this.context) this.apply(this.context);
+    };
+    const handleCancel = () => {
+      if (this.context) this.cancel(this.context);
+    };
+    const handleReset = () => {
+      if (this.context) this.resetCrop(this.context);
+    };
 
     window.addEventListener("forge:crop-apply", handleApply);
     window.addEventListener("forge:crop-cancel", handleCancel);
@@ -74,9 +82,9 @@ export class CropTool extends BaseTool {
 
     const { project } = context;
     // Update ratio settings based on project if not set
-    const settings = useToolStore.getState().toolSettings.crop;
+    const settings = context.settings.crop;
     if (settings.mode === "Original Ratio") {
-      useToolStore.getState().updateToolSettings("crop", {
+      context.updateToolSettings("crop", {
         ratioW: project.width,
         ratioH: project.height,
       });
@@ -87,10 +95,10 @@ export class CropTool extends BaseTool {
       selection: { hasSelection: false, bounds: null },
     });
 
-    useToolStore.getState().updateToolSettings("crop", { isDirty: false });
+    context.updateToolSettings("crop", { isDirty: false });
   }
 
-  onDeactivate(_context: ToolContext): void {
+  onDeactivate(context: ToolContext): void {
     if ((this as any)._listeners) {
       const { handleApply, handleCancel, handleReset } = (this as any)
         ._listeners;
@@ -101,7 +109,8 @@ export class CropTool extends BaseTool {
     }
     this.isCropping = false;
     this.cropState = null;
-    useToolStore.getState().updateToolSettings("crop", { isDirty: false });
+    context.updateToolSettings("crop", { isDirty: false });
+    this.context = null;
   }
 
   private worldToLocal(px: number, py: number): { x: number; y: number } {
@@ -230,7 +239,7 @@ export class CropTool extends BaseTool {
       }
     }
 
-    useToolStore.getState().setInteracting(true);
+    context.setInteracting(true);
   }
 
   onMouseMove(e: MouseEvent, context: ToolContext): void {
@@ -264,7 +273,7 @@ export class CropTool extends BaseTool {
       t.rotation = newRotation;
     } else {
       // Scaling logic
-      const settings = useToolStore.getState().toolSettings.crop;
+      const settings = context.settings.crop;
       const keepAspect = e.shiftKey || settings.mode !== "Free";
 
       const ratio =
@@ -346,13 +355,13 @@ export class CropTool extends BaseTool {
       t.y = scaleAnchor.y + newWorldVec.y;
     }
 
-    this.syncStore();
+    this.syncStore(context);
   }
 
-  onMouseUp(_e: MouseEvent, _context: ToolContext): void {
+  onMouseUp(_e: MouseEvent, context: ToolContext): void {
     this.activeHandle = null;
     this.dragStartCrop = null;
-    useToolStore.getState().setInteracting(false);
+    context.setInteracting(false);
   }
 
   onRender(ctx: CanvasRenderingContext2D, context: ToolContext): void {
@@ -444,7 +453,7 @@ export class CropTool extends BaseTool {
   async apply(context: ToolContext) {
     if (!this.cropState) return;
     const t = this.cropState;
-    const settings = useToolStore.getState().toolSettings.crop;
+    const settings = context.settings.crop;
 
     const localLeft = -t.width * t.anchor.x * t.scaleX;
     const localTop = -t.height * t.anchor.y * t.scaleY;
@@ -579,13 +588,13 @@ export class CropTool extends BaseTool {
     // Reset crop state
     this.isCropping = false;
     this.cropState = null;
-    useToolStore.getState().setActiveTool("move");
+    context.setActiveTool("move");
   }
 
-  cancel() {
+  cancel(context: ToolContext) {
     this.isCropping = false;
     this.cropState = null;
-    useToolStore.getState().setActiveTool("move");
+    context.setActiveTool("move");
   }
 
   private loadImage(src: string): Promise<HTMLImageElement> {

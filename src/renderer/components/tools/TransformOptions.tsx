@@ -1,9 +1,9 @@
 import React from "react";
-import { useToolStore } from "@store/toolStore";
-import ToolSettingInput from "./ui/ToolSettingInput";
 import { Check, X } from "lucide-react";
+import { useToolStore } from "@/renderer/store/toolStore";
+import ToolSettingInput from "@/renderer/components/ui/ToolSettingInput";
 
-const TransformOptions: React.FC = () => {
+export const TransformOptions: React.FC = () => {
   const transform = useToolStore((state) => state.toolSettings.transform);
 
   const updateSettings = (updates: any) => {
@@ -13,12 +13,6 @@ const TransformOptions: React.FC = () => {
   };
 
   const handleApply = () => {
-    // Dispatch custom event or call engine directly if accessible
-    // In this architecture, it's better to use a global command or store action
-    // but the actual application logic is inside TransformTool class.
-    // We can use a trick: setting the tool to move will trigger deactivation/application
-    // Or we can add an 'applying' state.
-    // However, the cleanest way is to trigger it via a custom event that the tool listens to.
     window.dispatchEvent(new CustomEvent("forge:transform-apply"));
   };
 
@@ -48,7 +42,7 @@ const TransformOptions: React.FC = () => {
         />
       </div>
 
-      <div className="w-[1px] h-4 bg-bg-tertiary" />
+      <div className="w-[1px] h-4 bg-white/10" />
 
       <div className="flex items-center gap-2">
         <span className="text-[#999] font-bold">SIZE:</span>
@@ -70,7 +64,7 @@ const TransformOptions: React.FC = () => {
         />
       </div>
 
-      <div className="w-[1px] h-4 bg-bg-tertiary" />
+      <div className="w-[1px] h-4 bg-white/10" />
 
       <div className="flex items-center gap-2">
         <span className="text-[#999] font-bold">SCALE:</span>
@@ -96,7 +90,7 @@ const TransformOptions: React.FC = () => {
         />
       </div>
 
-      <div className="w-[1px] h-4 bg-bg-tertiary" />
+      <div className="w-[1px] h-4 bg-white/10" />
 
       <div className="flex items-center gap-2">
         <span className="text-[#999] font-bold">ROT:</span>
@@ -110,7 +104,7 @@ const TransformOptions: React.FC = () => {
         />
       </div>
 
-      <div className="w-[1px] h-4 bg-bg-tertiary" />
+      <div className="w-[1px] h-4 bg-white/10" />
 
       <div className="flex items-center gap-1">
         <button
@@ -133,5 +127,3 @@ const TransformOptions: React.FC = () => {
     </div>
   );
 };
-
-export default TransformOptions;

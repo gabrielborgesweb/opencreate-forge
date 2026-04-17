@@ -53,7 +53,9 @@ export class ForgeEngine {
     this.onViewportChange = onViewportChange;
 
     this.selectionCanvas = document.createElement("canvas");
-    this.selectionCtx = this.selectionCanvas.getContext("2d", { willReadFrequently: true })!;
+    this.selectionCtx = this.selectionCanvas.getContext("2d", {
+      willReadFrequently: true,
+    })!;
 
     this.tools = {
       move: new MoveTool(),
@@ -90,6 +92,7 @@ export class ForgeEngine {
     if (!this.project) return null;
     return {
       project: this.project,
+      settings: useToolStore.getState().toolSettings,
       canvas: this.canvas,
       ctx: this.ctx,
       updateProject: (updates) => {
@@ -99,9 +102,21 @@ export class ForgeEngine {
       },
       invalidateCache: (layerId: string) => this.invalidateLayerCache(layerId),
       screenToProject: (x, y) => this.screenToProject(x, y),
-      getSelectionCanvas: () => ({ canvas: this.selectionCanvas, ctx: this.selectionCtx }),
+      getSelectionCanvas: () => ({
+        canvas: this.selectionCanvas,
+        ctx: this.selectionCtx,
+      }),
       updateSelectionEdges: () => this.updateSelectionEdges(),
-      setLastSelectionMask: (mask) => { this.lastSelectionMask = mask; },
+      setLastSelectionMask: (mask) => {
+        this.lastSelectionMask = mask;
+      },
+      setInteracting: (isInteracting) =>
+        useToolStore.getState().setInteracting(isInteracting),
+      setActiveTool: (id) => useToolStore.getState().setActiveTool(id),
+      updateToolSettings: (id, settings) =>
+        useToolStore.getState().updateToolSettings(id, settings),
+      subscribe: (listener) =>
+        useToolStore.subscribe((state) => listener(state.toolSettings)),
       setLayerCache: (layerId: string, canvas: HTMLCanvasElement) => {
         this.layerCanvasCache.set(layerId, canvas);
         this.layerReadyCache.set(layerId, true);
@@ -307,10 +322,7 @@ export class ForgeEngine {
   }
 
   private updateSelectionEdges() {
-    if (
-      !this.project ||
-      !this.project.selection.hasSelection
-    ) {
+    if (!this.project || !this.project.selection.hasSelection) {
       this.selectionEdges = null;
       return;
     }

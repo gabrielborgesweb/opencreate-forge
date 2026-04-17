@@ -1,8 +1,8 @@
-import { BaseTool, ToolContext } from "./BaseTool";
-import { useToolStore } from "@/renderer/store/toolStore";
+import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 
 export class BrushTool extends BaseTool {
-  id = "brush";
+  id: ToolId = "brush";
+
   private isDrawing = false;
   private lastX = 0;
   private lastY = 0;
@@ -106,7 +106,7 @@ export class BrushTool extends BaseTool {
     this.lastX = x;
     this.lastY = y;
 
-    const settings = useToolStore.getState().toolSettings.brush;
+    const settings = context.settings.brush;
     this.initBrush(settings.size, settings.hardness, settings.color);
     this.initOffscreen(layer, context);
 
@@ -140,7 +140,7 @@ export class BrushTool extends BaseTool {
 
     if (!this.isDrawing) return;
 
-    const settings = useToolStore.getState().toolSettings.brush;
+    const settings = context.settings.brush;
     const pad = settings.size;
     this.minX = Math.min(this.minX, x - pad);
     this.minY = Math.min(this.minY, y - pad);
@@ -337,9 +337,9 @@ export class BrushTool extends BaseTool {
     }
   }
 
-  private draw(x: number, y: number, _context: ToolContext) {
+  private draw(x: number, y: number, context: ToolContext) {
     if (!this.offscreenCtx || !this.layerId || !this.brushCanvas) return;
-    const settings = useToolStore.getState().toolSettings.brush;
+    const settings = context.settings.brush;
     const localX = x - this.strokeOriginX;
     const localY = y - this.strokeOriginY;
     const localLastX = this.lastX - this.strokeOriginX;
@@ -377,7 +377,7 @@ export class BrushTool extends BaseTool {
   }
 
   onRender(ctx: CanvasRenderingContext2D, context: ToolContext): void {
-    const settings = useToolStore.getState().toolSettings.brush;
+    const settings = context.settings.brush;
 
     if (this.isDrawing && this.offscreenCanvas && this.layerId) {
       const layer = context.project.layers.find((l) => l.id === this.layerId)!;

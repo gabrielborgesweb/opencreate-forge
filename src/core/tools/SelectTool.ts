@@ -1,8 +1,8 @@
-import { BaseTool, ToolContext } from "./BaseTool";
-import { useToolStore } from "@/renderer/store/toolStore";
+import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 
 export class SelectTool extends BaseTool {
-  id = "select";
+  id: ToolId = "select";
+
   private isSelecting = false;
   private startX = 0;
   private startY = 0;
@@ -17,10 +17,10 @@ export class SelectTool extends BaseTool {
     if (e.button !== 0) return;
 
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
-    
+
     // O modo já deve estar correto no store graças aos listeners no App.tsx
     // mas capturamos aqui para manter o mesmo modo até o final do clique
-    const { mode } = useToolStore.getState().toolSettings.select;
+    const { mode } = context.settings.select;
     (this as any).effectiveMode = mode;
 
     // Verificar se clicou dentro da seleção existente para mover
@@ -33,7 +33,7 @@ export class SelectTool extends BaseTool {
 
       if (canMove && this.isPointInSelection(context, x, y)) {
         this.isMovingSelection = true;
-        useToolStore.getState().setInteracting(true);
+        context.setInteracting(true);
         this.selectionMoveStart = { x, y };
         this.selectionMoveStartBounds = { ...bounds };
         return;
@@ -41,7 +41,7 @@ export class SelectTool extends BaseTool {
     }
 
     this.isSelecting = true;
-    useToolStore.getState().setInteracting(true);
+    context.setInteracting(true);
     this.startX = Math.floor(x);
     this.startY = Math.floor(y);
     this.currentX = this.startX;
@@ -115,14 +115,14 @@ export class SelectTool extends BaseTool {
   onMouseUp(e: MouseEvent, context: ToolContext): void {
     if (this.isMovingSelection) {
       this.isMovingSelection = false;
-      useToolStore.getState().setInteracting(false);
+      context.setInteracting(false);
       context.updateSelectionEdges();
       return;
     }
 
     if (this.isSelecting) {
       this.isSelecting = false;
-      useToolStore.getState().setInteracting(false);
+      context.setInteracting(false);
 
       let startX = this.startX;
       let startY = this.startY;
@@ -143,7 +143,7 @@ export class SelectTool extends BaseTool {
 
       if (width < 1 || height < 1) {
         // Clique simples fora de seleção limpa se mode for replace
-        if (useToolStore.getState().toolSettings.select.mode === "replace") {
+        if (context.settings.select.mode === "replace") {
           this.clearSelection(context);
         }
         return;
@@ -153,7 +153,11 @@ export class SelectTool extends BaseTool {
     }
   }
 
-  private isPointInSelection(context: ToolContext, px: number, py: number): boolean {
+  private isPointInSelection(
+    context: ToolContext,
+    px: number,
+    py: number,
+  ): boolean {
     const { selection } = context.project;
     if (!selection.hasSelection || !selection.bounds) return false;
 
@@ -190,7 +194,7 @@ export class SelectTool extends BaseTool {
     context: ToolContext,
     rect: { x: number; y: number; width: number; height: number },
   ) {
-    const mode = (this as any).effectiveMode || useToolStore.getState().toolSettings.select.mode;
+    const mode = (this as any).effectiveMode || context.settings.select.mode;
     const { canvas: selCanvas, ctx: selCtx } = context.getSelectionCanvas();
     const { selection } = context.project;
 
@@ -200,10 +204,18 @@ export class SelectTool extends BaseTool {
       selCanvas.height = rect.height;
       selCtx.fillStyle = "white";
 
-      const { shape } = useToolStore.getState().toolSettings.select;
+      const { shape } = context.settings.select;
       if (shape === "ellipse") {
         selCtx.beginPath();
-        selCtx.ellipse(rect.width / 2, rect.height / 2, rect.width / 2, rect.height / 2, 0, 0, Math.PI * 2);
+        selCtx.ellipse(
+          rect.width / 2,
+          rect.height / 2,
+          rect.width / 2,
+          rect.height / 2,
+          0,
+          0,
+          Math.PI * 2,
+        );
         selCtx.fill();
       } else {
         selCtx.fillRect(0, 0, rect.width, rect.height);
@@ -253,24 +265,32 @@ export class SelectTool extends BaseTool {
           break;
       }
 
-    // Desenha o novo retângulo ou elipse
-    const { shape } = useToolStore.getState().toolSettings.select;
-    tempCtx.fillStyle = "white";
-    const rx = rect.x - newBounds.x;
-    const ry = rect.y - newBounds.y;
-    const rw = rect.width;
-    const rh = rect.height;
+      // Desenha o novo retângulo ou elipse
+      const { shape } = context.settings.select;
+      tempCtx.fillStyle = "white";
+      const rx = rect.x - newBounds.x;
+      const ry = rect.y - newBounds.y;
+      const rw = rect.width;
+      const rh = rect.height;
 
-    if (shape === "ellipse") {
-      tempCtx.beginPath();
-      tempCtx.ellipse(rx + rw / 2, ry + rh / 2, rw / 2, rh / 2, 0, 0, Math.PI * 2);
-      tempCtx.fill();
-    } else {
-      tempCtx.fillRect(rx, ry, rw, rh);
-    }
+      if (shape === "ellipse") {
+        tempCtx.beginPath();
+        tempCtx.ellipse(
+          rx + rw / 2,
+          ry + rh / 2,
+          rw / 2,
+          rh / 2,
+          0,
+          0,
+          Math.PI * 2,
+        );
+        tempCtx.fill();
+      } else {
+        tempCtx.fillRect(rx, ry, rw, rh);
+      }
 
-    // Volta ao normal
-    tempCtx.globalCompositeOperation = "source-over";
+      // Volta ao normal
+      tempCtx.globalCompositeOperation = "source-over";
 
       // Verifica se ainda tem pixels na seleção
       const imageData = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
@@ -293,7 +313,12 @@ export class SelectTool extends BaseTool {
         context.updateProject({
           selection: {
             hasSelection: true,
-            bounds: { x: newBounds.x, y: newBounds.y, width: finalWidth, height: finalHeight },
+            bounds: {
+              x: newBounds.x,
+              y: newBounds.y,
+              width: finalWidth,
+              height: finalHeight,
+            },
             mask,
           },
         });
@@ -328,7 +353,7 @@ export class SelectTool extends BaseTool {
       const w = Math.abs(currentX - startX);
       const h = Math.abs(currentY - startY);
 
-      const { shape } = useToolStore.getState().toolSettings.select;
+      const { shape } = context.settings.select;
 
       ctx.beginPath();
       if (shape === "ellipse") {
@@ -355,9 +380,9 @@ export class SelectTool extends BaseTool {
     }
   }
 
-  onDeactivate(_context: ToolContext): void {
+  onDeactivate(context: ToolContext): void {
     this.isSelecting = false;
     this.isMovingSelection = false;
-    useToolStore.getState().setInteracting(false);
+    context.setInteracting(false);
   }
 }

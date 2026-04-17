@@ -6,33 +6,35 @@ export type SelectMode = 'replace' | 'unite' | 'subtract' | 'intersect';
 export type SelectShape = 'rectangle' | 'ellipse' | 'lasso' | 'wand';
 export type CropMode = 'Free' | 'Original Ratio' | 'Fixed Ratio';
 
+export interface ToolSettings {
+  select: { mode: SelectMode; shape: SelectShape };
+  brush: { size: number; color: string; hardness: number };
+  pencil: { size: number; color: string; shape: 'circle' | 'square' };
+  eraser: { size: number; hardness: number; mode: 'brush' | 'pencil'; shape: 'circle' | 'square' };
+  crop: {
+    mode: CropMode;
+    ratioW: number;
+    ratioH: number;
+    deleteCropped: boolean;
+    isDirty: boolean;
+  };
+  transform: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    scaleX: number;
+    scaleY: number;
+    rotation: number;
+    anchor: { x: number; y: number };
+    isDirty: boolean;
+  };
+}
+
 interface ToolState {
   activeToolId: ToolId;
   isInteracting: boolean;
-  toolSettings: {
-    select: { mode: SelectMode; shape: SelectShape };
-    brush: { size: number; color: string; hardness: number };
-    pencil: { size: number; color: string; shape: 'circle' | 'square' };
-    eraser: { size: number; hardness: number; mode: 'brush' | 'pencil'; shape: 'circle' | 'square' };
-    crop: {
-      mode: CropMode;
-      ratioW: number;
-      ratioH: number;
-      deleteCropped: boolean;
-      isDirty: boolean;
-    };
-    transform: {
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      scaleX: number;
-      scaleY: number;
-      rotation: number;
-      anchor: { x: number; y: number };
-      isDirty: boolean;
-    };
-  };
+  toolSettings: ToolSettings;
   
   // Actions
   setActiveTool: (id: ToolId) => void;

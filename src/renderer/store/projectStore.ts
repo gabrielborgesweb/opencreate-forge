@@ -48,7 +48,10 @@ interface ProjectState {
   removeProject: (id: string) => void;
   setActiveProject: (id: string | null) => void;
   updateProject: (id: string, updates: Partial<Project>) => void;
-  addLayer: (projectId: string, layer: Layer) => void;
+  addLayer: (projectId: string, layer: Partial<Layer>) => void;
+  removeLayer: (projectId: string, layerId: string) => void;
+  duplicateLayer: (projectId: string, layerId: string) => void;
+  moveLayer: (projectId: string, fromIndex: number, toIndex: number) => void;
   updateLayer: (projectId: string, layerId: string, updates: Partial<Layer>) => void;
   setActiveLayer: (projectId: string, layerId: string | null) => void;
 }
@@ -77,11 +80,86 @@ export const useProjectStore = create<ProjectState>((set) => ({
     projects: state.projects.map((p) => p.id === id ? { ...p, ...updates, isDirty: updates.isDirty !== undefined ? updates.isDirty : true } : p)
   })),
 
-  addLayer: (projectId, layer) => set((state) => ({
-    projects: state.projects.map((p) => 
-      p.id === projectId ? { ...p, layers: [...p.layers, layer], activeLayerId: layer.id, isDirty: true } : p
-    )
-  })),
+  addLayer: (projectId, partialLayer) => set((state) => {
+    const project = state.projects.find(p => p.id === projectId);
+    if (!project) return state;
+
+    const id = partialLayer.id || Math.random().toString(36).substr(2, 9);
+    const newLayer: Layer = {
+      id,
+      name: partialLayer.name || `Layer ${project.layers.length + 1}`,
+      type: partialLayer.type || 'raster',
+      visible: partialLayer.visible ?? true,
+      locked: partialLayer.locked ?? false,
+      opacity: partialLayer.opacity ?? 100,
+      x: partialLayer.x ?? 0,
+      y: partialLayer.y ?? 0,
+      width: partialLayer.width ?? project.width,
+      height: partialLayer.height ?? project.height,
+      blendMode: partialLayer.blendMode || 'source-over',
+      ...partialLayer
+    };
+
+    return {
+      projects: state.projects.map((p) => 
+        p.id === projectId ? { ...p, layers: [...p.layers, newLayer], activeLayerId: id, isDirty: true } : p
+      )
+    };
+  }),
+
+  removeLayer: (projectId, layerId) => set((state) => {
+    const project = state.projects.find(p => p.id === projectId);
+    if (!project || project.layers.length <= 1) return state; // Prevent deleting last layer for now
+
+    const newLayers = project.layers.filter(l => l.id !== layerId);
+    let newActiveLayerId = project.activeLayerId;
+    if (project.activeLayerId === layerId) {
+      const index = project.layers.findIndex(l => l.id === layerId);
+      newActiveLayerId = newLayers[Math.max(0, index - 1)]?.id || null;
+    }
+
+    return {
+      projects: state.projects.map((p) => 
+        p.id === projectId ? { ...p, layers: newLayers, activeLayerId: newActiveLayerId, isDirty: true } : p
+      )
+    };
+  }),
+
+  duplicateLayer: (projectId, layerId) => set((state) => {
+    const project = state.projects.find(p => p.id === projectId);
+    if (!project) return state;
+
+    const layer = project.layers.find(l => l.id === layerId);
+    if (!layer) return state;
+
+    const newId = Math.random().toString(36).substr(2, 9);
+    const newLayer = { ...layer, id: newId, name: `${layer.name} copy` };
+    const index = project.layers.findIndex(l => l.id === layerId);
+    
+    const newLayers = [...project.layers];
+    newLayers.splice(index + 1, 0, newLayer);
+
+    return {
+      projects: state.projects.map((p) => 
+        p.id === projectId ? { ...p, layers: newLayers, activeLayerId: newId, isDirty: true } : p
+      )
+    };
+  }),
+
+  moveLayer: (projectId, fromIndex, toIndex) => set((state) => {
+    const project = state.projects.find(p => p.id === projectId);
+    if (!project) return state;
+
+    const newLayers = [...project.layers];
+    const [movedLayer] = newLayers.splice(fromIndex, 1);
+    newLayers.splice(toIndex, 0, movedLayer);
+
+    return {
+      projects: state.projects.map((p) => 
+        p.id === projectId ? { ...p, layers: newLayers, isDirty: true } : p
+      )
+    };
+  }),
 
   updateLayer: (projectId, layerId, updates) => set((state) => ({
     projects: state.projects.map((p) => 

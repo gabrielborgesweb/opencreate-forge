@@ -32,7 +32,11 @@ function App() {
 
   // Restore mode when interaction ends
   React.useEffect(() => {
-    if (!isInteracting && pendingRestoreRef.current && originalModeRef.current) {
+    if (
+      !isInteracting &&
+      pendingRestoreRef.current &&
+      originalModeRef.current
+    ) {
       updateToolSettings("select", { mode: originalModeRef.current });
       originalModeRef.current = null;
       pendingRestoreRef.current = false;
@@ -184,11 +188,11 @@ function App() {
             <CanvasViewport />
 
             <aside className="w-[250px] bg-[#222] border-l border-bg-tertiary flex flex-col">
-              <div className="px-4 py-2 border-b border-bg-tertiary">
+              {/* <div className="px-4 py-2 border-b border-bg-tertiary">
                 <h3 className="text-[0.8rem] m-0 text-[#999] font-bold uppercase">
                   LAYERS
                 </h3>
-              </div>
+              </div> */}
               <LayerList />
             </aside>
           </>

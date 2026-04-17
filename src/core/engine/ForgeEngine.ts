@@ -26,6 +26,7 @@ export class ForgeEngine {
   private ZOOM_SENSITIVITY = 0.05;
   private ZOOM_SMOOTHING = 0.15;
   private animationFrameId: number | null = null;
+  private viewportAnimationId: number | null = null;
 
   private isPanning = false;
   private startX = 0;
@@ -359,7 +360,10 @@ export class ForgeEngine {
     if (!this.project) return null;
     return {
       project: this.project,
-      settings: useToolStore.getState().toolSettings,
+      // settings: useToolStore.getState().toolSettings,
+      get settings() {
+        return useToolStore.getState().toolSettings;
+      },
       canvas: this.canvas,
       ctx: this.ctx,
       updateProject: (updates) => {
@@ -393,7 +397,45 @@ export class ForgeEngine {
         if (!canvas) return null;
         return { canvas, ready: !!this.layerReadyCache.get(layerId) };
       },
+      ensureLayerCanvas: (layer: Layer) => this.ensureLayerCanvas(layer),
+      animateFitToScreen: (ow?: number, oh?: number) =>
+        this.animateFitToScreen(ow, oh),
     };
+  }
+
+  public async ensureLayerCanvas(layer: Layer): Promise<HTMLCanvasElement> {
+    const cached = this.layerCanvasCache.get(layer.id);
+    if (
+      cached &&
+      this.layerReadyCache.get(layer.id) &&
+      cached.width === layer.width &&
+      cached.height === layer.height
+    ) {
+      return cached;
+    }
+
+    // Create and populate if not ready or not matching
+    const canvas = document.createElement("canvas");
+    canvas.width = layer.width;
+    canvas.height = layer.height;
+    const ctx = canvas.getContext("2d")!;
+
+    if (layer.data) {
+      const img = await this.loadImage(layer.data);
+      ctx.drawImage(img, 0, 0);
+    }
+
+    // We don't necessarily want to update the main cache here as it might
+    // conflict with the render loop, but for tools it's fine.
+    return canvas;
+  }
+
+  private loadImage(src: string): Promise<HTMLImageElement> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.src = src;
+    });
   }
 
   public screenToProject(x: number, y: number) {
@@ -406,6 +448,7 @@ export class ForgeEngine {
 
   private handleWheel(e: WheelEvent) {
     if (!this.project) return;
+    this.stopViewportAnimation();
     e.preventDefault();
 
     let newScale = this.project.zoom;
@@ -448,6 +491,7 @@ export class ForgeEngine {
 
   private handleMouseDown(e: MouseEvent) {
     if (!this.project) return;
+    this.stopViewportAnimation();
 
     if (e.button === 1) {
       this.isPanning = true;
@@ -462,6 +506,13 @@ export class ForgeEngine {
     const context = this.getToolContext();
     if (tool && context) {
       tool.onMouseDown(e, context);
+    }
+  }
+
+  private stopViewportAnimation() {
+    if (this.viewportAnimationId) {
+      cancelAnimationFrame(this.viewportAnimationId);
+      this.viewportAnimationId = null;
     }
   }
 
@@ -737,6 +788,71 @@ export class ForgeEngine {
     this.project.panX = originX;
     this.project.panY = originY;
     this.onViewportChange(scale, originX, originY);
+  }
+
+  public animateFitToScreen(overrideWidth?: number, overrideHeight?: number) {
+    if (!this.project || !this.canvas.parentElement) return;
+    const cw = this.canvas.parentElement.clientWidth;
+    const ch = this.canvas.parentElement.clientHeight;
+
+    const targetW = overrideWidth ?? this.project.width;
+    const targetH = overrideHeight ?? this.project.height;
+
+    const padding = 40;
+    const scaleX = (cw - padding * 2) / targetW;
+    const scaleY = (ch - padding * 2) / targetH;
+    const scale = Math.min(scaleX, scaleY);
+    const originX = (cw - targetW * scale) / 2;
+    const originY = (ch - targetH * scale) / 2;
+
+    this.animateToViewport(scale, originX, originY);
+  }
+
+  private animateToViewport(
+    targetZoom: number,
+    targetPanX: number,
+    targetPanY: number,
+  ) {
+    if (!this.project) return;
+
+    if (this.viewportAnimationId) {
+      cancelAnimationFrame(this.viewportAnimationId);
+    }
+
+    const startZoom = this.project.zoom;
+    const startPanX = this.project.panX;
+    const startPanY = this.project.panY;
+    const duration = 500; // ms
+    const startTime = performance.now();
+
+    const animate = (now: number) => {
+      if (!this.project) return;
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Ease-in-out cubic
+      const ease =
+        progress < 0.5
+          ? 4 * progress * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+      const currentZoom = startZoom + (targetZoom - startZoom) * ease;
+      const currentPanX = startPanX + (targetPanX - startPanX) * ease;
+      const currentPanY = startPanY + (targetPanY - startPanY) * ease;
+
+      this.project.zoom = currentZoom;
+      this.project.panX = currentPanX;
+      this.project.panY = currentPanY;
+      this.onViewportChange(currentZoom, currentPanX, currentPanY);
+
+      if (progress < 1) {
+        this.viewportAnimationId = requestAnimationFrame(animate);
+      } else {
+        this.viewportAnimationId = null;
+      }
+    };
+
+    this.viewportAnimationId = requestAnimationFrame(animate);
   }
 
   private intersects(

@@ -510,8 +510,13 @@ export class CropTool extends BaseTool {
         const maxX = Math.max(...transCorners.map((c) => c.x));
         const maxY = Math.max(...transCorners.map((c) => c.y));
 
-        const lw = Math.ceil(maxX - minX);
-        const lh = Math.ceil(maxY - minY);
+        const finalMinX = Math.floor(minX);
+        const finalMinY = Math.floor(minY);
+        const finalMaxX = Math.ceil(maxX);
+        const finalMaxY = Math.ceil(maxY);
+
+        const lw = finalMaxX - finalMinX;
+        const lh = finalMaxY - finalMinY;
 
         if (lw <= 0 || lh <= 0)
           return { ...layer, data: undefined, width: 1, height: 1, x: 0, y: 0 };
@@ -522,22 +527,22 @@ export class CropTool extends BaseTool {
         canvas.height = lh;
         const ctx = canvas.getContext("2d")!;
 
-        ctx.translate(-Math.round(minX), -Math.round(minY));
+        ctx.translate(-finalMinX, -finalMinY);
         ctx.translate(t.x - newOriginX, t.y - newOriginY);
         ctx.rotate(invRot);
         ctx.translate(-(t.x - newOriginX), -(t.y - newOriginY));
 
-        // Draw original layer
+        // Draw original layer - Optimized to use cached canvas if possible
         if (layer.data) {
-          const img = await this.loadImage(layer.data);
-          ctx.drawImage(img, layer.x - newOriginX, layer.y - newOriginY);
+          const lCanvas = await context.ensureLayerCanvas(layer);
+          ctx.drawImage(lCanvas, layer.x - newOriginX, layer.y - newOriginY);
         }
 
         let finalCanvas = canvas;
-        let finalX = Math.round(minX);
-        let finalY = Math.round(minY);
+        let finalX = finalMinX;
+        let finalY = finalMinY;
 
-        if (!settings.deleteCropped) {
+        if (settings.deleteCropped) {
           // Clip to project bounds (the new crop area)
           const clipped = document.createElement("canvas");
           clipped.width = lw;
@@ -548,7 +553,7 @@ export class CropTool extends BaseTool {
           cctx.clip();
           cctx.drawImage(canvas, 0, 0);
 
-          // Optimize bounding box
+          // Optimize bounding box of the clipped result
           const bounds = this.getOptimizedBounds(clipped);
           if (bounds) {
             const opt = document.createElement("canvas");
@@ -627,6 +632,13 @@ export class CropTool extends BaseTool {
       layers: newLayers,
       isDirty: true,
     });
+
+    // Animate viewport to fit the new cropped project dimensions.
+    // We pass the new dimensions explicitly to avoid using stale values from context.project.
+    // Added a tiny timeout to ensure React starts processing the heavy update before animation begins.
+    setTimeout(() => {
+      context.animateFitToScreen(newW, newH);
+    }, 100);
 
     // Reset crop state
     this.isCropping = false;

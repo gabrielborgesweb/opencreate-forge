@@ -1,4 +1,4 @@
-import { Project } from "@/renderer/store/projectStore";
+import { Project, Layer } from "@/renderer/store/projectStore";
 import { ToolSettings, ToolId } from "@/renderer/store/toolStore";
 
 export type { ToolId };
@@ -14,6 +14,7 @@ export interface ToolContext {
   getLayerCanvas: (
     layerId: string,
   ) => { canvas: HTMLCanvasElement; ready: boolean } | null;
+  ensureLayerCanvas: (layer: Layer) => Promise<HTMLCanvasElement>;
   screenToProject: (x: number, y: number) => { x: number; y: number };
   getSelectionCanvas: () => {
     canvas: HTMLCanvasElement;
@@ -28,6 +29,7 @@ export interface ToolContext {
     settings: Partial<ToolSettings[K]>,
   ) => void;
   subscribe: (listener: (settings: ToolSettings) => void) => () => void;
+  animateFitToScreen: (overrideWidth?: number, overrideHeight?: number) => void;
 }
 
 export abstract class BaseTool {

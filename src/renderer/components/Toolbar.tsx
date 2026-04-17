@@ -9,13 +9,18 @@ const Toolbar: React.FC = () => {
   const transformSettings = useToolStore(
     (state) => state.toolSettings.transform,
   );
+  const cropSettings = useToolStore(
+    (state) => state.toolSettings.crop,
+  );
   const showToast = useUIStore((state) => state.showToast);
 
   const handleToolClick = (id: string) => {
+    const isTransformDirty = activeToolId === "transform" && transformSettings.isDirty;
+    const isCropDirty = activeToolId === "crop" && cropSettings.isDirty;
+
     if (
-      activeToolId === "transform" &&
-      transformSettings.isDirty &&
-      id !== "transform"
+      (isTransformDirty || isCropDirty) &&
+      id !== activeToolId
     ) {
       showToast(
         "<b>Apply (Enter)</b> or <b>Cancel (Esc)</b> before switching tools",

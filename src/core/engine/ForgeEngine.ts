@@ -6,6 +6,7 @@ import { PencilTool } from "../tools/PencilTool";
 import { EraserTool } from "../tools/EraserTool";
 import { TransformTool } from "../tools/TransformTool";
 import { SelectTool } from "../tools/SelectTool";
+import { CropTool } from "../tools/CropTool";
 import { useToolStore } from "@/renderer/store/toolStore";
 
 export interface ViewportState {
@@ -61,6 +62,7 @@ export class ForgeEngine {
       pencil: new PencilTool(),
       eraser: new EraserTool(),
       transform: new TransformTool(),
+      crop: new CropTool(),
     };
 
     this.handleWheel = this.handleWheel.bind(this);

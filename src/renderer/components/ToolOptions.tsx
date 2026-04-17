@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import ToolSettingInput from "./ui/ToolSettingInput";
 import TransformOptions from "./TransformOptions";
+import CropOptions from "./CropOptions";
 
 const ToolOptions: React.FC = () => {
   const activeToolId = useToolStore((state) => state.activeToolId);
@@ -324,6 +325,8 @@ const ToolOptions: React.FC = () => {
         );
       case "transform":
         return <TransformOptions />;
+      case "crop":
+        return <CropOptions />;
       default:
         return (
           <span className="text-[0.75rem] text-[#666]">

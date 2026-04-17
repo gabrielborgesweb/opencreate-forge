@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 
-export type ToolId = 'move' | 'select' | 'brush' | 'pencil' | 'eraser' | 'text' | 'transform';
+export type ToolId = 'move' | 'select' | 'brush' | 'pencil' | 'eraser' | 'text' | 'transform' | 'crop';
 
 export type SelectMode = 'replace' | 'unite' | 'subtract' | 'intersect';
 export type SelectShape = 'rectangle' | 'ellipse' | 'lasso' | 'wand';
+export type CropMode = 'Free' | 'Original Ratio' | 'Fixed Ratio';
 
 interface ToolState {
   activeToolId: ToolId;
@@ -13,6 +14,13 @@ interface ToolState {
     brush: { size: number; color: string; hardness: number };
     pencil: { size: number; color: string; shape: 'circle' | 'square' };
     eraser: { size: number; hardness: number; mode: 'brush' | 'pencil'; shape: 'circle' | 'square' };
+    crop: {
+      mode: CropMode;
+      ratioW: number;
+      ratioH: number;
+      deleteCropped: boolean;
+      isDirty: boolean;
+    };
     transform: {
       x: number;
       y: number;
@@ -40,6 +48,13 @@ export const useToolStore = create<ToolState>((set) => ({
     brush: { size: 50, color: '#000000', hardness: 1.0 },
     pencil: { size: 1, color: '#000000', shape: 'square' },
     eraser: { size: 100, hardness: 1.0, mode: 'brush', shape: 'circle' },
+    crop: {
+      mode: 'Free',
+      ratioW: 1,
+      ratioH: 1,
+      deleteCropped: true,
+      isDirty: false,
+    },
     transform: {
       x: 0,
       y: 0,

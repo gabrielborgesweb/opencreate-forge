@@ -485,6 +485,15 @@ export class ForgeEngine {
     this.onViewportChange(scale, originX, originY);
   }
 
+  private intersects(layer: Layer, projectWidth: number, projectHeight: number): boolean {
+    return !(
+      layer.x >= projectWidth ||
+      layer.x + layer.width <= 0 ||
+      layer.y >= projectHeight ||
+      layer.y + layer.height <= 0
+    );
+  }
+
   public render() {
     if (!this.project) return;
 
@@ -534,9 +543,28 @@ export class ForgeEngine {
     const tool = this.getActiveTool();
     const editingLayerId = tool?.getEditingLayerId();
 
+    // 1. PASSO: Camadas que INTERSECTAM o projeto (Serão clipadas)
+    this.ctx.save();
+    this.ctx.beginPath();
+    this.ctx.rect(0, 0, this.project.width, this.project.height);
+    this.ctx.clip();
+
     for (const layer of this.project.layers) {
       if (layer.visible && layer.id !== editingLayerId) {
-        this.renderLayer(layer);
+        if (this.intersects(layer, this.project.width, this.project.height)) {
+          this.renderLayer(layer);
+        }
+      }
+    }
+
+    this.ctx.restore(); // Fim do clip do projeto
+
+    // 2. PASSO: Camadas que NÃO INTERSECTAM o projeto (Desenhar sem clip)
+    for (const layer of this.project.layers) {
+      if (layer.visible && layer.id !== editingLayerId) {
+        if (!this.intersects(layer, this.project.width, this.project.height)) {
+          this.renderLayer(layer);
+        }
       }
     }
 

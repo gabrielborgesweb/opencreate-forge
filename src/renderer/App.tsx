@@ -106,27 +106,33 @@ function App() {
         return true;
       };
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "t") {
+      if (isCmdOrCtrl && e.key.toLowerCase() === "t") {
         e.preventDefault();
         if (checkDirty("transform")) setActiveTool("transform");
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === "x") {
+        // Prevent default browser cut if needed, although we handle it in ForgeEngine
+        // e.preventDefault(); 
       } else if (e.key === "Enter") {
         if (activeToolId === "transform") window.dispatchEvent(new CustomEvent("forge:transform-apply"));
         if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-apply"));
       } else if (e.key === "Escape") {
         if (activeToolId === "transform") window.dispatchEvent(new CustomEvent("forge:transform-cancel"));
         if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-cancel"));
-      } else if (e.key.toLowerCase() === "v") {
-        if (checkDirty("move")) setActiveTool("move");
-      } else if (e.key.toLowerCase() === "b") {
-        if (checkDirty("brush")) setActiveTool("brush");
-      } else if (e.key.toLowerCase() === "e") {
-        if (checkDirty("eraser")) setActiveTool("eraser");
-      } else if (e.key.toLowerCase() === "p") {
-        if (checkDirty("pencil")) setActiveTool("pencil");
-      } else if (e.key.toLowerCase() === "m") {
-        if (checkDirty("select")) setActiveTool("select");
-      } else if (e.key.toLowerCase() === "c") {
-        if (checkDirty("crop")) setActiveTool("crop");
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Tool shortcuts - only if no modifiers
+        if (e.key.toLowerCase() === "v") {
+          if (checkDirty("move")) setActiveTool("move");
+        } else if (e.key.toLowerCase() === "b") {
+          if (checkDirty("brush")) setActiveTool("brush");
+        } else if (e.key.toLowerCase() === "e") {
+          if (checkDirty("eraser")) setActiveTool("eraser");
+        } else if (e.key.toLowerCase() === "p") {
+          if (checkDirty("pencil")) setActiveTool("pencil");
+        } else if (e.key.toLowerCase() === "m") {
+          if (checkDirty("select")) setActiveTool("select");
+        } else if (e.key.toLowerCase() === "c") {
+          if (checkDirty("crop")) setActiveTool("crop");
+        }
       }
     };
 

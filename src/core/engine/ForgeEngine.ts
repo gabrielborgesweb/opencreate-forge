@@ -8,6 +8,7 @@ import { TransformTool } from "../tools/TransformTool";
 import { SelectTool } from "../tools/SelectTool";
 import { CropTool } from "../tools/CropTool";
 import { useToolStore } from "@/renderer/store/toolStore";
+import { getOptimizedBoundingBox } from "../utils/imageUtils";
 
 export interface ViewportState {
   scale: number;
@@ -71,16 +72,237 @@ export class ForgeEngine {
     this.handleMouseDown = this.handleMouseDown.bind(this);
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleMouseUp = this.handleMouseUp.bind(this);
+    this.handleKeyDown = this.handleKeyDown.bind(this);
 
     this.setupEventListeners();
     this.startRenderLoop();
-  }
+    }
 
-  private setupEventListeners() {
+    private setupEventListeners() {
     this.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
     this.canvas.addEventListener("mousedown", this.handleMouseDown);
     window.addEventListener("mousemove", this.handleMouseMove);
     window.addEventListener("mouseup", this.handleMouseUp);
+    window.addEventListener("keydown", this.handleKeyDown);
+    }
+
+    private handleKeyDown(e: KeyboardEvent) {
+      const isCtrl = e.ctrlKey || e.metaKey;
+
+      if (isCtrl && e.key.toLowerCase() === "c") {
+        this.copyToClipboard();
+      } else if (isCtrl && e.key.toLowerCase() === "v") {
+        this.pasteFromClipboard();
+      } else if (isCtrl && e.key.toLowerCase() === "x") {
+        this.cutToClipboard();
+      }
+    }
+
+    public async cutToClipboard() {
+      if (!this.project || !this.project.activeLayerId) return;
+
+      // 1. Copy first
+      await this.copyToClipboard();
+
+      // 2. Clear selection
+      const activeLayer = this.project.layers.find(
+        (l) => l.id === this.project?.activeLayerId,
+      );
+      if (!activeLayer || activeLayer.type !== "raster" || !activeLayer.data)
+        return;
+
+      const layerCanvas = this.layerCanvasCache.get(activeLayer.id);
+      if (!layerCanvas) return;
+
+      if (this.project.selection.hasSelection && this.project.selection.bounds) {
+        const { bounds } = this.project.selection;
+        const ctx = layerCanvas.getContext("2d")!;
+        ctx.save();
+        ctx.globalCompositeOperation = "destination-out";
+
+        // Draw selection mask relative to layer
+        ctx.drawImage(this.selectionCanvas, bounds.x - activeLayer.x, bounds.y - activeLayer.y);
+        ctx.restore();
+
+        // Update project store
+        useProjectStore.getState().updateLayer(this.project.id, activeLayer.id, {
+          data: layerCanvas.toDataURL(),
+        });
+        this.invalidateLayerCache(activeLayer.id);
+      } else {
+        // If no selection, maybe clear whole layer? 
+        // Most editors "Cut" whole layer if no selection, but let's just do nothing for safety or clear it.
+        // Standard behavior: Cut entire layer.
+        useProjectStore.getState().updateLayer(this.project.id, activeLayer.id, {
+          data: undefined,
+        });
+        this.invalidateLayerCache(activeLayer.id);
+      }
+    }
+
+  public async copyToClipboard() {
+    if (!this.project || !this.project.activeLayerId) return;
+
+    const activeLayer = this.project.layers.find(
+      (l) => l.id === this.project?.activeLayerId,
+    );
+    if (!activeLayer || activeLayer.type !== "raster" || !activeLayer.data)
+      return;
+
+    let sourceCanvas: HTMLCanvasElement;
+    let finalX = activeLayer.x;
+    let finalY = activeLayer.y;
+
+    const layerCanvas = this.layerCanvasCache.get(activeLayer.id);
+    if (!layerCanvas) return;
+
+    if (!this.project.selection.hasSelection || !this.project.selection.bounds) {
+      sourceCanvas = layerCanvas;
+    } else {
+      const { bounds } = this.project.selection;
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = bounds.width;
+      tempCanvas.height = bounds.height;
+      const tempCtx = tempCanvas.getContext("2d")!;
+
+      const layerOffsetX = activeLayer.x - bounds.x;
+      const layerOffsetY = activeLayer.y - bounds.y;
+
+      tempCtx.drawImage(layerCanvas, layerOffsetX, layerOffsetY);
+      tempCtx.globalCompositeOperation = "destination-in";
+      tempCtx.drawImage(this.selectionCanvas, 0, 0);
+
+      const optimizedBounds = getOptimizedBoundingBox(tempCanvas, {
+        x: 0,
+        y: 0,
+        width: tempCanvas.width,
+        height: tempCanvas.height,
+      });
+
+      if (!optimizedBounds) return;
+
+      const finalCanvas = document.createElement("canvas");
+      finalCanvas.width = optimizedBounds.width;
+      finalCanvas.height = optimizedBounds.height;
+      const finalCtx = finalCanvas.getContext("2d")!;
+      finalCtx.drawImage(
+        tempCanvas,
+        optimizedBounds.x,
+        optimizedBounds.y,
+        optimizedBounds.width,
+        optimizedBounds.height,
+        0,
+        0,
+        optimizedBounds.width,
+        optimizedBounds.height,
+      );
+      sourceCanvas = finalCanvas;
+      finalX = bounds.x + optimizedBounds.x;
+      finalY = bounds.y + optimizedBounds.y;
+    }
+
+    try {
+      const blob = await new Promise<Blob | null>((resolve) =>
+        sourceCanvas.toBlob(resolve, "image/png"),
+      );
+      if (!blob) return;
+
+      const metadata = {
+        source: "forge-editor",
+        projectId: this.project.id,
+        x: finalX,
+        y: finalY,
+      };
+
+      const metadataBlob = new Blob([JSON.stringify(metadata)], {
+        type: "text/plain",
+      });
+
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": blob,
+          "text/plain": metadataBlob,
+        }),
+      ]);
+    } catch (err) {
+      console.error("Failed to copy to clipboard:", err);
+    }
+    }
+
+    public async pasteFromClipboard() {
+    if (!this.project) return;
+
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const item of clipboardItems) {
+        const imageType = item.types.find((t) => t.startsWith("image/"));
+        if (!imageType) continue;
+
+        let pasteX: number | null = null;
+        let pasteY: number | null = null;
+
+        if (item.types.includes("text/plain")) {
+          const textBlob = await item.getType("text/plain");
+          const text = await textBlob.text();
+          try {
+            const metadata = JSON.parse(text);
+            if (metadata.source === "forge-editor") {
+              pasteX = metadata.x;
+              pasteY = metadata.y;
+            }
+          } catch (_) {
+            // Not our metadata
+          }
+        }
+
+        const imageBlob = await item.getType(imageType);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const dataUrl = e.target?.result as string;
+          const img = new Image();
+          img.onload = () => {
+            if (pasteX === null || pasteY === null) {
+              // Center in viewport
+              const viewportWidth = this.canvas.width;
+              const viewportHeight = this.canvas.height;
+              const projCenterX = (viewportWidth / 2 - this.project!.panX) / this.project!.zoom;
+              const projCenterY = (viewportHeight / 2 - this.project!.panY) / this.project!.zoom;
+              pasteX = Math.round(projCenterX - img.naturalWidth / 2);
+              pasteY = Math.round(projCenterY - img.naturalHeight / 2);
+            }
+
+            useProjectStore.getState().addLayer(this.project!.id, {
+              name: "Pasted Layer",
+              type: "raster",
+              data: dataUrl,
+              width: img.naturalWidth,
+              height: img.naturalHeight,
+              x: pasteX,
+              y: pasteY,
+            });
+          };
+          img.src = dataUrl;
+        };
+        reader.readAsDataURL(imageBlob);
+        break; // Only paste the first image found
+      }
+    } catch (err) {
+      console.error("Failed to paste from clipboard:", err);
+    }
+  }
+
+  private handleMouseUp(e: MouseEvent) {
+    if (this.isPanning) {
+      this.isPanning = false;
+      this.canvas.style.cursor = "default";
+      return;
+    }
+
+    const tool = this.getActiveTool();
+    const context = this.getToolContext();
+    if (tool && context) {
+      tool.onMouseUp(e, context);
+    }
   }
 
   private getActiveTool(): BaseTool | null {
@@ -229,20 +451,6 @@ export class ForgeEngine {
     }
   }
 
-  private handleMouseUp(e: MouseEvent) {
-    if (this.isPanning) {
-      this.isPanning = false;
-      this.canvas.style.cursor = "default";
-      return;
-    }
-
-    const tool = this.getActiveTool();
-    const context = this.getToolContext();
-    if (tool && context) {
-      tool.onMouseUp(e, context);
-    }
-  }
-
   private startRenderLoop() {
     const loop = () => {
       this.render();
@@ -259,6 +467,7 @@ export class ForgeEngine {
     this.canvas.removeEventListener("mousedown", this.handleMouseDown);
     window.removeEventListener("mousemove", this.handleMouseMove);
     window.removeEventListener("mouseup", this.handleMouseUp);
+    window.removeEventListener("keydown", this.handleKeyDown);
   }
 
   private getCheckerPattern(): CanvasPattern {

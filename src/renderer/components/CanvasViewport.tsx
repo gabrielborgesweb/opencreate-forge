@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useProjectStore } from '@store/projectStore';
+import { useUIStore } from '@store/uiStore';
 import { ForgeEngine } from '@core/engine/ForgeEngine';
 
 const CanvasViewport: React.FC = () => {
@@ -10,6 +11,7 @@ const CanvasViewport: React.FC = () => {
     state.projects.find((p) => p.id === activeProjectId) || null
   );
 
+  const showToast = useUIStore((state) => state.showToast);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   // 1. Inicializa o Engine apenas uma vez
@@ -147,6 +149,8 @@ const CanvasViewport: React.FC = () => {
           img.src = dataUrl;
         };
         reader.readAsDataURL(file);
+      } else {
+        showToast(`File "<b>${file.name}</b>" is not supported.`, 'error');
       }
     }
   };

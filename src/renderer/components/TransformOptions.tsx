@@ -27,7 +27,7 @@ const TransformOptions: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center gap-4 px-4 text-[0.75rem]">
+    <div className="flex items-center gap-4 text-[0.75rem]">
       <div className="flex items-center gap-2">
         <span className="text-[#999] font-bold">POS:</span>
         <ToolSettingInput

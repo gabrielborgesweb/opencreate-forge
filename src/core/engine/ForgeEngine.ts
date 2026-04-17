@@ -8,6 +8,7 @@ import { TransformTool } from "../tools/TransformTool";
 import { SelectTool } from "../tools/SelectTool";
 import { CropTool } from "../tools/CropTool";
 import { useToolStore } from "@/renderer/store/toolStore";
+import { useUIStore } from "@/renderer/store/uiStore";
 import { getOptimizedBoundingBox } from "../utils/imageUtils";
 
 export interface ViewportState {
@@ -149,6 +150,17 @@ export class ForgeEngine {
     if (!activeLayer || activeLayer.type !== "raster" || !activeLayer.data)
       return;
 
+    // Check if layer is visible or locked
+    if (!activeLayer.visible) {
+      useUIStore.getState().showToast("Cannot copy from a hidden layer", "warning");
+      return;
+    }
+    if (activeLayer.locked) {
+      // For copy it might be okay, but user asked to prevent it for both
+      useUIStore.getState().showToast("Cannot copy from a locked layer", "warning");
+      return;
+    }
+
     let sourceCanvas: HTMLCanvasElement;
     let finalX = activeLayer.x;
     let finalY = activeLayer.y;
@@ -160,6 +172,8 @@ export class ForgeEngine {
       sourceCanvas = layerCanvas;
     } else {
       const { bounds } = this.project.selection;
+
+      // 1. First, check if there are ANY pixels in this selection on the current layer
       const tempCanvas = document.createElement("canvas");
       tempCanvas.width = bounds.width;
       tempCanvas.height = bounds.height;
@@ -179,7 +193,11 @@ export class ForgeEngine {
         height: tempCanvas.height,
       });
 
-      if (!optimizedBounds) return;
+      // Selection is empty for this layer
+      if (!optimizedBounds) {
+        useUIStore.getState().showToast("The selection is empty on this layer", "warning");
+        return;
+      }
 
       const finalCanvas = document.createElement("canvas");
       finalCanvas.width = optimizedBounds.width;
@@ -227,13 +245,24 @@ export class ForgeEngine {
     } catch (err) {
       console.error("Failed to copy to clipboard:", err);
     }
-    }
+  }
 
-    public async pasteFromClipboard() {
+  public async pasteFromClipboard() {
     if (!this.project) return;
 
-    try {
-      const clipboardItems = await navigator.clipboard.read();
+    // Deselect if selection is empty (standard QoL behavior)
+    if (this.project.selection.hasSelection) {
+      // If we have a selection, let's just clear it to paste normally
+      // Usually editors paste INSIDE if there's a selection, but here the request is:
+      // "colar e a seleção estiver vazia, tirar a seleção e colar normalmente"
+      // If the selection has NO pixels it's redundant to keep it.
+      // Most users actually want to paste as new layer and ignore selection if it's just a rectangle.
+      useProjectStore.getState().updateProject(this.project.id, {
+        selection: { hasSelection: false, bounds: null, mask: undefined }
+      });
+    }
+
+    try {      const clipboardItems = await navigator.clipboard.read();
       for (const item of clipboardItems) {
         const imageType = item.types.find((t) => t.startsWith("image/"));
         if (!imageType) continue;

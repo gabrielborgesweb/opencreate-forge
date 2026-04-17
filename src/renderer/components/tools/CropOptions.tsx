@@ -66,7 +66,7 @@ export const CropOptions: React.FC = () => {
             }
             className="w-3 h-3 rounded bg-[#333] border-white/10 accent-accent"
           />
-          <span className="text-[#999] font-bold">DELETE PIXELS</span>
+          <span className="text-[#999] font-bold">DELETE OUTSIDE</span>
         </label>
       </div>
 

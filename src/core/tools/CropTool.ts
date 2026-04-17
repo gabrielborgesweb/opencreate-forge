@@ -42,16 +42,32 @@ export class CropTool extends BaseTool {
 
   private resetCrop(context: ToolContext) {
     const { project } = context;
-    this.cropState = {
-      x: project.width / 2,
-      y: project.height / 2,
-      width: project.width,
-      height: project.height,
-      scaleX: 1,
-      scaleY: 1,
-      rotation: 0,
-      anchor: { x: 0.5, y: 0.5 },
-    };
+
+    // Use selection bounds if available
+    if (project.selection.hasSelection && project.selection.bounds) {
+      const { bounds } = project.selection;
+      this.cropState = {
+        x: bounds.x + bounds.width / 2,
+        y: bounds.y + bounds.height / 2,
+        width: bounds.width,
+        height: bounds.height,
+        scaleX: 1,
+        scaleY: 1,
+        rotation: 0,
+        anchor: { x: 0.5, y: 0.5 },
+      };
+    } else {
+      this.cropState = {
+        x: project.width / 2,
+        y: project.height / 2,
+        width: project.width,
+        height: project.height,
+        scaleX: 1,
+        scaleY: 1,
+        rotation: 0,
+        anchor: { x: 0.5, y: 0.5 },
+      };
+    }
     context.updateToolSettings("crop", { isDirty: false });
   }
 
@@ -521,8 +537,8 @@ export class CropTool extends BaseTool {
         let finalX = Math.round(minX);
         let finalY = Math.round(minY);
 
-        if (settings.deleteCropped) {
-          // Clip to project bounds
+        if (!settings.deleteCropped) {
+          // Clip to project bounds (the new crop area)
           const clipped = document.createElement("canvas");
           clipped.width = lw;
           clipped.height = lh;
@@ -555,6 +571,7 @@ export class CropTool extends BaseTool {
             finalX += bounds.x;
             finalY += bounds.y;
           } else {
+            // Layer is completely outside the crop area and we are deleting cropped pixels
             return {
               ...layer,
               data: undefined,
@@ -563,6 +580,32 @@ export class CropTool extends BaseTool {
               x: 0,
               y: 0,
             };
+          }
+        } else {
+          // NOT deleting pixels. We should still optimize the bounding box
+          // of the FULL transformed layer to avoid massive empty canvases,
+          // but we DON'T clip it to the project bounds.
+          const bounds = this.getOptimizedBounds(canvas);
+          if (bounds) {
+            const opt = document.createElement("canvas");
+            opt.width = bounds.width;
+            opt.height = bounds.height;
+            opt
+              .getContext("2d")!
+              .drawImage(
+                canvas,
+                bounds.x,
+                bounds.y,
+                bounds.width,
+                bounds.height,
+                0,
+                0,
+                bounds.width,
+                bounds.height,
+              );
+            finalCanvas = opt;
+            finalX += bounds.x;
+            finalY += bounds.y;
           }
         }
 

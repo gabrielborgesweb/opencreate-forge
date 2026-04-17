@@ -229,9 +229,25 @@ export class CropTool extends BaseTool {
 
   onMouseDown(e: MouseEvent, context: ToolContext): void {
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
-    const handle = this.getHandleAtPoint(x, y, context);
+    let handle = this.getHandleAtPoint(x, y, context);
 
-    if (!handle || !this.cropState) return;
+    if (!this.cropState) return;
+
+    if (!handle) {
+      // Start creating a new crop area
+      this.cropState = {
+        x: x,
+        y: y,
+        width: 0,
+        height: 0,
+        scaleX: 1,
+        scaleY: 1,
+        rotation: 0,
+        anchor: { x: 0, y: 0 },
+      };
+      handle = { name: "bottom-right", cursor: "nwse-resize" };
+      this.syncStore(context);
+    }
 
     this.activeHandle = handle;
     this.dragStartCoords = { x, y };
@@ -252,6 +268,9 @@ export class CropTool extends BaseTool {
       const opp = handles.find((h) => h.name === oppositeName);
       if (opp) {
         this.scaleAnchor = { x: opp.x, y: opp.y };
+      } else {
+        // Fallback for new crop creation where handles don't exist yet
+        this.scaleAnchor = { x: this.dragStartCoords.x, y: this.dragStartCoords.y };
       }
     }
 
@@ -295,7 +314,7 @@ export class CropTool extends BaseTool {
       const ratio =
         settings.mode === "Fixed Ratio"
           ? settings.ratioW / settings.ratioH
-          : (startT.width * startT.scaleX) / (startT.height * startT.scaleY);
+          : (startT.width * startT.scaleX) / (startT.height * startT.scaleY) || 1;
 
       const rot = (startT.rotation * Math.PI) / 180;
       const cos = Math.cos(rot);
@@ -318,8 +337,8 @@ export class CropTool extends BaseTool {
       const currentProjX = vecCurrent.x * axisX.x + vecCurrent.y * axisX.y;
       const currentProjY = vecCurrent.x * axisY.x + vecCurrent.y * axisY.y;
 
-      let sfx = startProjX === 0 ? 1 : currentProjX / startProjX;
-      let sfy = startProjY === 0 ? 1 : currentProjY / startProjY;
+      let sfx = startProjX === 0 ? currentProjX : currentProjX / startProjX;
+      let sfy = startProjY === 0 ? currentProjY : currentProjY / startProjY;
 
       const applyX =
         this.activeHandle.name.includes("left") ||
@@ -330,45 +349,60 @@ export class CropTool extends BaseTool {
 
       if (keepAspect) {
         if (applyX && applyY) {
-          const mag = Math.hypot(startProjX, startProjY);
-          if (mag > 0) {
-            const globalSf =
-              (currentProjX * (startProjX / mag) +
-                currentProjY * (startProjY / mag)) /
-              mag;
-            sfx = sfy = globalSf;
+          if (startProjX === 0 && startProjY === 0) {
+            sfx = sfy = Math.max(Math.abs(currentProjX), Math.abs(currentProjY)) * (currentProjX < 0 || currentProjY < 0 ? -1 : 1);
+          } else {
+            const mag = Math.hypot(startProjX, startProjY);
+            if (mag > 0) {
+              const globalSf =
+                (currentProjX * (startProjX / mag) +
+                  currentProjY * (startProjY / mag)) /
+                mag;
+              sfx = sfy = globalSf;
+            }
           }
         } else if (applyX) {
-          const newW = Math.abs(startT.width * startT.scaleX * sfx);
+          const newW = Math.abs((startT.width * startT.scaleX || 1) * sfx);
           const newH = newW / ratio;
-          sfy = newH / Math.abs(startT.height * startT.scaleY);
+          sfy = newH / Math.abs(startT.height * startT.scaleY || 1);
         } else if (applyY) {
-          const newH = Math.abs(startT.height * startT.scaleY * sfy);
+          const newH = Math.abs((startT.height * startT.scaleY || 1) * sfy);
           const newW = newH * ratio;
-          sfx = newW / Math.abs(startT.width * startT.scaleX);
+          sfx = newW / Math.abs(startT.width * startT.scaleX || 1);
         }
       }
 
       const finalSfx = applyX || (keepAspect && applyY) ? sfx : 1;
       const finalSfy = applyY || (keepAspect && applyX) ? sfy : 1;
 
-      t.scaleX = startT.scaleX * finalSfx;
-      t.scaleY = startT.scaleY * finalSfy;
+      if (startProjX === 0 && startProjY === 0) {
+        // Special case for new creation from zero size
+        t.width = Math.abs(finalSfx);
+        t.height = Math.abs(finalSfy);
+        t.scaleX = 1;
+        t.scaleY = 1;
+        t.x = scaleAnchor.x + finalSfx / 2;
+        t.y = scaleAnchor.y + finalSfy / 2;
+        t.anchor = { x: 0.5, y: 0.5 };
+      } else {
+        t.scaleX = startT.scaleX * finalSfx;
+        t.scaleY = startT.scaleY * finalSfy;
 
-      const centerProjX =
-        (startT.x - scaleAnchor.x) * axisX.x +
-        (startT.y - scaleAnchor.y) * axisX.y;
-      const centerProjY =
-        (startT.x - scaleAnchor.x) * axisY.x +
-        (startT.y - scaleAnchor.y) * axisY.y;
+        const centerProjX =
+          (startT.x - scaleAnchor.x) * axisX.x +
+          (startT.y - scaleAnchor.y) * axisX.y;
+        const centerProjY =
+          (startT.x - scaleAnchor.x) * axisY.x +
+          (startT.y - scaleAnchor.y) * axisY.y;
 
-      const newWorldVec = {
-        x: centerProjX * finalSfx * axisX.x + centerProjY * finalSfy * axisY.x,
-        y: centerProjX * finalSfx * axisX.y + centerProjY * finalSfy * axisY.y,
-      };
+        const newWorldVec = {
+          x: centerProjX * finalSfx * axisX.x + centerProjY * finalSfy * axisY.x,
+          y: centerProjX * finalSfx * axisX.y + centerProjY * finalSfy * axisY.y,
+        };
 
-      t.x = scaleAnchor.x + newWorldVec.x;
-      t.y = scaleAnchor.y + newWorldVec.y;
+        t.x = scaleAnchor.x + newWorldVec.x;
+        t.y = scaleAnchor.y + newWorldVec.y;
+      }
     }
 
     this.syncStore(context);
@@ -643,13 +677,13 @@ export class CropTool extends BaseTool {
     // Reset crop state
     this.isCropping = false;
     this.cropState = null;
-    context.setActiveTool("move");
+    context.setActiveTool(context.previousToolId);
   }
 
   cancel(context: ToolContext) {
     this.isCropping = false;
     this.cropState = null;
-    context.setActiveTool("move");
+    context.setActiveTool(context.previousToolId);
   }
 
   private loadImage(src: string): Promise<HTMLImageElement> {

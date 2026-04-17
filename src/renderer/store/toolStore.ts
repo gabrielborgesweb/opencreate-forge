@@ -33,6 +33,7 @@ export interface ToolSettings {
 
 interface ToolState {
   activeToolId: ToolId;
+  previousToolId: ToolId;
   isInteracting: boolean;
   toolSettings: ToolSettings;
   
@@ -44,6 +45,7 @@ interface ToolState {
 
 export const useToolStore = create<ToolState>((set) => ({
   activeToolId: 'move',
+  previousToolId: 'move',
   isInteracting: false,
   toolSettings: {
     select: { mode: 'replace', shape: 'rectangle' },
@@ -70,7 +72,19 @@ export const useToolStore = create<ToolState>((set) => ({
     },
   },
 
-  setActiveTool: (id) => set({ activeToolId: id }),
+  setActiveTool: (id) => set((state) => {
+    if (id === state.activeToolId) return state;
+    
+    // Don't save 'transform' or 'crop' as the previous tool
+    const newPreviousToolId = (state.activeToolId === 'transform' || state.activeToolId === 'crop')
+      ? state.previousToolId
+      : state.activeToolId;
+
+    return {
+      activeToolId: id,
+      previousToolId: newPreviousToolId,
+    };
+  }),
 
   setInteracting: (isInteracting) => set({ isInteracting }),
 

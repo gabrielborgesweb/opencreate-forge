@@ -358,9 +358,11 @@ export class ForgeEngine {
 
   private getToolContext(): ToolContext | null {
     if (!this.project) return null;
+    const toolStore = useToolStore.getState();
     return {
       project: this.project,
-      // settings: useToolStore.getState().toolSettings,
+      activeToolId: toolStore.activeToolId,
+      previousToolId: toolStore.previousToolId,
       get settings() {
         return useToolStore.getState().toolSettings;
       },

@@ -626,11 +626,11 @@ export class TransformTool extends BaseTool {
       context.invalidateCache(layer.id);
     }
 
-    context.setActiveTool("move");
+    context.setActiveTool(context.previousToolId);
   }
 
   cancel(context: ToolContext) {
-    context.setActiveTool("move");
+    context.setActiveTool(context.previousToolId);
   }
 
   getEditingLayerId(): string | null {

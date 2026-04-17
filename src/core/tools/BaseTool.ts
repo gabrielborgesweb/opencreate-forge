@@ -6,6 +6,8 @@ export type { ToolId };
 export interface ToolContext {
   project: Project;
   settings: ToolSettings;
+  activeToolId: ToolId;
+  previousToolId: ToolId;
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   updateProject: (updates: Partial<Project>) => void;

@@ -81,23 +81,32 @@ const ProjectTabs: React.FC = () => {
       {projects.map((project) => (
         <button
           key={project.id}
-          className={`flex items-center px-3 h-[30px] rounded-t-[4px] cursor-pointer text-[0.8rem] gap-2 min-w-[150px] justify-between flex-shrink-0 transition-all border-b ${
+          className={`flex items-center px-3 pe-[5px] h-[30px] rounded-t-[4px] cursor-pointer text-[0.8rem] gap-2 min-w-[150px] justify-between flex-shrink-0 transition-all border-b ${
             activeTab === project.id
-              ? "bg-bg-primary text-text border-accent"
+              ? "bg-bg-primary text-text border-accent active:!translate-y-0 active:!filter-none"
               : "bg-transparent text-[#666] hover:bg-white/5 border-transparent"
           }`}
           onClick={() => handleTabClick(project.id)}
         >
           <span className="overflow-hidden text-ellipsis whitespace-nowrap">
-            {project.name}
-            {project.isDirty ? "*" : ""}.ocfd
+            {project.name}.ocfd
           </span>
           <div
             tabIndex={-1}
-            className="bg-none border-none text-inherit flex p-[2px] rounded-[2px] cursor-pointer hover:bg-white/10 transition-colors"
+            className="group relative bg-none border-none text-inherit flex p-[4px] rounded-[2px] cursor-pointer hover:bg-white/10 transition-colors w-[20px] h-[20px] items-center justify-center"
             onClick={(e) => handleCloseTab(e, project.id)}
           >
-            <X size={12} />
+            {project.isDirty ? (
+              <>
+                <div className="w-[10px] h-[10px] bg-white rounded-full group-hover:opacity-0 transition-opacity" />
+                <X
+                  size={14}
+                  className="absolute inset-0 m-auto opacity-0 group-hover:opacity-100 transition-opacity"
+                />
+              </>
+            ) : (
+              <X size={14} />
+            )}
           </div>
         </button>
       ))}

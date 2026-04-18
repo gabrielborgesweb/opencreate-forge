@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "tsc": "tsc --noEmit",
-    "check": "npm run tsc && npm run lint"
+    "check": "npm run tsc && npm run lint",
+    "prettier": "prettier --write . --ignore-path .prettierignore"
   },
   "dependencies": {
     "lucide-react": "^1.8.0",

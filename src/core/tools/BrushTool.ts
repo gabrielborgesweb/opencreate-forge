@@ -43,14 +43,7 @@ export class BrushTool extends BaseTool {
     const ctx = this.brushCanvas.getContext("2d")!;
 
     const center = canvasSize / 2;
-    const gradient = ctx.createRadialGradient(
-      center,
-      center,
-      0,
-      center,
-      center,
-      radius,
-    );
+    const gradient = ctx.createRadialGradient(center, center, 0, center, center, radius);
 
     // 1. Centro e início do falloff (totalmente opaco)
     const opaque = this.hexToRgba(color, 1);
@@ -74,10 +67,7 @@ export class BrushTool extends BaseTool {
       // Mapeamos a posição do stop entre o hardness e o final (1.0)
       const stopPosition = hardnessStop + t * (1 - hardnessStop);
 
-      gradient.addColorStop(
-        Math.min(0.999, stopPosition),
-        this.hexToRgba(color, alpha),
-      );
+      gradient.addColorStop(Math.min(0.999, stopPosition), this.hexToRgba(color, alpha));
     }
 
     ctx.fillStyle = gradient;
@@ -195,10 +185,7 @@ export class BrushTool extends BaseTool {
       searchBounds.width = searchMaxX - searchBounds.x;
       searchBounds.height = searchMaxY - searchBounds.y;
 
-      const bounds = this.getOptimizedBoundingBox(
-        this.offscreenCtx,
-        searchBounds,
-      );
+      const bounds = this.getOptimizedBoundingBox(this.offscreenCtx, searchBounds);
 
       if (bounds) {
         const croppedCanvas = document.createElement("canvas");
@@ -250,12 +237,7 @@ export class BrushTool extends BaseTool {
     search: { x: number; y: number; width: number; height: number },
   ) {
     if (search.width <= 0 || search.height <= 0) return null;
-    const imageData = ctx.getImageData(
-      search.x,
-      search.y,
-      search.width,
-      search.height,
-    );
+    const imageData = ctx.getImageData(search.x, search.y, search.width, search.height);
     const data = imageData.data;
     let minX = search.width,
       minY = search.height,
@@ -302,11 +284,7 @@ export class BrushTool extends BaseTool {
     if (cachedResult) {
       // Limpa para evitar sobreposição caso o motor tente desenhar a camada base de novo
       this.offscreenCtx.clearRect(0, 0, width, height);
-      this.offscreenCtx.drawImage(
-        cachedResult.canvas,
-        this.STROKE_PADDING,
-        this.STROKE_PADDING,
-      );
+      this.offscreenCtx.drawImage(cachedResult.canvas, this.STROKE_PADDING, this.STROKE_PADDING);
 
       // Se o cache já estava pronto, não precisamos carregar do data URL
       if (cachedResult.ready) {
@@ -324,11 +302,7 @@ export class BrushTool extends BaseTool {
           // Como vamos carregar a imagem real, limpamos o que quer que tenha vindo do cache incompleto
           // para evitar o efeito de "duplicação" de opacidade
           this.offscreenCtx.globalCompositeOperation = "destination-over";
-          this.offscreenCtx.drawImage(
-            img,
-            this.STROKE_PADDING,
-            this.STROKE_PADDING,
-          );
+          this.offscreenCtx.drawImage(img, this.STROKE_PADDING, this.STROKE_PADDING);
           this.offscreenCtx.restore();
         }
         this.isLoadingBaseImage = false;
@@ -350,9 +324,13 @@ export class BrushTool extends BaseTool {
 
     // Paint only within selection if it exists
     const selection = context.getSelectionCanvas();
-    if (context.project.selection.hasSelection && context.project.selection.bounds && selection.canvas) {
+    if (
+      context.project.selection.hasSelection &&
+      context.project.selection.bounds &&
+      selection.canvas
+    ) {
       const { bounds } = context.project.selection;
-      
+
       // 1. Prepare or reuse scratch canvas
       if (!this.scratchCanvas) {
         this.scratchCanvas = document.createElement("canvas");
@@ -360,10 +338,10 @@ export class BrushTool extends BaseTool {
         this.scratchCanvas.height = this.offscreenCanvas!.height;
         this.scratchCtx = this.scratchCanvas.getContext("2d")!;
       }
-      
+
       const sctx = this.scratchCtx!;
       const brushSize = this.brushCanvas.width;
-      
+
       // 2. Calculate bounding box of the current segment to limit the area
       const minSegmentX = Math.floor(Math.min(localX, localLastX) - brushSize);
       const minSegmentY = Math.floor(Math.min(localY, localLastY) - brushSize);
@@ -394,15 +372,21 @@ export class BrushTool extends BaseTool {
       sctx.drawImage(
         selection.canvas,
         bounds.x - this.strokeOriginX,
-        bounds.y - this.strokeOriginY
+        bounds.y - this.strokeOriginY,
       );
       sctx.restore();
 
       // 6. Draw the clipped scratch onto offscreen
       this.offscreenCtx.drawImage(
         this.scratchCanvas,
-        minSegmentX, minSegmentY, segmentWidth, segmentHeight,
-        minSegmentX, minSegmentY, segmentWidth, segmentHeight
+        minSegmentX,
+        minSegmentY,
+        segmentWidth,
+        segmentHeight,
+        minSegmentX,
+        minSegmentY,
+        segmentWidth,
+        segmentHeight,
       );
     } else {
       // Normal draw without selection
@@ -448,11 +432,7 @@ export class BrushTool extends BaseTool {
       );
       ctx.globalAlpha = layer.opacity / 100;
       ctx.globalCompositeOperation = layer.blendMode;
-      ctx.drawImage(
-        this.offscreenCanvas,
-        this.strokeOriginX,
-        this.strokeOriginY,
-      );
+      ctx.drawImage(this.offscreenCanvas, this.strokeOriginX, this.strokeOriginY);
       ctx.restore();
     }
 
@@ -480,13 +460,7 @@ export class BrushTool extends BaseTool {
 
       // Outline interna (preta para contraste)
       ctx.beginPath();
-      ctx.arc(
-        this.mouseX,
-        this.mouseY,
-        radius - 0.5 / context.project.zoom,
-        0,
-        Math.PI * 2,
-      );
+      ctx.arc(this.mouseX, this.mouseY, radius - 0.5 / context.project.zoom, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
       ctx.lineWidth = 0.5 / context.project.zoom;
       ctx.stroke();

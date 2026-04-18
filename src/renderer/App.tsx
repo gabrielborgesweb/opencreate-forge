@@ -13,16 +13,13 @@ import Toast from "./components/ui/Toast";
 
 function App() {
   const activeTab = useUIStore((state) => state.activeTab);
-  const [isNewProjectModalOpen, setIsNewProjectModalOpen] =
-    React.useState(false);
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = React.useState(false);
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
   const setActiveTool = useToolStore((state) => state.setActiveTool);
   const activeToolId = useToolStore((state) => state.activeToolId);
   const toolSettings = useToolStore((state) => state.toolSettings);
   const updateToolSettings = useToolStore((state) => state.updateToolSettings);
-  const transformSettings = useToolStore(
-    (state) => state.toolSettings.transform,
-  );
+  const transformSettings = useToolStore((state) => state.toolSettings.transform);
   const showToast = useUIStore((state) => state.showToast);
   const isInteracting = useToolStore((state) => state.isInteracting);
 
@@ -35,11 +32,7 @@ function App() {
 
   // Restore mode when interaction ends
   React.useEffect(() => {
-    if (
-      !isInteracting &&
-      pendingRestoreRef.current &&
-      originalModeRef.current
-    ) {
+    if (!isInteracting && pendingRestoreRef.current && originalModeRef.current) {
       updateToolSettings("select", { mode: originalModeRef.current });
       originalModeRef.current = null;
       pendingRestoreRef.current = false;
@@ -94,13 +87,11 @@ function App() {
         if (e.key === "Enter") {
           if (activeToolId === "transform")
             window.dispatchEvent(new CustomEvent("forge:transform-apply"));
-          if (activeToolId === "crop")
-            window.dispatchEvent(new CustomEvent("forge:crop-apply"));
+          if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-apply"));
         } else if (e.key === "Escape") {
           if (activeToolId === "transform")
             window.dispatchEvent(new CustomEvent("forge:transform-cancel"));
-          if (activeToolId === "crop")
-            window.dispatchEvent(new CustomEvent("forge:crop-cancel"));
+          if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-cancel"));
         }
         return;
       }
@@ -129,13 +120,11 @@ function App() {
       } else if (e.key === "Enter") {
         if (activeToolId === "transform")
           window.dispatchEvent(new CustomEvent("forge:transform-apply"));
-        if (activeToolId === "crop")
-          window.dispatchEvent(new CustomEvent("forge:crop-apply"));
+        if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-apply"));
       } else if (e.key === "Escape") {
         if (activeToolId === "transform")
           window.dispatchEvent(new CustomEvent("forge:transform-cancel"));
-        if (activeToolId === "crop")
-          window.dispatchEvent(new CustomEvent("forge:crop-cancel"));
+        if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-cancel"));
       } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         // Tool shortcuts - only if no modifiers
         if (e.key.toLowerCase() === "v") {
@@ -194,8 +183,7 @@ function App() {
   React.useEffect(() => {
     const handleNewProject = () => setIsNewProjectModalOpen(true);
     window.addEventListener("forge:new-project", handleNewProject);
-    return () =>
-      window.removeEventListener("forge:new-project", handleNewProject);
+    return () => window.removeEventListener("forge:new-project", handleNewProject);
   }, []);
 
   return (

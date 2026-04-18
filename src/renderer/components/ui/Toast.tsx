@@ -74,12 +74,8 @@ const Toast: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className="flex items-center gap-3 pr-2">
-        {toast.type === "warning" && (
-          <TriangleAlert size={18} className="text-orange-200" />
-        )}
-        {toast.type === "error" && (
-          <AlertCircle size={18} className="text-red-200" />
-        )}
+        {toast.type === "warning" && <TriangleAlert size={18} className="text-orange-200" />}
+        {toast.type === "error" && <AlertCircle size={18} className="text-red-200" />}
         {toast.type === "info" && <Info size={18} className="text-blue-200" />}
         <span
           className="text-sm whitespace-nowrap [&_b]:font-bold [&_a]:underline [&_a]:text-white/80 [&_a:hover]:text-white"

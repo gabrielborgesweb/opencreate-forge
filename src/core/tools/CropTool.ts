@@ -116,8 +116,7 @@ export class CropTool extends BaseTool {
 
   onDeactivate(context: ToolContext): void {
     if ((this as any)._listeners) {
-      const { handleApply, handleCancel, handleReset } = (this as any)
-        ._listeners;
+      const { handleApply, handleCancel, handleReset } = (this as any)._listeners;
       window.removeEventListener("forge:crop-apply", handleApply);
       window.removeEventListener("forge:crop-cancel", handleCancel);
       window.removeEventListener("forge:crop-reset", handleReset);
@@ -255,14 +254,11 @@ export class CropTool extends BaseTool {
 
     if (handle.name !== "move" && handle.name !== "rotate") {
       let oppositeName = handle.name;
-      if (oppositeName.includes("top"))
-        oppositeName = oppositeName.replace("top", "bottom");
+      if (oppositeName.includes("top")) oppositeName = oppositeName.replace("top", "bottom");
       else if (oppositeName.includes("bottom"))
         oppositeName = oppositeName.replace("bottom", "top");
-      if (oppositeName.includes("left"))
-        oppositeName = oppositeName.replace("left", "right");
-      else if (oppositeName.includes("right"))
-        oppositeName = oppositeName.replace("right", "left");
+      if (oppositeName.includes("left")) oppositeName = oppositeName.replace("left", "right");
+      else if (oppositeName.includes("right")) oppositeName = oppositeName.replace("right", "left");
 
       const handles = this.getHandles(context);
       const opp = handles.find((h) => h.name === oppositeName);
@@ -300,8 +296,7 @@ export class CropTool extends BaseTool {
         this.dragStartCoords.x - startT.x,
       );
       const currentAngle = Math.atan2(rawY - startT.y, rawX - startT.x);
-      let newRotation =
-        startT.rotation + ((currentAngle - startAngle) * 180) / Math.PI;
+      let newRotation = startT.rotation + ((currentAngle - startAngle) * 180) / Math.PI;
       if (e.shiftKey) {
         newRotation = Math.round(newRotation / 15) * 15;
       }
@@ -322,9 +317,7 @@ export class CropTool extends BaseTool {
       const axisX = { x: cos, y: sin };
       const axisY = { x: -sin, y: cos };
 
-      const scaleAnchor = e.altKey
-        ? { x: startT.x, y: startT.y }
-        : this.scaleAnchor;
+      const scaleAnchor = e.altKey ? { x: startT.x, y: startT.y } : this.scaleAnchor;
 
       const vecStart = {
         x: this.dragStartCoords.x - scaleAnchor.x,
@@ -341,23 +334,21 @@ export class CropTool extends BaseTool {
       let sfy = startProjY === 0 ? currentProjY : currentProjY / startProjY;
 
       const applyX =
-        this.activeHandle.name.includes("left") ||
-        this.activeHandle.name.includes("right");
+        this.activeHandle.name.includes("left") || this.activeHandle.name.includes("right");
       const applyY =
-        this.activeHandle.name.includes("top") ||
-        this.activeHandle.name.includes("bottom");
+        this.activeHandle.name.includes("top") || this.activeHandle.name.includes("bottom");
 
       if (keepAspect) {
         if (applyX && applyY) {
           if (startProjX === 0 && startProjY === 0) {
-            sfx = sfy = Math.max(Math.abs(currentProjX), Math.abs(currentProjY)) * (currentProjX < 0 || currentProjY < 0 ? -1 : 1);
+            sfx = sfy =
+              Math.max(Math.abs(currentProjX), Math.abs(currentProjY)) *
+              (currentProjX < 0 || currentProjY < 0 ? -1 : 1);
           } else {
             const mag = Math.hypot(startProjX, startProjY);
             if (mag > 0) {
               const globalSf =
-                (currentProjX * (startProjX / mag) +
-                  currentProjY * (startProjY / mag)) /
-                mag;
+                (currentProjX * (startProjX / mag) + currentProjY * (startProjY / mag)) / mag;
               sfx = sfy = globalSf;
             }
           }
@@ -389,11 +380,9 @@ export class CropTool extends BaseTool {
         t.scaleY = startT.scaleY * finalSfy;
 
         const centerProjX =
-          (startT.x - scaleAnchor.x) * axisX.x +
-          (startT.y - scaleAnchor.y) * axisX.y;
+          (startT.x - scaleAnchor.x) * axisX.x + (startT.y - scaleAnchor.y) * axisX.y;
         const centerProjY =
-          (startT.x - scaleAnchor.x) * axisY.x +
-          (startT.y - scaleAnchor.y) * axisY.y;
+          (startT.x - scaleAnchor.x) * axisY.x + (startT.y - scaleAnchor.y) * axisY.y;
 
         const newWorldVec = {
           x: centerProjX * finalSfx * axisX.x + centerProjY * finalSfy * axisY.x,
@@ -421,14 +410,7 @@ export class CropTool extends BaseTool {
 
     ctx.save();
     // Use project transform for easier drawing
-    ctx.setTransform(
-      zoom,
-      0,
-      0,
-      zoom,
-      context.project.panX,
-      context.project.panY,
-    );
+    ctx.setTransform(zoom, 0, 0, zoom, context.project.panX, context.project.panY);
 
     // 1. Darken outside area
     ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
@@ -473,14 +455,7 @@ export class CropTool extends BaseTool {
     // We need to undo the crop rotation/translation to draw handles correctly if we use world coords
     ctx.restore();
     ctx.save();
-    ctx.setTransform(
-      zoom,
-      0,
-      0,
-      zoom,
-      context.project.panX,
-      context.project.panY,
-    );
+    ctx.setTransform(zoom, 0, 0, zoom, context.project.panX, context.project.panY);
 
     for (const h of handles) {
       ctx.fillStyle = "white";
@@ -714,8 +689,6 @@ export class CropTool extends BaseTool {
         }
       }
     }
-    return found
-      ? { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 }
-      : null;
+    return found ? { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 } : null;
   }
 }

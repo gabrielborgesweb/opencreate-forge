@@ -5,8 +5,7 @@ import { Home, X } from "lucide-react";
 
 const ProjectTabs: React.FC = () => {
   const { projects, removeProject, setActiveProject } = useProjectStore();
-  const { activeTab, setActiveTab, tabHistory, removeFromHistory } =
-    useUIStore();
+  const { activeTab, setActiveTab, tabHistory, removeFromHistory } = useUIStore();
 
   const handleTabClick = (id: "home" | string) => {
     setActiveTab(id);
@@ -62,8 +61,7 @@ const ProjectTabs: React.FC = () => {
       }
     };
     window.addEventListener("forge:close-project", handleCloseActive);
-    return () =>
-      window.removeEventListener("forge:close-project", handleCloseActive);
+    return () => window.removeEventListener("forge:close-project", handleCloseActive);
   }, [activeTab, handleCloseTab]);
 
   return (

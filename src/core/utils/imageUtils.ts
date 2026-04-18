@@ -4,7 +4,7 @@
  */
 export function getOptimizedBoundingBox(
   canvas: HTMLCanvasElement,
-  searchBounds: { x: number; y: number; width: number; height: number }
+  searchBounds: { x: number; y: number; width: number; height: number },
 ) {
   const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
   const { x, y, width, height } = searchBounds;

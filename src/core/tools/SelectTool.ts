@@ -24,10 +24,7 @@ export class SelectTool extends BaseTool {
     (this as any).effectiveMode = mode;
 
     // Verificar se clicou dentro da seleção existente para mover
-    if (
-      context.project.selection.hasSelection &&
-      context.project.selection.bounds
-    ) {
+    if (context.project.selection.hasSelection && context.project.selection.bounds) {
       const { bounds } = context.project.selection;
       const canMove = mode === "replace" || mode === "unite";
 
@@ -102,10 +99,7 @@ export class SelectTool extends BaseTool {
     }
 
     // Hover logic
-    if (
-      context.project.selection.hasSelection &&
-      this.isPointInSelection(context, x, y)
-    ) {
+    if (context.project.selection.hasSelection && this.isPointInSelection(context, x, y)) {
       context.canvas.style.cursor = "move";
     } else {
       context.canvas.style.cursor = "crosshair";
@@ -153,11 +147,7 @@ export class SelectTool extends BaseTool {
     }
   }
 
-  private isPointInSelection(
-    context: ToolContext,
-    px: number,
-    py: number,
-  ): boolean {
+  private isPointInSelection(context: ToolContext, px: number, py: number): boolean {
     const { selection } = context.project;
     if (!selection.hasSelection || !selection.bounds) return false;
 
@@ -187,12 +177,12 @@ export class SelectTool extends BaseTool {
     rect: { x: number; y: number; width: number; height: number },
   ) {
     const mode = (this as any).effectiveMode || context.settings.select.mode;
-    
+
     // Commit if creating new selection in replace mode
-    if (mode === 'replace' && context.project.selection.floatingLayer) {
-        await context.commitFloatingLayer();
+    if (mode === "replace" && context.project.selection.floatingLayer) {
+      await context.commitFloatingLayer();
     }
-    
+
     const { canvas: selCanvas, ctx: selCtx } = context.getSelectionCanvas();
     const { selection } = context.project;
 
@@ -273,15 +263,7 @@ export class SelectTool extends BaseTool {
 
       if (shape === "ellipse") {
         tempCtx.beginPath();
-        tempCtx.ellipse(
-          rx + rw / 2,
-          ry + rh / 2,
-          rw / 2,
-          rh / 2,
-          0,
-          0,
-          Math.PI * 2,
-        );
+        tempCtx.ellipse(rx + rw / 2, ry + rh / 2, rw / 2, rh / 2, 0, 0, Math.PI * 2);
         tempCtx.fill();
       } else {
         tempCtx.fillRect(rx, ry, rw, rh);

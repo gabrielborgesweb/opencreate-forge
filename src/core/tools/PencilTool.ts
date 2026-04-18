@@ -132,10 +132,7 @@ export class PencilTool extends BaseTool {
       searchBounds.width = searchMaxX - searchBounds.x;
       searchBounds.height = searchMaxY - searchBounds.y;
 
-      const bounds = this.getOptimizedBoundingBox(
-        this.offscreenCtx,
-        searchBounds,
-      );
+      const bounds = this.getOptimizedBoundingBox(this.offscreenCtx, searchBounds);
 
       if (bounds) {
         const croppedCanvas = document.createElement("canvas");
@@ -187,12 +184,7 @@ export class PencilTool extends BaseTool {
     search: { x: number; y: number; width: number; height: number },
   ) {
     if (search.width <= 0 || search.height <= 0) return null;
-    const imageData = ctx.getImageData(
-      search.x,
-      search.y,
-      search.width,
-      search.height,
-    );
+    const imageData = ctx.getImageData(search.x, search.y, search.width, search.height);
     const data = imageData.data;
     let minX = search.width,
       minY = search.height,
@@ -240,11 +232,7 @@ export class PencilTool extends BaseTool {
     const cachedResult = context.getLayerCanvas(layer.id);
     if (cachedResult) {
       this.offscreenCtx.clearRect(0, 0, width, height);
-      this.offscreenCtx.drawImage(
-        cachedResult.canvas,
-        this.STROKE_PADDING,
-        this.STROKE_PADDING,
-      );
+      this.offscreenCtx.drawImage(cachedResult.canvas, this.STROKE_PADDING, this.STROKE_PADDING);
       if (cachedResult.ready) return;
     }
 
@@ -255,11 +243,7 @@ export class PencilTool extends BaseTool {
         if (this.offscreenCtx) {
           this.offscreenCtx.save();
           this.offscreenCtx.globalCompositeOperation = "destination-over";
-          this.offscreenCtx.drawImage(
-            img,
-            this.STROKE_PADDING,
-            this.STROKE_PADDING,
-          );
+          this.offscreenCtx.drawImage(img, this.STROKE_PADDING, this.STROKE_PADDING);
           this.offscreenCtx.restore();
         }
         this.isLoadingBaseImage = false;
@@ -282,9 +266,13 @@ export class PencilTool extends BaseTool {
 
     // Paint only within selection if it exists
     const selection = context.getSelectionCanvas();
-    if (context.project.selection.hasSelection && context.project.selection.bounds && selection.canvas) {
+    if (
+      context.project.selection.hasSelection &&
+      context.project.selection.bounds &&
+      selection.canvas
+    ) {
       const { bounds } = context.project.selection;
-      
+
       // 1. Prepare or reuse scratch canvas
       if (!this.scratchCanvas) {
         this.scratchCanvas = document.createElement("canvas");
@@ -292,10 +280,10 @@ export class PencilTool extends BaseTool {
         this.scratchCanvas.height = this.offscreenCanvas!.height;
         this.scratchCtx = this.scratchCanvas.getContext("2d")!;
       }
-      
+
       const sctx = this.scratchCtx!;
       const size = settings.size;
-      
+
       // 2. Calculate bounding box of the current segment
       const minSegmentX = Math.floor(Math.min(localX, localLastX) - size);
       const minSegmentY = Math.floor(Math.min(localY, localLastY) - size);
@@ -339,15 +327,21 @@ export class PencilTool extends BaseTool {
       sctx.drawImage(
         selection.canvas,
         bounds.x - this.strokeOriginX,
-        bounds.y - this.strokeOriginY
+        bounds.y - this.strokeOriginY,
       );
       sctx.restore();
 
       // 6. Draw the clipped scratch onto offscreen
       this.offscreenCtx.drawImage(
         this.scratchCanvas,
-        minSegmentX, minSegmentY, segmentWidth, segmentHeight,
-        minSegmentX, minSegmentY, segmentWidth, segmentHeight
+        minSegmentX,
+        minSegmentY,
+        segmentWidth,
+        segmentHeight,
+        minSegmentX,
+        minSegmentY,
+        segmentWidth,
+        segmentHeight,
       );
     } else {
       this.offscreenCtx.save();
@@ -391,12 +385,7 @@ export class PencilTool extends BaseTool {
     shape: "circle" | "square",
   ) {
     if (shape === "square") {
-      ctx.fillRect(
-        x - Math.floor(size / 2),
-        y - Math.floor(size / 2),
-        size,
-        size,
-      );
+      ctx.fillRect(x - Math.floor(size / 2), y - Math.floor(size / 2), size, size);
     } else {
       if (size === 1) {
         ctx.fillRect(x, y, 1, 1);
@@ -421,33 +410,18 @@ export class PencilTool extends BaseTool {
           const x_max = Math.floor(max_dist_x + radius - 0.5);
           const draw_width = x_max - x_min + 1;
           if (draw_width > 0) {
-            ctx.fillRect(
-              topLeftX + x_min,
-              topLeftY + py,
-              draw_width,
-              1,
-            );
+            ctx.fillRect(topLeftX + x_min, topLeftY + py, draw_width, 1);
           }
         }
       }
     }
   }
 
-  private drawPixel(
-    x: number,
-    y: number,
-    size: number,
-    shape: "circle" | "square",
-  ) {
+  private drawPixel(x: number, y: number, size: number, shape: "circle" | "square") {
     if (!this.offscreenCtx) return;
 
     if (shape === "square") {
-      this.offscreenCtx.fillRect(
-        x - Math.floor(size / 2),
-        y - Math.floor(size / 2),
-        size,
-        size,
-      );
+      this.offscreenCtx.fillRect(x - Math.floor(size / 2), y - Math.floor(size / 2), size, size);
     } else {
       // Circle shape (pixelated)
       if (size === 1) {
@@ -475,12 +449,7 @@ export class PencilTool extends BaseTool {
           const x_max = Math.floor(max_dist_x + radius - 0.5);
           const draw_width = x_max - x_min + 1;
           if (draw_width > 0) {
-            this.offscreenCtx.fillRect(
-              topLeftX + x_min,
-              topLeftY + py,
-              draw_width,
-              1,
-            );
+            this.offscreenCtx.fillRect(topLeftX + x_min, topLeftY + py, draw_width, 1);
           }
         }
       }
@@ -514,11 +483,7 @@ export class PencilTool extends BaseTool {
       ctx.globalAlpha = layer.opacity / 100;
       ctx.globalCompositeOperation = layer.blendMode;
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(
-        this.offscreenCanvas,
-        this.strokeOriginX,
-        this.strokeOriginY,
-      );
+      ctx.drawImage(this.offscreenCanvas, this.strokeOriginX, this.strokeOriginY);
       ctx.restore();
     }
 
@@ -544,12 +509,7 @@ export class PencilTool extends BaseTool {
       ctx.lineWidth = 1 / zoom;
 
       if (settings.shape === "square") {
-        ctx.strokeRect(
-          x - Math.floor(size / 2),
-          y - Math.floor(size / 2),
-          size,
-          size,
-        );
+        ctx.strokeRect(x - Math.floor(size / 2), y - Math.floor(size / 2), size, size);
       } else {
         ctx.beginPath();
         ctx.arc(x, y, size / 2, 0, Math.PI * 2);

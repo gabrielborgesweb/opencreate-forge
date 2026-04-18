@@ -30,9 +30,7 @@ export const BrushOptions: React.FC = () => {
         <input
           type="color"
           value={toolSettings.brush.color}
-          onChange={(e) =>
-            updateToolSettings("brush", { color: e.target.value })
-          }
+          onChange={(e) => updateToolSettings("brush", { color: e.target.value })}
           className="border-none bg-none w-5 h-5 cursor-pointer rounded overflow-hidden"
         />
       </div>

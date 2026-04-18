@@ -3,6 +3,7 @@
 OpenCreate Forge é um software de manipulação de imagens. 100% gratuito e de código-aberto.
 
 Este software fará parte de um pacote criativo:
+
 - **OpenCreate Forge:** Manipulador de imagens
 - **OpenCreate Scale:** Desenho vetorial
 - **OpenCreate Waves:** Criação de músicas (Digital Audio Workstation)

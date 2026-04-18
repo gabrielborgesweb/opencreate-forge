@@ -21,16 +21,11 @@ const presets = [
   },
 ];
 
-const NewProjectModal: React.FC<NewProjectModalProps> = ({
-  isOpen,
-  onClose,
-}) => {
+const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) => {
   const [name, setName] = useState("Untitled");
   const [width, setWidth] = useState(1080);
   const [height, setHeight] = useState(1080);
-  const [background, setBackground] = useState<
-    "white" | "black" | "transparent"
-  >("white");
+  const [background, setBackground] = useState<"white" | "black" | "transparent">("white");
 
   const addProject = useProjectStore((state) => state.addProject);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
@@ -67,9 +62,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
         );
         const firstElement = focusableElements[0] as HTMLElement;
-        const lastElement = focusableElements[
-          focusableElements.length - 1
-        ] as HTMLElement;
+        const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
 
         if (e.shiftKey) {
           // Shift + Tab
@@ -173,9 +166,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         <div className="flex flex-1">
           {/* Presets */}
           <div className="w-[250px] border-r border-bg-tertiary p-4 bg-[#222]">
-            <h3 className="text-[0.75rem] text-[#666] mb-4 uppercase font-bold">
-              Presets
-            </h3>
+            <h3 className="text-[0.75rem] text-[#666] mb-4 uppercase font-bold">Presets</h3>
             <div className="flex flex-col gap-2">
               {presets.map((p) => (
                 <button

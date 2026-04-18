@@ -87,19 +87,19 @@ export class ForgeEngine {
     window.addEventListener("mouseup", this.handleMouseUp);
     window.addEventListener("keydown", this.handleKeyDown);
     window.addEventListener("forge:clear-selection", () => {
-        if (this.project) {
-            this.clearSelection();
-        }
+      if (this.project) {
+        this.clearSelection();
+      }
     });
   }
 
   private async clearSelection() {
     if (!this.project) return;
     if (this.project.selection.floatingLayer) {
-        await this.commitFloatingLayer();
+      await this.commitFloatingLayer();
     }
     useProjectStore.getState().updateProject(this.project.id, {
-        selection: { hasSelection: false, bounds: null, mask: undefined, floatingLayer: null },
+      selection: { hasSelection: false, bounds: null, mask: undefined, floatingLayer: null },
     });
     this.selectionCanvas.width = 1;
     this.selectionCanvas.height = 1;
@@ -126,11 +126,8 @@ export class ForgeEngine {
     await this.copyToClipboard();
 
     // 2. Clear selection
-    const activeLayer = this.project.layers.find(
-      (l) => l.id === this.project?.activeLayerId,
-    );
-    if (!activeLayer || activeLayer.type !== "raster" || !activeLayer.data)
-      return;
+    const activeLayer = this.project.layers.find((l) => l.id === this.project?.activeLayerId);
+    if (!activeLayer || activeLayer.type !== "raster" || !activeLayer.data) return;
 
     const layerCanvas = this.layerCanvasCache.get(activeLayer.id);
     if (!layerCanvas) return;
@@ -142,11 +139,7 @@ export class ForgeEngine {
       ctx.globalCompositeOperation = "destination-out";
 
       // Draw selection mask relative to layer
-      ctx.drawImage(
-        this.selectionCanvas,
-        bounds.x - activeLayer.x,
-        bounds.y - activeLayer.y,
-      );
+      ctx.drawImage(this.selectionCanvas, bounds.x - activeLayer.x, bounds.y - activeLayer.y);
       ctx.restore();
 
       // Update project store
@@ -168,24 +161,17 @@ export class ForgeEngine {
   public async copyToClipboard() {
     if (!this.project || !this.project.activeLayerId) return;
 
-    const activeLayer = this.project.layers.find(
-      (l) => l.id === this.project?.activeLayerId,
-    );
-    if (!activeLayer || activeLayer.type !== "raster" || !activeLayer.data)
-      return;
+    const activeLayer = this.project.layers.find((l) => l.id === this.project?.activeLayerId);
+    if (!activeLayer || activeLayer.type !== "raster" || !activeLayer.data) return;
 
     // Check if layer is visible or locked
     if (!activeLayer.visible) {
-      useUIStore
-        .getState()
-        .showToast("Cannot copy from a hidden layer", "warning");
+      useUIStore.getState().showToast("Cannot copy from a hidden layer", "warning");
       return;
     }
     if (activeLayer.locked) {
       // For copy it might be okay, but user asked to prevent it for both
-      useUIStore
-        .getState()
-        .showToast("Cannot copy from a locked layer", "warning");
+      useUIStore.getState().showToast("Cannot copy from a locked layer", "warning");
       return;
     }
 
@@ -196,10 +182,7 @@ export class ForgeEngine {
     const layerCanvas = this.layerCanvasCache.get(activeLayer.id);
     if (!layerCanvas) return;
 
-    if (
-      !this.project.selection.hasSelection ||
-      !this.project.selection.bounds
-    ) {
+    if (!this.project.selection.hasSelection || !this.project.selection.bounds) {
       sourceCanvas = layerCanvas;
     } else {
       const { bounds } = this.project.selection;
@@ -226,9 +209,7 @@ export class ForgeEngine {
 
       // Selection is empty for this layer
       if (!optimizedBounds) {
-        useUIStore
-          .getState()
-          .showToast("The selection is empty on this layer", "warning");
+        useUIStore.getState().showToast("The selection is empty on this layer", "warning");
         return;
       }
 
@@ -328,10 +309,8 @@ export class ForgeEngine {
               // Center in viewport
               const viewportWidth = this.canvas.width;
               const viewportHeight = this.canvas.height;
-              const projCenterX =
-                (viewportWidth / 2 - this.project!.panX) / this.project!.zoom;
-              const projCenterY =
-                (viewportHeight / 2 - this.project!.panY) / this.project!.zoom;
+              const projCenterX = (viewportWidth / 2 - this.project!.panX) / this.project!.zoom;
+              const projCenterY = (viewportHeight / 2 - this.project!.panY) / this.project!.zoom;
               pasteX = Math.round(projCenterX - img.naturalWidth / 2);
               pasteY = Math.round(projCenterY - img.naturalHeight / 2);
             }
@@ -410,8 +389,7 @@ export class ForgeEngine {
       setActiveTool: (id: any) => useToolStore.getState().setActiveTool(id),
       updateToolSettings: (id: any, settings: any) =>
         useToolStore.getState().updateToolSettings(id, settings),
-      subscribe: (listener: any) =>
-        useToolStore.subscribe((state) => listener(state.toolSettings)),
+      subscribe: (listener: any) => useToolStore.subscribe((state) => listener(state.toolSettings)),
       setLayerCache: (layerId: string, canvas: HTMLCanvasElement) => {
         this.layerCanvasCache.set(layerId, canvas);
         this.layerReadyCache.set(layerId, true);
@@ -422,8 +400,7 @@ export class ForgeEngine {
         return { canvas, ready: !!this.layerReadyCache.get(layerId) };
       },
       ensureLayerCanvas: (layer: Layer) => this.ensureLayerCanvas(layer),
-      animateFitToScreen: (ow?: number, oh?: number) =>
-        this.animateFitToScreen(ow, oh),
+      animateFitToScreen: (ow?: number, oh?: number) => this.animateFitToScreen(ow, oh),
     };
 
     Object.defineProperty(context, "project", {
@@ -492,23 +469,16 @@ export class ForgeEngine {
       const my = e.offsetY;
       const wheelDelta = -e.deltaY;
       const normalizedDelta =
-        Math.sign(wheelDelta) *
-        Math.min(Math.abs(wheelDelta * this.ZOOM_SENSITIVITY), 0.5);
+        Math.sign(wheelDelta) * Math.min(Math.abs(wheelDelta * this.ZOOM_SENSITIVITY), 0.5);
 
       const zoomFactor = Math.exp(normalizedDelta);
-      const targetScale = Math.min(
-        Math.max(this.project.zoom * zoomFactor, 0.05),
-        50,
-      );
+      const targetScale = Math.min(Math.max(this.project.zoom * zoomFactor, 0.05), 50);
 
-      const scaleChange =
-        (targetScale - this.project.zoom) * this.ZOOM_SMOOTHING;
+      const scaleChange = (targetScale - this.project.zoom) * this.ZOOM_SMOOTHING;
       newScale = this.project.zoom + scaleChange;
 
-      newOriginX =
-        mx - (mx - this.project.panX) * (newScale / this.project.zoom);
-      newOriginY =
-        my - (my - this.project.panY) * (newScale / this.project.zoom);
+      newOriginX = mx - (mx - this.project.panX) * (newScale / this.project.zoom);
+      newOriginY = my - (my - this.project.panY) * (newScale / this.project.zoom);
     } else {
       newOriginX = this.project.panX - e.deltaX;
       newOriginY = this.project.panY - e.deltaY;
@@ -694,10 +664,7 @@ export class ForgeEngine {
       }
     }
 
-    const mergeSegments = (
-      segments: any[],
-      orientation: "horizontal" | "vertical",
-    ) => {
+    const mergeSegments = (segments: any[], orientation: "horizontal" | "vertical") => {
       if (segments.length === 0) return [];
       const isHorizontal = orientation === "horizontal";
       if (isHorizontal) {
@@ -842,11 +809,7 @@ export class ForgeEngine {
     this.animateToViewport(scale, originX, originY);
   }
 
-  private animateToViewport(
-    targetZoom: number,
-    targetPanX: number,
-    targetPanY: number,
-  ) {
+  private animateToViewport(targetZoom: number, targetPanX: number, targetPanY: number) {
     if (!this.project) return;
 
     if (this.viewportAnimationId) {
@@ -889,11 +852,7 @@ export class ForgeEngine {
     this.viewportAnimationId = requestAnimationFrame(animate);
   }
 
-  private intersects(
-    layer: Layer,
-    projectWidth: number,
-    projectHeight: number,
-  ): boolean {
+  private intersects(layer: Layer, projectWidth: number, projectHeight: number): boolean {
     return !(
       layer.x >= projectWidth ||
       layer.x + layer.width <= 0 ||
@@ -966,7 +925,11 @@ export class ForgeEngine {
     }
 
     // Render floating layer if it exists
-    if (this.project.selection.floatingLayer && this.project.selection.floatingLayer.visible && this.project.selection.floatingLayer.id !== editingLayerId) {
+    if (
+      this.project.selection.floatingLayer &&
+      this.project.selection.floatingLayer.visible &&
+      this.project.selection.floatingLayer.id !== editingLayerId
+    ) {
       this.renderLayer(this.project.selection.floatingLayer);
     }
 
@@ -989,9 +952,7 @@ export class ForgeEngine {
     if (tool && context) tool.onRender(this.ctx, context);
 
     if (this.project.activeLayerId && activeToolId !== "transform" && activeToolId !== "crop") {
-      const activeLayer = this.project.layers.find(
-        (l) => l.id === this.project?.activeLayerId,
-      );
+      const activeLayer = this.project.layers.find((l) => l.id === this.project?.activeLayerId);
       if (activeLayer) {
         this.ctx.save();
 
@@ -1005,12 +966,7 @@ export class ForgeEngine {
 
         this.ctx.lineWidth = 1 / this.project.zoom;
         this.ctx.setLineDash([4 / this.project.zoom, 2 / this.project.zoom]);
-        this.ctx.strokeRect(
-          activeLayer.x,
-          activeLayer.y,
-          activeLayer.width,
-          activeLayer.height,
-        );
+        this.ctx.strokeRect(activeLayer.x, activeLayer.y, activeLayer.width, activeLayer.height);
         this.ctx.restore();
       }
     }
@@ -1026,13 +982,9 @@ export class ForgeEngine {
 
     if (layer.type === "raster") {
       let lCanvas = this.layerCanvasCache.get(layer.id);
-      
+
       // If not in cache and we have data, try to load it
-      if (
-        !lCanvas ||
-        lCanvas.width !== layer.width ||
-        lCanvas.height !== layer.height
-      ) {
+      if (!lCanvas || lCanvas.width !== layer.width || lCanvas.height !== layer.height) {
         if (layer.data) {
           // Check if we are already loading or have an image
           let img = this.imageCache.get(layer.data);
@@ -1069,11 +1021,7 @@ export class ForgeEngine {
     } else if (layer.type === "text") {
       this.ctx.fillStyle = layer.color || "#ffffff";
       this.ctx.font = `${layer.fontSize}px ${layer.fontFamily}`;
-      this.ctx.fillText(
-        layer.text || "",
-        layer.x,
-        layer.y + (layer.fontSize || 0),
-      );
+      this.ctx.fillText(layer.text || "", layer.x, layer.y + (layer.fontSize || 0));
     }
     this.ctx.restore();
   }
@@ -1110,11 +1058,7 @@ export class ForgeEngine {
   }
 
   private async floatSelection(layerId: string): Promise<boolean> {
-    if (
-      !this.project ||
-      !this.project.selection.hasSelection ||
-      !this.project.selection.bounds
-    )
+    if (!this.project || !this.project.selection.hasSelection || !this.project.selection.bounds)
       return false;
 
     if (this.project.selection.floatingLayer) return true;
@@ -1142,11 +1086,7 @@ export class ForgeEngine {
     const nlctx = newLayerCanvas.getContext("2d")!;
     nlctx.drawImage(layerCanvas, 0, 0);
     nlctx.globalCompositeOperation = "destination-out";
-    nlctx.drawImage(
-      this.selectionCanvas,
-      bounds.x - layer.x,
-      bounds.y - layer.y,
-    );
+    nlctx.drawImage(this.selectionCanvas, bounds.x - layer.x, bounds.y - layer.y);
 
     const floatingLayer: Layer = {
       id: "floating-selection",
@@ -1188,16 +1128,10 @@ export class ForgeEngine {
   }
 
   private async commitFloatingLayer() {
-    if (
-      !this.project ||
-      !this.project.selection.floatingLayer ||
-      !this.project.activeLayerId
-    )
+    if (!this.project || !this.project.selection.floatingLayer || !this.project.activeLayerId)
       return;
 
-    const activeLayer = this.project.layers.find(
-      (l) => l.id === this.project?.activeLayerId,
-    );
+    const activeLayer = this.project.layers.find((l) => l.id === this.project?.activeLayerId);
     if (!activeLayer || activeLayer.type !== "raster") return;
 
     const floatingLayer = this.project.selection.floatingLayer;
@@ -1206,10 +1140,7 @@ export class ForgeEngine {
 
     const minX = Math.min(activeLayer.x, floatingLayer.x);
     const minY = Math.min(activeLayer.y, floatingLayer.y);
-    const maxX = Math.max(
-      activeLayer.x + activeLayer.width,
-      floatingLayer.x + floatingLayer.width,
-    );
+    const maxX = Math.max(activeLayer.x + activeLayer.width, floatingLayer.x + floatingLayer.width);
     const maxY = Math.max(
       activeLayer.y + activeLayer.height,
       floatingLayer.y + floatingLayer.height,
@@ -1223,8 +1154,16 @@ export class ForgeEngine {
     finalCanvas.height = newH;
     const fctx = finalCanvas.getContext("2d")!;
 
-    fctx.drawImage(activeCanvas, Math.round(activeLayer.x - minX), Math.round(activeLayer.y - minY));
-    fctx.drawImage(floatCanvas, Math.round(floatingLayer.x - minX), Math.round(floatingLayer.y - minY));
+    fctx.drawImage(
+      activeCanvas,
+      Math.round(activeLayer.x - minX),
+      Math.round(activeLayer.y - minY),
+    );
+    fctx.drawImage(
+      floatCanvas,
+      Math.round(floatingLayer.x - minX),
+      Math.round(floatingLayer.y - minY),
+    );
 
     this.layerCanvasCache.set(activeLayer.id, finalCanvas);
     this.layerReadyCache.set(activeLayer.id, true);
@@ -1243,7 +1182,7 @@ export class ForgeEngine {
         floatingLayer: null,
       },
     });
-    
+
     this.project.selection.floatingLayer = null;
   }
 }

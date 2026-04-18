@@ -13,9 +13,7 @@ export interface ToolContext {
   updateProject: (updates: Partial<Project>) => void;
   invalidateCache: (layerId: string) => void;
   setLayerCache: (layerId: string, canvas: HTMLCanvasElement) => void;
-  getLayerCanvas: (
-    layerId: string,
-  ) => { canvas: HTMLCanvasElement; ready: boolean } | null;
+  getLayerCanvas: (layerId: string) => { canvas: HTMLCanvasElement; ready: boolean } | null;
   ensureLayerCanvas: (layer: Layer) => Promise<HTMLCanvasElement>;
   screenToProject: (x: number, y: number) => { x: number; y: number };
   getSelectionCanvas: () => {

@@ -37,14 +37,7 @@ export class EraserTool extends BaseTool {
     const ctx = this.brushCanvas.getContext("2d")!;
 
     const center = canvasSize / 2;
-    const gradient = ctx.createRadialGradient(
-      center,
-      center,
-      0,
-      center,
-      center,
-      radius,
-    );
+    const gradient = ctx.createRadialGradient(center, center, 0, center, center, radius);
 
     // Na borracha (Brush mode), desenhamos com PRETO sólido no canvas auxiliar
     // e depois usamos destination-out no canvas principal.
@@ -61,10 +54,7 @@ export class EraserTool extends BaseTool {
       const alpha = 1 - tSmooth;
       const stopPosition = hardnessStop + t * (1 - hardnessStop);
 
-      gradient.addColorStop(
-        Math.min(0.999, stopPosition),
-        `rgba(0,0,0,${alpha})`,
-      );
+      gradient.addColorStop(Math.min(0.999, stopPosition), `rgba(0,0,0,${alpha})`);
     }
 
     ctx.fillStyle = gradient;
@@ -185,10 +175,7 @@ export class EraserTool extends BaseTool {
       searchBounds.width = searchMaxX - searchBounds.x;
       searchBounds.height = searchMaxY - searchBounds.y;
 
-      const bounds = this.getOptimizedBoundingBox(
-        this.offscreenCtx,
-        searchBounds,
-      );
+      const bounds = this.getOptimizedBoundingBox(this.offscreenCtx, searchBounds);
 
       if (bounds) {
         const croppedCanvas = document.createElement("canvas");
@@ -255,12 +242,7 @@ export class EraserTool extends BaseTool {
     search: { x: number; y: number; width: number; height: number },
   ) {
     if (search.width <= 0 || search.height <= 0) return null;
-    const imageData = ctx.getImageData(
-      search.x,
-      search.y,
-      search.width,
-      search.height,
-    );
+    const imageData = ctx.getImageData(search.x, search.y, search.width, search.height);
     const data = imageData.data;
     let minX = search.width,
       minY = search.height,
@@ -310,11 +292,7 @@ export class EraserTool extends BaseTool {
     const cachedResult = context.getLayerCanvas(layer.id);
     if (cachedResult) {
       this.offscreenCtx.clearRect(0, 0, width, height);
-      this.offscreenCtx.drawImage(
-        cachedResult.canvas,
-        this.STROKE_PADDING,
-        this.STROKE_PADDING,
-      );
+      this.offscreenCtx.drawImage(cachedResult.canvas, this.STROKE_PADDING, this.STROKE_PADDING);
       if (cachedResult.ready) return;
     }
 
@@ -325,11 +303,7 @@ export class EraserTool extends BaseTool {
         if (this.offscreenCtx) {
           this.offscreenCtx.save();
           this.offscreenCtx.globalCompositeOperation = "destination-over";
-          this.offscreenCtx.drawImage(
-            img,
-            this.STROKE_PADDING,
-            this.STROKE_PADDING,
-          );
+          this.offscreenCtx.drawImage(img, this.STROKE_PADDING, this.STROKE_PADDING);
           this.offscreenCtx.restore();
         }
         this.isLoadingBaseImage = false;
@@ -352,7 +326,11 @@ export class EraserTool extends BaseTool {
 
     // Paint only within selection if it exists
     const selection = context.getSelectionCanvas();
-    if (context.project.selection.hasSelection && context.project.selection.bounds && selection.canvas) {
+    if (
+      context.project.selection.hasSelection &&
+      context.project.selection.bounds &&
+      selection.canvas
+    ) {
       const { bounds } = context.project.selection;
 
       // 1. Prepare or reuse scratch canvas
@@ -364,8 +342,9 @@ export class EraserTool extends BaseTool {
       }
 
       const sctx = this.scratchCtx!;
-      const brushSize = (settings.mode === "brush" && this.brushCanvas) ? this.brushCanvas.width : settings.size;
-      
+      const brushSize =
+        settings.mode === "brush" && this.brushCanvas ? this.brushCanvas.width : settings.size;
+
       // 2. Calculate bounding box
       const minSegmentX = Math.floor(Math.min(localX, localLastX) - brushSize);
       const minSegmentY = Math.floor(Math.min(localY, localLastY) - brushSize);
@@ -374,11 +353,11 @@ export class EraserTool extends BaseTool {
 
       // 3. Clear segment area in scratch
       sctx.clearRect(minSegmentX, minSegmentY, segmentWidth, segmentHeight);
-      
+
       if (settings.mode === "pencil") {
         sctx.imageSmoothingEnabled = false;
         sctx.fillStyle = "black";
-        
+
         let x0 = Math.floor(localLastX);
         let y0 = Math.floor(localLastY);
         const x1 = Math.floor(localX);
@@ -424,7 +403,7 @@ export class EraserTool extends BaseTool {
       sctx.drawImage(
         selection.canvas,
         bounds.x - this.strokeOriginX,
-        bounds.y - this.strokeOriginY
+        bounds.y - this.strokeOriginY,
       );
       sctx.restore();
 
@@ -433,11 +412,16 @@ export class EraserTool extends BaseTool {
       this.offscreenCtx.globalCompositeOperation = "destination-out";
       this.offscreenCtx.drawImage(
         this.scratchCanvas,
-        minSegmentX, minSegmentY, segmentWidth, segmentHeight,
-        minSegmentX, minSegmentY, segmentWidth, segmentHeight
+        minSegmentX,
+        minSegmentY,
+        segmentWidth,
+        segmentHeight,
+        minSegmentX,
+        minSegmentY,
+        segmentWidth,
+        segmentHeight,
       );
       this.offscreenCtx.restore();
-
     } else {
       // No selection, draw directly with destination-out
       this.offscreenCtx.save();
@@ -498,12 +482,7 @@ export class EraserTool extends BaseTool {
     shape: "circle" | "square",
   ) {
     if (shape === "square") {
-      ctx.fillRect(
-        x - Math.floor(size / 2),
-        y - Math.floor(size / 2),
-        size,
-        size,
-      );
+      ctx.fillRect(x - Math.floor(size / 2), y - Math.floor(size / 2), size, size);
     } else {
       if (size === 1) {
         ctx.fillRect(x, y, 1, 1);
@@ -528,33 +507,18 @@ export class EraserTool extends BaseTool {
           const x_max = Math.floor(max_dist_x + radius - 0.5);
           const draw_width = x_max - x_min + 1;
           if (draw_width > 0) {
-            ctx.fillRect(
-              topLeftX + x_min,
-              topLeftY + py,
-              draw_width,
-              1,
-            );
+            ctx.fillRect(topLeftX + x_min, topLeftY + py, draw_width, 1);
           }
         }
       }
     }
   }
 
-  private drawPixel(
-    x: number,
-    y: number,
-    size: number,
-    shape: "circle" | "square",
-  ) {
+  private drawPixel(x: number, y: number, size: number, shape: "circle" | "square") {
     if (!this.offscreenCtx) return;
 
     if (shape === "square") {
-      this.offscreenCtx.fillRect(
-        x - Math.floor(size / 2),
-        y - Math.floor(size / 2),
-        size,
-        size,
-      );
+      this.offscreenCtx.fillRect(x - Math.floor(size / 2), y - Math.floor(size / 2), size, size);
     } else {
       // Circle shape (pixelated)
       if (size === 1) {
@@ -582,12 +546,7 @@ export class EraserTool extends BaseTool {
           const x_max = Math.floor(max_dist_x + radius - 0.5);
           const draw_width = x_max - x_min + 1;
           if (draw_width > 0) {
-            this.offscreenCtx.fillRect(
-              topLeftX + x_min,
-              topLeftY + py,
-              draw_width,
-              1,
-            );
+            this.offscreenCtx.fillRect(topLeftX + x_min, topLeftY + py, draw_width, 1);
           }
         }
       }
@@ -623,11 +582,7 @@ export class EraserTool extends BaseTool {
       if (settings.mode === "pencil") {
         ctx.imageSmoothingEnabled = false;
       }
-      ctx.drawImage(
-        this.offscreenCanvas,
-        this.strokeOriginX,
-        this.strokeOriginY,
-      );
+      ctx.drawImage(this.offscreenCanvas, this.strokeOriginX, this.strokeOriginY);
       ctx.restore();
     }
 
@@ -676,13 +631,7 @@ export class EraserTool extends BaseTool {
         );
       } else {
         ctx.beginPath();
-        ctx.arc(
-          this.mouseX,
-          this.mouseY,
-          Math.max(0, size / 2 - offset),
-          0,
-          Math.PI * 2,
-        );
+        ctx.arc(this.mouseX, this.mouseY, Math.max(0, size / 2 - offset), 0, Math.PI * 2);
         ctx.stroke();
       }
 

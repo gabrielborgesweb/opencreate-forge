@@ -90,61 +90,53 @@ app.whenReady().then(() => {
     return filePaths[0];
   });
 
-  ipcMain.handle(
-    "dialog:saveFile",
-    async (_event, { dataURL, defaultName }) => {
-      const { canceled, filePath } = await dialog.showSaveDialog({
-        title: "Salvar imagem",
-        defaultPath: defaultName || "image.png",
-        filters: [
-          { name: "PNG", extensions: ["png"] },
-          { name: "JPEG", extensions: ["jpg", "jpeg"] },
-        ],
-      });
-      if (canceled || !filePath) return { success: false };
+  ipcMain.handle("dialog:saveFile", async (_event, { dataURL, defaultName }) => {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: "Salvar imagem",
+      defaultPath: defaultName || "image.png",
+      filters: [
+        { name: "PNG", extensions: ["png"] },
+        { name: "JPEG", extensions: ["jpg", "jpeg"] },
+      ],
+    });
+    if (canceled || !filePath) return { success: false };
 
-      const matches = dataURL.match(/^data:(.+);base64,(.+)$/);
-      if (!matches)
-        return { success: false, error: "Formato de dataURL inválido" };
+    const matches = dataURL.match(/^data:(.+);base64,(.+)$/);
+    if (!matches) return { success: false, error: "Formato de dataURL inválido" };
 
-      const buffer = Buffer.from(matches[2], "base64");
-      try {
-        await fs.writeFile(filePath, buffer);
-        return { success: true, filePath };
-      } catch (err: any) {
-        return { success: false, error: err.message };
-      }
-    },
-  );
+    const buffer = Buffer.from(matches[2], "base64");
+    try {
+      await fs.writeFile(filePath, buffer);
+      return { success: true, filePath };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
 
-  ipcMain.handle(
-    "dialog:saveProjectAs",
-    async (_event, { jsonString, defaultName }) => {
-      const { canceled, filePath } = await dialog.showSaveDialog({
-        title: "Salvar Projeto Como...",
-        defaultPath: defaultName || "projeto.ocfd",
-        filters: [{ name: "OpenCreate Forge Document", extensions: ["ocfd"] }],
-      });
-      if (canceled || !filePath) return { success: false, filePath: null };
+  ipcMain.handle("dialog:saveProjectAs", async (_event, { jsonString, defaultName }) => {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: "Salvar Projeto Como...",
+      defaultPath: defaultName || "projeto.ocfd",
+      filters: [{ name: "OpenCreate Forge Document", extensions: ["ocfd"] }],
+    });
+    if (canceled || !filePath) return { success: false, filePath: null };
 
-      try {
-        let projectData = JSON.parse(jsonString);
-        projectData = {
-          ...projectData,
-          originalName: projectData.name,
-          name: path.basename(filePath),
-        };
-        await fs.writeFile(filePath, JSON.stringify(projectData));
-        return { success: true, filePath };
-      } catch (err: any) {
-        return { success: false, error: err.message, filePath: null };
-      }
-    },
-  );
+    try {
+      let projectData = JSON.parse(jsonString);
+      projectData = {
+        ...projectData,
+        originalName: projectData.name,
+        name: path.basename(filePath),
+      };
+      await fs.writeFile(filePath, JSON.stringify(projectData));
+      return { success: true, filePath };
+    } catch (err: any) {
+      return { success: false, error: err.message, filePath: null };
+    }
+  });
 
   ipcMain.handle("fs:saveProject", async (_event, { jsonString, filePath }) => {
-    if (!filePath)
-      return { success: false, error: "Nenhum caminho de arquivo fornecido." };
+    if (!filePath) return { success: false, error: "Nenhum caminho de arquivo fornecido." };
     try {
       await fs.writeFile(filePath, jsonString);
       return { success: true, filePath };

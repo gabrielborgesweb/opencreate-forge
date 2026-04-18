@@ -1,16 +1,24 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
-export type ToolId = 'move' | 'select' | 'brush' | 'pencil' | 'eraser' | 'text' | 'transform' | 'crop';
+export type ToolId =
+  | "move"
+  | "select"
+  | "brush"
+  | "pencil"
+  | "eraser"
+  | "text"
+  | "transform"
+  | "crop";
 
-export type SelectMode = 'replace' | 'unite' | 'subtract' | 'intersect';
-export type SelectShape = 'rectangle' | 'ellipse' | 'lasso' | 'wand';
-export type CropMode = 'Free' | 'Original Ratio' | 'Fixed Ratio';
+export type SelectMode = "replace" | "unite" | "subtract" | "intersect";
+export type SelectShape = "rectangle" | "ellipse" | "lasso" | "wand";
+export type CropMode = "Free" | "Original Ratio" | "Fixed Ratio";
 
 export interface ToolSettings {
   select: { mode: SelectMode; shape: SelectShape };
   brush: { size: number; color: string; hardness: number };
-  pencil: { size: number; color: string; shape: 'circle' | 'square' };
-  eraser: { size: number; hardness: number; mode: 'brush' | 'pencil'; shape: 'circle' | 'square' };
+  pencil: { size: number; color: string; shape: "circle" | "square" };
+  eraser: { size: number; hardness: number; mode: "brush" | "pencil"; shape: "circle" | "square" };
   crop: {
     mode: CropMode;
     ratioW: number;
@@ -36,7 +44,7 @@ interface ToolState {
   previousToolId: ToolId;
   isInteracting: boolean;
   toolSettings: ToolSettings;
-  
+
   // Actions
   setActiveTool: (id: ToolId) => void;
   setInteracting: (isInteracting: boolean) => void;
@@ -44,16 +52,16 @@ interface ToolState {
 }
 
 export const useToolStore = create<ToolState>((set) => ({
-  activeToolId: 'move',
-  previousToolId: 'move',
+  activeToolId: "move",
+  previousToolId: "move",
   isInteracting: false,
   toolSettings: {
-    select: { mode: 'replace', shape: 'rectangle' },
-    brush: { size: 50, color: '#000000', hardness: 1.0 },
-    pencil: { size: 1, color: '#000000', shape: 'square' },
-    eraser: { size: 100, hardness: 1.0, mode: 'brush', shape: 'circle' },
+    select: { mode: "replace", shape: "rectangle" },
+    brush: { size: 50, color: "#000000", hardness: 1.0 },
+    pencil: { size: 1, color: "#000000", shape: "square" },
+    eraser: { size: 100, hardness: 1.0, mode: "brush", shape: "circle" },
     crop: {
-      mode: 'Free',
+      mode: "Free",
       ratioW: 1,
       ratioH: 1,
       deleteCropped: true,
@@ -72,26 +80,29 @@ export const useToolStore = create<ToolState>((set) => ({
     },
   },
 
-  setActiveTool: (id) => set((state) => {
-    if (id === state.activeToolId) return state;
-    
-    // Don't save 'transform' or 'crop' as the previous tool
-    const newPreviousToolId = (state.activeToolId === 'transform' || state.activeToolId === 'crop')
-      ? state.previousToolId
-      : state.activeToolId;
+  setActiveTool: (id) =>
+    set((state) => {
+      if (id === state.activeToolId) return state;
 
-    return {
-      activeToolId: id,
-      previousToolId: newPreviousToolId,
-    };
-  }),
+      // Don't save 'transform' or 'crop' as the previous tool
+      const newPreviousToolId =
+        state.activeToolId === "transform" || state.activeToolId === "crop"
+          ? state.previousToolId
+          : state.activeToolId;
+
+      return {
+        activeToolId: id,
+        previousToolId: newPreviousToolId,
+      };
+    }),
 
   setInteracting: (isInteracting) => set({ isInteracting }),
 
-  updateToolSettings: (id, settings) => set((state) => ({
-    toolSettings: {
-      ...state.toolSettings,
-      [id]: { ...state.toolSettings[id as keyof typeof state.toolSettings], ...settings }
-    }
-  })),
+  updateToolSettings: (id, settings) =>
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        [id]: { ...state.toolSettings[id as keyof typeof state.toolSettings], ...settings },
+      },
+    })),
 }));

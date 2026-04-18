@@ -152,9 +152,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
     <div
       className={`group flex items-center p-2 cursor-pointer select-none border-b border-bg-tertiary transition-colors ${
         isActive ? "bg-bg-tertiary" : "bg-transparent hover:bg-white/5"
-      } ${!layer.visible ? "opacity-60" : ""} ${
-        isDragOver ? "border-t-2 border-t-accent" : ""
-      }`}
+      } ${!layer.visible ? "opacity-60" : ""} ${isDragOver ? "border-t-2 border-t-accent" : ""}`}
       onClick={() => setActiveLayer(projectId, layer.id)}
       draggable={!isEditing}
       onDragStart={(e) => onDragStart(e, index)}
@@ -208,10 +206,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
-          <div
-            className="text-[0.85rem] truncate"
-            onDoubleClick={() => setIsEditing(true)}
-          >
+          <div className="text-[0.85rem] truncate" onDoubleClick={() => setIsEditing(true)}>
             {layer.name}
           </div>
         )}

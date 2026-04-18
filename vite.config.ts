@@ -1,8 +1,8 @@
-import { defineConfig } from 'vite'
-import path from 'node:path'
-import react from '@vitejs/plugin-react'
-import electron from 'vite-plugin-electron/simple'
-import tailwindcss from '@tailwindcss/vite'
+import { defineConfig } from "vite";
+import path from "node:path";
+import react from "@vitejs/plugin-react";
+import electron from "vite-plugin-electron/simple";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [
@@ -10,18 +10,18 @@ export default defineConfig({
     tailwindcss(),
     electron({
       main: {
-        entry: 'src/main/main.ts',
+        entry: "src/main/main.ts",
         vite: {
           build: {
-            outDir: 'dist-electron',
+            outDir: "dist-electron",
           },
         },
       },
       preload: {
-        input: 'src/main/preload.ts',
+        input: "src/main/preload.ts",
         vite: {
           build: {
-            outDir: 'dist-electron',
+            outDir: "dist-electron",
           },
         },
       },
@@ -31,13 +31,13 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@core': path.resolve(__dirname, './src/core'),
-      '@ui': path.resolve(__dirname, './src/renderer'),
-      '@store': path.resolve(__dirname, './src/renderer/store'),
+      "@": path.resolve(__dirname, "./src"),
+      "@core": path.resolve(__dirname, "./src/core"),
+      "@ui": path.resolve(__dirname, "./src/renderer"),
+      "@store": path.resolve(__dirname, "./src/renderer/store"),
     },
   },
   build: {
     emptyOutDir: true,
   },
-})
+});

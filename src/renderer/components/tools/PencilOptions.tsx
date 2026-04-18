@@ -22,9 +22,7 @@ export const PencilOptions: React.FC = () => {
         <input
           type="color"
           value={toolSettings.pencil.color}
-          onChange={(e) =>
-            updateToolSettings("pencil", { color: e.target.value })
-          }
+          onChange={(e) => updateToolSettings("pencil", { color: e.target.value })}
           className="border-none bg-none w-5 h-5 cursor-pointer rounded overflow-hidden"
         />
       </div>

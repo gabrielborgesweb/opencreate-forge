@@ -57,11 +57,7 @@ const CanvasViewport: React.FC = () => {
   const centeredProjectsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (
-      engineRef.current &&
-      project &&
-      !centeredProjectsRef.current.has(project.id)
-    ) {
+    if (engineRef.current && project && !centeredProjectsRef.current.has(project.id)) {
       // Se o projeto foi recém-criado (está no estado padrão 1:1 e 0:0) ou simplesmente ainda não foi centralizado nesta sessão
       if (project.zoom === 1 && project.panX === 0 && project.panY === 0) {
         engineRef.current.fitToScreen();
@@ -131,10 +127,8 @@ const CanvasViewport: React.FC = () => {
 
             // Converte o centro da tela para coordenadas dentro do projeto
             // levando em conta o zoom e o pan atual
-            const projCenterX =
-              (viewportWidth / 2 - project.panX) / project.zoom;
-            const projCenterY =
-              (viewportHeight / 2 - project.panY) / project.zoom;
+            const projCenterX = (viewportWidth / 2 - project.panX) / project.zoom;
+            const projCenterY = (viewportHeight / 2 - project.panY) / project.zoom;
 
             // Posiciona a imagem centralizada nesse ponto do projeto
             const x = Math.round(projCenterX - img.naturalWidth / 2);

@@ -25,9 +25,7 @@ export const CropOptions: React.FC = () => {
         <span className="text-[#999] font-bold">MODE:</span>
         <select
           value={crop.mode}
-          onChange={(e) =>
-            updateSettings("crop", { mode: e.target.value as CropMode })
-          }
+          onChange={(e) => updateSettings("crop", { mode: e.target.value as CropMode })}
           className="bg-[#333] border border-white/10 text-text rounded px-1 outline-none h-6"
         >
           <option value="Free">Free</option>
@@ -61,9 +59,7 @@ export const CropOptions: React.FC = () => {
           <input
             type="checkbox"
             checked={crop.deleteCropped}
-            onChange={(e) =>
-              updateSettings("crop", { deleteCropped: e.target.checked })
-            }
+            onChange={(e) => updateSettings("crop", { deleteCropped: e.target.checked })}
             className="w-3 h-3 rounded bg-[#333] border-white/10 accent-accent"
           />
           <span className="text-[#999] font-bold">DELETE OUTSIDE</span>

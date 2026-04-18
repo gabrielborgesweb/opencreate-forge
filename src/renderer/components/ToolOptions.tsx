@@ -37,9 +37,7 @@ const ToolOptions: React.FC = () => {
       {OptionsComponent ? (
         <OptionsComponent />
       ) : (
-        <span className="text-[0.75rem] text-[#666]">
-          No options for this tool
-        </span>
+        <span className="text-[0.75rem] text-[#666]">No options for this tool</span>
       )}
     </div>
   );

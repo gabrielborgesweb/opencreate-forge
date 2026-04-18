@@ -64,12 +64,7 @@ const HomeScreen: React.FC = () => {
             const dataUrl = event.target?.result as string;
             const img = new Image();
             img.onload = () => {
-              handleCreateFromImage(
-                dataUrl,
-                img.naturalWidth,
-                img.naturalHeight,
-                "Pasted Image",
-              );
+              handleCreateFromImage(dataUrl, img.naturalWidth, img.naturalHeight, "Pasted Image");
             };
             img.src = dataUrl;
           };
@@ -143,9 +138,7 @@ const HomeScreen: React.FC = () => {
         <h2 className="text-[2rem] mb-2 font-bold text-text">
           OpenCreate <span className="text-accent">Forge</span>
         </h2>
-        <p className="text-[#888]">
-          Modern Image Editor powered by React & Electron
-        </p>
+        <p className="text-[#888]">Modern Image Editor powered by React & Electron</p>
       </div>
 
       <div className="flex gap-6">

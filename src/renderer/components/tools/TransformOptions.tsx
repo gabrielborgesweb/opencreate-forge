@@ -7,9 +7,7 @@ export const TransformOptions: React.FC = () => {
   const transform = useToolStore((state) => state.toolSettings.transform);
 
   const updateSettings = (updates: any) => {
-    useToolStore
-      .getState()
-      .updateToolSettings("transform", { ...updates, isDirty: true });
+    useToolStore.getState().updateToolSettings("transform", { ...updates, isDirty: true });
   };
 
   const handleApply = () => {

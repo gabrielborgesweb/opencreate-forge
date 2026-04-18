@@ -29,9 +29,7 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
   const startValue = useRef(0);
 
   // Valor convertido para exibição (ex: 0.5 * 100 = 50)
-  const displayValue = Number(
-    (value * displayMultiplier).toFixed(displayMultiplier === 1 ? 0 : 2)
-  );
+  const displayValue = Number((value * displayMultiplier).toFixed(displayMultiplier === 1 ? 0 : 2));
 
   const clampAndSave = (newValue: number) => {
     const clamped = Math.min(max, Math.max(min, newValue));
@@ -76,10 +74,7 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
   // Fechar o slider ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -88,11 +83,7 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
   }, []);
 
   return (
-    <div
-      className="relative flex items-center gap-2"
-      ref={containerRef}
-      onWheel={handleWheel}
-    >
+    <div className="relative flex items-center gap-2" ref={containerRef} onWheel={handleWheel}>
       <label
         className="text-[0.75rem] text-[#999] cursor-col-resize select-none font-medium hover:text-white transition-colors"
         onMouseDown={handleMouseDown}
@@ -118,9 +109,7 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
           onClick={(e) => e.stopPropagation()}
           className="bg-transparent border-none text-[0.75rem] w-10 text-center outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-white font-medium"
         />
-        <span className="text-[0.65rem] text-[#666] select-none font-bold">
-          {unit}
-        </span>
+        <span className="text-[0.65rem] text-[#666] select-none font-bold">{unit}</span>
         <ChevronDown
           size={12}
           className={`text-[#666] group-hover:text-accent transition-transform duration-200 ${isOpen ? "rotate-180 text-accent" : ""}`}

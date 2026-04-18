@@ -11,8 +11,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Novo
   saveProject: (data) => ipcRenderer.invoke("fs:saveProject", data),
   // Novo
-  confirmClose: (projectName) =>
-    ipcRenderer.invoke("dialog:confirmClose", projectName),
+  confirmClose: (projectName) => ipcRenderer.invoke("dialog:confirmClose", projectName),
   // --- FIM DA MODIFICAÇÃO ---
   openProject: () => ipcRenderer.invoke("dialog:openProject"),
   // readFile: (filePath) => ipcRenderer.invoke("fs:readFile", filePath),
@@ -70,9 +69,7 @@ window.addEventListener("DOMContentLoaded", () => {
         // *** FIM DA APLICAÇÃO ***
 
         if (!filePath) {
-          console.warn(
-            "PRELOAD SCRIPT: Não foi possível obter o file.path via webUtils."
-          );
+          console.warn("PRELOAD SCRIPT: Não foi possível obter o file.path via webUtils.");
         }
 
         // --- INÍCIO DA MODIFICAÇÃO ---
@@ -80,8 +77,8 @@ window.addEventListener("DOMContentLoaded", () => {
         const dropTarget = projectsTabs.contains(e.target)
           ? "tabs"
           : canvasContainer.contains(e.target)
-          ? "canvas"
-          : "unknown";
+            ? "canvas"
+            : "unknown";
         // --- FIM DA MODIFICAÇÃO ---
 
         // Lê o conteúdo do arquivo e envia tudo para o app.js
@@ -97,7 +94,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 name: file.name,
                 target: dropTarget, // <-- NOVO: Informa onde o drop aconteceu
               },
-            })
+            }),
           );
         } catch (err) {
           console.error("Erro ao ler arquivo no preload:", err);
@@ -107,7 +104,7 @@ window.addEventListener("DOMContentLoaded", () => {
       // Você pode adicionar um 'else if' aqui e disparar um evento
       // 'image-dropped' com o file.path e o tipo.
     },
-    false // <-- MUDANÇA CRUCIAL: de 'true' para 'false'
+    false, // <-- MUDANÇA CRUCIAL: de 'true' para 'false'
   ); // Use 'capture' para pegar o evento primeiro
 
   // 4. Prevenir o comportamento padrão do 'dragover' é essencial
@@ -142,7 +139,7 @@ window.addEventListener("DOMContentLoaded", () => {
         window.dispatchEvent(new CustomEvent("drag-ended"));
       }
     },
-    false // <-- MUDANÇA CRUCIAL: de 'true' para 'false'
+    false, // <-- MUDANÇA CRUCIAL: de 'true' para 'false'
   );
   // --- FIM DA CORREÇÃO ---
 
@@ -159,7 +156,7 @@ window.addEventListener("DOMContentLoaded", () => {
       // Envia um evento para o app.js limpar o feedback visual
       window.dispatchEvent(new CustomEvent("drag-ended"));
     },
-    false // <-- MUDANÇA CRUCIAL: de 'true' para 'false'
+    false, // <-- MUDANÇA CRUCIAL: de 'true' para 'false'
   );
 });
 // --- FIM DA NOVA SOLUÇÃO ---

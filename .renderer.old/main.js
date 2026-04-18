@@ -179,35 +179,32 @@ app.whenReady().then(() => {
   });
 
   // 1. RENOMEIE o handler "dialog:saveProject" para "dialog:saveProjectAs"
-  ipcMain.handle(
-    "dialog:saveProjectAs",
-    async (event, { jsonString, defaultName }) => {
-      const { canceled, filePath } = await dialog.showSaveDialog({
-        title: "Salvar Projeto Como...", // Título atualizado
-        defaultPath: defaultName || "projeto.ocfd",
-        filters: [{ name: "OpenCreate Forge Document", extensions: ["ocfd"] }],
-      });
-      if (canceled || !filePath) {
-        // Retorna o filePath como nulo se cancelado
-        return { success: false, filePath: null };
-      }
-      let projectData = await JSON.parse(jsonString);
-      projectData = {
-        ...projectData,
-        originalName: projectData.name,
-        name: filePath.split(/[\\/]/).pop(),
-      };
+  ipcMain.handle("dialog:saveProjectAs", async (event, { jsonString, defaultName }) => {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: "Salvar Projeto Como...", // Título atualizado
+      defaultPath: defaultName || "projeto.ocfd",
+      filters: [{ name: "OpenCreate Forge Document", extensions: ["ocfd"] }],
+    });
+    if (canceled || !filePath) {
+      // Retorna o filePath como nulo se cancelado
+      return { success: false, filePath: null };
+    }
+    let projectData = await JSON.parse(jsonString);
+    projectData = {
+      ...projectData,
+      originalName: projectData.name,
+      name: filePath.split(/[\\/]/).pop(),
+    };
 
-      jsonString = JSON.stringify(projectData);
+    jsonString = JSON.stringify(projectData);
 
-      try {
-        await fs.writeFile(filePath, jsonString);
-        return { success: true, filePath }; // Retorna o caminho bem-sucedido
-      } catch (err) {
-        return { success: false, error: err.message, filePath: null };
-      }
-    },
-  );
+    try {
+      await fs.writeFile(filePath, jsonString);
+      return { success: true, filePath }; // Retorna o caminho bem-sucedido
+    } catch (err) {
+      return { success: false, error: err.message, filePath: null };
+    }
+  });
 
   // 2. CRIE o NOVO handler "fs:saveProject" para salvamento rápido
   ipcMain.handle("fs:saveProject", async (event, { jsonString, filePath }) => {

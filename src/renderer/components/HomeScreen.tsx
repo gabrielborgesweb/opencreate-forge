@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Plus, FolderOpen } from "lucide-react";
-import NewProjectModal from "./NewProjectModal";
 import { useProjectStore, Project } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";
 
 const HomeScreen: React.FC = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const addProject = useProjectStore((state) => state.addProject);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  const handleNewProjectClick = () => {
+    window.dispatchEvent(new CustomEvent("forge:new-project"));
+  };
 
   const handleCreateFromImage = useCallback(
     (dataUrl: string, width: number, height: number, name: string) => {
@@ -148,7 +150,7 @@ const HomeScreen: React.FC = () => {
 
       <div className="flex gap-6">
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleNewProjectClick}
           className="flex flex-col items-center gap-4 p-8 bg-[#252525] border border-bg-tertiary rounded-lg cursor-pointer w-40 transition-all hover:border-accent hover:-translate-y-1"
         >
           <Plus size={32} className="text-accent" />
@@ -160,11 +162,6 @@ const HomeScreen: React.FC = () => {
           <span className="text-[0.9rem] font-medium">Open Project</span>
         </button>
       </div>
-
-      <NewProjectModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
     </div>
   );
 };

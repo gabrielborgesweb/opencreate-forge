@@ -7,11 +7,13 @@ import Toolbar from "./components/Toolbar";
 import ToolOptions from "./components/ToolOptions";
 import ProjectTabs from "./components/ProjectTabs";
 import HomeScreen from "./components/HomeScreen";
+import NewProjectModal from "./components/NewProjectModal";
 import { useToolStore } from "@store/toolStore";
 import Toast from "./components/ui/Toast";
 
 function App() {
   const activeTab = useUIStore((state) => state.activeTab);
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = React.useState(false);
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
   const setActiveTool = useToolStore((state) => state.setActiveTool);
   const activeToolId = useToolStore((state) => state.activeToolId);
@@ -63,7 +65,18 @@ function App() {
       }
 
       const isCmdOrCtrl = e.ctrlKey || e.metaKey;
-      // ... rest of existing keydown logic ...
+
+      if (isCmdOrCtrl && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        setIsNewProjectModalOpen(true);
+        return;
+      }
+
+      if (isCmdOrCtrl && e.key.toLowerCase() === "w") {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("forge:close-project"));
+        return;
+      }
 
       // 1. Atalhos Globais (Independente de foco em input se for Cmd/Ctrl)
       if (isCmdOrCtrl && e.key.toLowerCase() === "d") {
@@ -177,9 +190,20 @@ function App() {
     isInteracting,
   ]);
 
+  React.useEffect(() => {
+    const handleNewProject = () => setIsNewProjectModalOpen(true);
+    window.addEventListener("forge:new-project", handleNewProject);
+    return () => window.removeEventListener("forge:new-project", handleNewProject);
+  }, []);
+
   return (
     <div className="flex flex-col h-screen bg-bg-primary text-[#eee] overflow-hidden relative">
       <Toast />
+
+      <NewProjectModal
+        isOpen={isNewProjectModalOpen}
+        onClose={() => setIsNewProjectModalOpen(false)}
+      />
 
       {/* 1. Abas de Projeto */}
       <ProjectTabs />

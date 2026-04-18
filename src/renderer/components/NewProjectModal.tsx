@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useProjectStore, Project } from '@store/projectStore';
 import { useUIStore } from '@store/uiStore';
 import { X, Layout, Monitor, FileCode, FileImage, Printer } from 'lucide-react';
@@ -23,6 +23,60 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
   
   const addProject = useProjectStore((state) => state.addProject);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
+  
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Reset state and focus
+      setName('Untitled');
+      setWidth(1080);
+      setHeight(1080);
+      setBackground('white');
+      
+      // Small timeout to ensure the modal is rendered before focusing
+      setTimeout(() => {
+        nameInputRef.current?.focus();
+        nameInputRef.current?.select();
+      }, 50);
+    }
+  }, [isOpen]);
+
+  // Focus Trap Logic
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = modalRef.current.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const firstElement = focusableElements[0] as HTMLElement;
+        const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+        if (e.shiftKey) { // Shift + Tab
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else { // Tab
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -66,7 +120,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
       ],
       activeLayerId: 'bg-' + id,
       selection: { hasSelection: false, bounds: null },
-      zoom: 1, // Será ajustado pelo engine no carregamento
+      zoom: 1,
       panX: 0,
       panY: 0,
       isDirty: false
@@ -83,15 +137,18 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[1000]">
-      <div className="bg-[#252525] w-[650px] rounded-lg border border-border overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[1000]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div 
+        ref={modalRef}
+        className="bg-[#252525] w-[650px] rounded-lg border border-border overflow-hidden flex flex-col"
+      >
         <div className="p-4 border-b border-bg-tertiary flex justify-between items-center bg-bg-secondary">
           <h2 className="text-base m-0 flex items-center gap-2">
             <Layout size={18} className="text-accent" /> New Project
           </h2>
           <button
             onClick={onClose}
-            className="bg-none border-none text-[#666] cursor-pointer hover:text-white transition-colors"
+            className="bg-none border-none text-[#666] cursor-pointer hover:text-white transition-colors p-1 rounded focus:ring-2 focus:ring-accent outline-none"
           >
             <X size={20} />
           </button>
@@ -108,7 +165,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
                 <button
                   key={p.name}
                   onClick={() => applyPreset(p.w, p.h, p.name)}
-                  className="flex items-center gap-3 p-2 bg-bg-secondary border border-bg-tertiary rounded cursor-pointer text-left text-[0.8rem] text-[#eee] transition-colors hover:border-accent"
+                  className="flex items-center gap-3 p-2 bg-bg-secondary border border-bg-tertiary rounded cursor-pointer text-left text-[0.8rem] text-[#eee] transition-colors hover:border-accent focus:ring-2 focus:ring-accent outline-none"
                 >
                   <p.icon size={16} className="text-[#888]" />
                   <div className="flex-1">
@@ -127,10 +184,12 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
             <div className="flex flex-col gap-2">
               <label className="text-[0.8rem] text-[#888]">Project Name</label>
               <input
+                ref={nameInputRef}
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="bg-bg-primary border border-border text-[#eee] p-2 rounded outline-none focus:border-accent"
+                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                className="bg-bg-primary border border-border text-[#eee] p-2 rounded outline-none focus:ring-2 focus:ring-accent"
               />
             </div>
 
@@ -140,8 +199,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
                 <input
                   type="number"
                   value={width}
-                  onChange={(e) => setWidth(parseInt(e.target.value))}
-                  className="bg-bg-primary border border-border text-[#eee] p-2 rounded outline-none focus:border-accent"
+                  onChange={(e) => setWidth(parseInt(e.target.value) || 0)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                  className="bg-bg-primary border border-border text-[#eee] p-2 rounded outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
               <div className="flex-1 flex flex-col gap-2">
@@ -149,8 +209,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
                 <input
                   type="number"
                   value={height}
-                  onChange={(e) => setHeight(parseInt(e.target.value))}
-                  className="bg-bg-primary border border-border text-[#eee] p-2 rounded outline-none focus:border-accent"
+                  onChange={(e) => setHeight(parseInt(e.target.value) || 0)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                  className="bg-bg-primary border border-border text-[#eee] p-2 rounded outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
             </div>
@@ -162,7 +223,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
                   <button
                     key={type}
                     onClick={() => setBackground(type)}
-                    className={`flex-1 p-2 rounded border text-[0.8rem] capitalize transition-all ${
+                    className={`flex-1 p-2 rounded border text-[0.8rem] capitalize transition-all outline-none focus:ring-2 focus:ring-accent ${
                       background === type 
                         ? 'bg-accent border-accent text-white' 
                         : 'bg-bg-primary border-border text-[#888] hover:border-[#666]'
@@ -176,7 +237,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) =>
 
             <button
               onClick={handleCreate}
-              className="mt-4 p-3 bg-accent text-white border-none rounded cursor-pointer font-bold hover:brightness-110 transition-all"
+              className="mt-4 p-3 bg-accent text-white border-none rounded cursor-pointer font-bold hover:brightness-110 transition-all focus:ring-2 focus:ring-accent outline-none"
             >
               Create Project
             </button>

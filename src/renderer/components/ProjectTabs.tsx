@@ -5,7 +5,7 @@ import { Home, X } from "lucide-react";
 
 const ProjectTabs: React.FC = () => {
   const { projects, removeProject, setActiveProject } = useProjectStore();
-  const { activeTab, setActiveTab } = useUIStore();
+  const { activeTab, setActiveTab, tabHistory, removeFromHistory } = useUIStore();
 
   const handleTabClick = (id: "home" | string) => {
     setActiveTab(id);
@@ -14,8 +14,8 @@ const ProjectTabs: React.FC = () => {
     }
   };
 
-  const handleCloseTab = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+  const handleCloseTab = React.useCallback(async (e: React.MouseEvent | null, id: string) => {
+    e?.stopPropagation();
     const project = projects.find((p) => p.id === id);
     if (!project) return;
 
@@ -29,11 +29,29 @@ const ProjectTabs: React.FC = () => {
       }
     }
 
+    removeFromHistory(id);
     removeProject(id);
+    
     if (activeTab === id) {
-      setActiveTab("home");
+      // Get the next best tab from history
+      const newHistory = tabHistory.filter(tid => tid !== id);
+      const lastTab = newHistory[newHistory.length - 1] || "home";
+      setActiveTab(lastTab);
+      if (lastTab !== "home") {
+        setActiveProject(lastTab);
+      }
     }
-  };
+  }, [projects, removeFromHistory, removeProject, activeTab, tabHistory, setActiveTab, setActiveProject]);
+
+  React.useEffect(() => {
+    const handleCloseActive = () => {
+        if (activeTab !== "home") {
+            handleCloseTab(null, activeTab);
+        }
+    };
+    window.addEventListener("forge:close-project", handleCloseActive);
+    return () => window.removeEventListener("forge:close-project", handleCloseActive);
+  }, [activeTab, handleCloseTab]);
 
   return (
     <div className="flex bg-[#111] h-[35px] border-b border-bg-tertiary px-[5px] items-end overflow-x-auto">

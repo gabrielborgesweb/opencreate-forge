@@ -1,14 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useProjectStore } from '@store/projectStore';
-import { useUIStore } from '@store/uiStore';
-import { ForgeEngine } from '@core/engine/ForgeEngine';
+import React, { useEffect, useRef, useState } from "react";
+import { useProjectStore } from "@store/projectStore";
+import { useUIStore } from "@store/uiStore";
+import { ForgeEngine } from "@core/engine/ForgeEngine";
 
 const CanvasViewport: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<ForgeEngine | null>(null);
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
-  const project = useProjectStore((state) => 
-    state.projects.find((p) => p.id === activeProjectId) || null
+  const project = useProjectStore(
+    (state) => state.projects.find((p) => p.id === activeProjectId) || null,
   );
 
   const showToast = useUIStore((state) => state.showToast);
@@ -28,11 +28,11 @@ const CanvasViewport: React.FC = () => {
         const id = useProjectStore.getState().activeProjectId;
         if (id) {
           // Atualiza a store APENAS quando o zoom/pan muda via interação
-          useProjectStore.getState().updateProject(id, { 
-            zoom, 
-            panX: x, 
+          useProjectStore.getState().updateProject(id, {
+            zoom,
+            panX: x,
             panY: y,
-            isDirty: false 
+            isDirty: false,
           });
         }
       });
@@ -57,7 +57,11 @@ const CanvasViewport: React.FC = () => {
   const centeredProjectsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (engineRef.current && project && !centeredProjectsRef.current.has(project.id)) {
+    if (
+      engineRef.current &&
+      project &&
+      !centeredProjectsRef.current.has(project.id)
+    ) {
       // Se o projeto foi recém-criado (está no estado padrão 1:1 e 0:0) ou simplesmente ainda não foi centralizado nesta sessão
       if (project.zoom === 1 && project.panX === 0 && project.panY === 0) {
         engineRef.current.fitToScreen();
@@ -67,7 +71,7 @@ const CanvasViewport: React.FC = () => {
         centeredProjectsRef.current.add(project.id);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id]); // Apenas quando mudar o projeto, não quando mudar o zoom
 
   // 4. Handle window resize (SEM fitToScreen forçado)
@@ -82,11 +86,11 @@ const CanvasViewport: React.FC = () => {
       }
     };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
     // Garantir que o primeiro resize ocorra antes de qualquer lógica de posicionamento
     handleResize();
 
-    return () => window.removeEventListener('resize', handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -115,7 +119,7 @@ const CanvasViewport: React.FC = () => {
 
     const files = Array.from(e.dataTransfer.files);
     for (const file of files) {
-      if (file.type.startsWith('image/')) {
+      if (file.type.startsWith("image/")) {
         const reader = new FileReader();
         reader.onload = (event) => {
           const dataUrl = event.target?.result as string;
@@ -127,16 +131,18 @@ const CanvasViewport: React.FC = () => {
 
             // Converte o centro da tela para coordenadas dentro do projeto
             // levando em conta o zoom e o pan atual
-            const projCenterX = (viewportWidth / 2 - project.panX) / project.zoom;
-            const projCenterY = (viewportHeight / 2 - project.panY) / project.zoom;
+            const projCenterX =
+              (viewportWidth / 2 - project.panX) / project.zoom;
+            const projCenterY =
+              (viewportHeight / 2 - project.panY) / project.zoom;
 
             // Posiciona a imagem centralizada nesse ponto do projeto
-            const x = Math.round(projCenterX - (img.naturalWidth / 2));
-            const y = Math.round(projCenterY - (img.naturalHeight / 2));
+            const x = Math.round(projCenterX - img.naturalWidth / 2);
+            const y = Math.round(projCenterY - img.naturalHeight / 2);
 
             useProjectStore.getState().addLayer(activeProjectId, {
               name: file.name.replace(/\.[^/.]+$/, ""),
-              type: 'raster',
+              type: "raster",
               data: dataUrl,
               width: img.naturalWidth,
               height: img.naturalHeight,
@@ -150,15 +156,17 @@ const CanvasViewport: React.FC = () => {
         };
         reader.readAsDataURL(file);
       } else {
-        showToast(`File "<b>${file.name}</b>" is not supported.`, 'error');
+        showToast(`File "<b>${file.name}</b>" is not supported.`, "error");
       }
     }
   };
 
   return (
-    <div 
+    <div
       className={`flex-1 relative overflow-hidden bg-[#111] transition-colors duration-200 ${
-        isDraggingOver ? 'ring-2 ring-blue-500 ring-inset bg-[#1a1a1a]' : ''
+        isDraggingOver
+          ? "ring-2 ring-accent ring-inset relative after:absolute after:inset-0 after:bg-accent after:opacity-[20%] after:pointer-events-none"
+          : ""
       }`}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}

@@ -981,6 +981,10 @@ export class ForgeEngine {
       }
     }
 
+    if (this.project.zoom >= 10) {
+      this.renderPixelGrid();
+    }
+
     const context = this.getToolContext();
     if (tool && context) tool.onRender(this.ctx, context);
 
@@ -1071,6 +1075,32 @@ export class ForgeEngine {
         layer.y + (layer.fontSize || 0),
       );
     }
+    this.ctx.restore();
+  }
+
+  private renderPixelGrid() {
+    if (!this.project) return;
+    this.ctx.save();
+    this.ctx.setTransform(
+      this.project.zoom,
+      0,
+      0,
+      this.project.zoom,
+      this.project.panX,
+      this.project.panY,
+    );
+    this.ctx.lineWidth = 0.5 / this.project.zoom;
+    this.ctx.strokeStyle = "rgba(128, 128, 128, 0.4)";
+    this.ctx.beginPath();
+    for (let x = 0; x <= this.project.width; x++) {
+      this.ctx.moveTo(x, 0);
+      this.ctx.lineTo(x, this.project.height);
+    }
+    for (let y = 0; y <= this.project.height; y++) {
+      this.ctx.moveTo(0, y);
+      this.ctx.lineTo(this.project.width, y);
+    }
+    this.ctx.stroke();
     this.ctx.restore();
   }
 

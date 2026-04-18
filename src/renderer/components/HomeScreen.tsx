@@ -1,12 +1,142 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Plus, FolderOpen } from "lucide-react";
 import NewProjectModal from "./NewProjectModal";
+import { useProjectStore, Project } from "@store/projectStore";
+import { useUIStore } from "@store/uiStore";
 
 const HomeScreen: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const addProject = useProjectStore((state) => state.addProject);
+  const setActiveTab = useUIStore((state) => state.setActiveTab);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  const handleCreateFromImage = useCallback(
+    (dataUrl: string, width: number, height: number, name: string) => {
+      const id = Math.random().toString(36).substr(2, 9);
+      const newProject: Project = {
+        id,
+        name,
+        width,
+        height,
+        layers: [
+          {
+            id: "layer-" + id,
+            name: "Layer 1",
+            type: "raster",
+            visible: true,
+            locked: false,
+            opacity: 100,
+            x: 0,
+            y: 0,
+            width,
+            height,
+            data: dataUrl,
+            blendMode: "source-over",
+          },
+        ],
+        activeLayerId: "layer-" + id,
+        selection: { hasSelection: false, bounds: null },
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+        isDirty: false,
+      };
+      addProject(newProject);
+      setActiveTab(id);
+    },
+    [addProject, setActiveTab],
+  );
+
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (!file) continue;
+
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const dataUrl = event.target?.result as string;
+            const img = new Image();
+            img.onload = () => {
+              handleCreateFromImage(
+                dataUrl,
+                img.naturalWidth,
+                img.naturalHeight,
+                "Pasted Image",
+              );
+            };
+            img.src = dataUrl;
+          };
+          reader.readAsDataURL(file);
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [handleCreateFromImage]);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const files = Array.from(e.dataTransfer.files);
+    for (const file of files) {
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target?.result as string;
+          const img = new Image();
+          img.onload = () => {
+            handleCreateFromImage(
+              dataUrl,
+              img.naturalWidth,
+              img.naturalHeight,
+              file.name.replace(/\.[^/.]+$/, ""),
+            );
+          };
+          img.src = dataUrl;
+        };
+        reader.readAsDataURL(file);
+        break; // Just create one project for the first image
+      }
+    }
+  };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center bg-bg-primary text-[#eee] gap-8">
+    <div
+      className={`flex-1 flex flex-col items-center justify-center bg-bg-primary text-[#eee] gap-8 ${
+        isDraggingOver
+          ? "ring-2 ring-accent ring-inset relative after:absolute after:inset-0 after:bg-accent after:opacity-[20%] after:pointer-events-none"
+          : ""
+      }`}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="text-center">
         <h2 className="text-[2rem] mb-2 font-bold text-text">
           OpenCreate <span className="text-accent">Forge</span>

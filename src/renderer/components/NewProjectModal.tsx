@@ -40,14 +40,12 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      // Reset state and focus
-      setName("Untitled");
-      setWidth(1080);
-      setHeight(1080);
-      setBackground("white");
-
-      // Small timeout to ensure the modal is rendered before focusing
+      // Small timeout to ensure the modal is rendered before resetting state and focusing
       setTimeout(() => {
+        setName("Untitled");
+        setWidth(1080);
+        setHeight(1080);
+        setBackground("white");
         nameInputRef.current?.focus();
         nameInputRef.current?.select();
       }, 50);

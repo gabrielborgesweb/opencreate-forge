@@ -988,7 +988,7 @@ export class ForgeEngine {
     const context = this.getToolContext();
     if (tool && context) tool.onRender(this.ctx, context);
 
-    if (this.project.activeLayerId) {
+    if (this.project.activeLayerId && activeToolId !== "transform" && activeToolId !== "crop") {
       const activeLayer = this.project.layers.find(
         (l) => l.id === this.project?.activeLayerId,
       );

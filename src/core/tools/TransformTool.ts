@@ -523,11 +523,13 @@ export class TransformTool extends BaseTool {
     ctx.lineWidth = 1 / scale;
 
     // Desenhar linhas conectando os cantos
-    ctx.beginPath();
-    const corners = handles.filter((h) =>
-      ["top-left", "top-right", "bottom-right", "bottom-left"].includes(h.name),
-    );
+    const cornerNames = ["top-left", "top-right", "bottom-right", "bottom-left"];
+    const corners = cornerNames
+      .map((name) => handles.find((h) => h.name === name))
+      .filter((h): h is Handle => !!h);
+
     if (corners.length === 4) {
+      ctx.beginPath();
       ctx.moveTo(corners[0].x, corners[0].y);
       ctx.lineTo(corners[1].x, corners[1].y);
       ctx.lineTo(corners[2].x, corners[2].y);

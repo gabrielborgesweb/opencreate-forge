@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "tsc": "tsc --noEmit",
+    "verify": "npm run tsc && npm run lint"
   },
   "dependencies": {
     "lucide-react": "^1.8.0",

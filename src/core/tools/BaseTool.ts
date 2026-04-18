@@ -24,6 +24,9 @@ export interface ToolContext {
   };
   updateSelectionEdges: () => void;
   setLastSelectionMask: (mask: string | undefined) => void;
+  floatSelection: (layerId: string) => Promise<boolean>;
+  commitFloatingLayer: () => Promise<void>;
+  clearSelection: () => Promise<void>;
   setInteracting: (isInteracting: boolean) => void;
   setActiveTool: (id: ToolId) => void;
   updateToolSettings: <K extends keyof ToolSettings>(

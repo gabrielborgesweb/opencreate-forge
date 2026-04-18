@@ -33,10 +33,27 @@ export class TransformTool extends BaseTool {
   private context: ToolContext | null = null;
   private unsubscribeStore: (() => void) | null = null;
 
-  onActivate(context: ToolContext): void {
+  private isFloating = false;
+
+  async onActivate(context: ToolContext): Promise<void> {
     this.context = context;
-    const activeLayerId = context.project.activeLayerId;
-    const layer = context.project.layers.find((l) => l.id === activeLayerId);
+    const { project } = context;
+    const activeLayerId = project.activeLayerId;
+    if (!activeLayerId) return;
+
+    if (project.selection.hasSelection && !project.selection.floatingLayer) {
+      const success = await context.floatSelection(activeLayerId);
+      if (success) {
+        this.isFloating = true;
+      }
+    } else if (project.selection.floatingLayer) {
+      this.isFloating = true;
+    }
+
+    // Now re-fetch layer from updated project (floatSelection updates context.project reference)
+    const layer = this.isFloating
+      ? context.project.selection.floatingLayer
+      : context.project.layers.find((l) => l.id === activeLayerId);
 
     if (layer) {
       this.originalLayer = JSON.parse(JSON.stringify(layer));
@@ -49,13 +66,14 @@ export class TransformTool extends BaseTool {
         scaleY: 1,
         rotation: 0,
         anchor: { x: 0.5, y: 0.5 },
-        isDirty: false,
+        isDirty: this.isFloating, // If we just floated, it's already a change from original
       };
       this.syncStore(context);
     }
 
     window.addEventListener("forge:transform-apply", this.handleApplyEvent);
     window.addEventListener("forge:transform-cancel", this.handleCancelEvent);
+    window.addEventListener("keydown", this.handleKeyDown);
 
     this.unsubscribeStore = context.subscribe((settings) => {
       // Only react if we are the active tool (the engine takes care of only calling active tool,
@@ -75,6 +93,16 @@ export class TransformTool extends BaseTool {
     });
   }
 
+  private handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (this.context) this.apply(this.context);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      if (this.context) this.cancel(this.context);
+    }
+  };
+
   private handleApplyEvent = () => {
     if (this.context) this.apply(this.context);
   };
@@ -92,6 +120,7 @@ export class TransformTool extends BaseTool {
       "forge:transform-cancel",
       this.handleCancelEvent,
     );
+    window.removeEventListener("keydown", this.handleKeyDown);
     if (this.unsubscribeStore) {
       this.unsubscribeStore();
       this.unsubscribeStore = null;
@@ -549,9 +578,10 @@ export class TransformTool extends BaseTool {
   async apply(context: ToolContext) {
     if (!this.currentTransform || !this.originalLayer) return;
     const t = this.currentTransform;
-    const layer = context.project.layers.find(
-      (l) => l.id === this.originalLayer?.id,
-    );
+    const layer = this.isFloating
+      ? context.project.selection.floatingLayer
+      : context.project.layers.find((l) => l.id === this.originalLayer?.id);
+
     if (!layer) return;
 
     const rot = (t.rotation * Math.PI) / 180;
@@ -609,20 +639,41 @@ export class TransformTool extends BaseTool {
         -t.height * t.anchor.y,
       );
 
-      context.updateProject({
-        layers: context.project.layers.map((l) =>
-          l.id === layer.id
-            ? {
-                ...l,
-                x: newX,
-                y: newY,
-                width: newWidth,
-                height: newHeight,
-                data: offCanvas.toDataURL(),
-              }
-            : l,
-        ),
-      });
+      if (this.isFloating) {
+        const newFloating = {
+          ...layer,
+          x: newX,
+          y: newY,
+          width: newWidth,
+          height: newHeight,
+          data: offCanvas.toDataURL(),
+        };
+        context.updateProject({
+          selection: {
+            ...context.project.selection,
+            floatingLayer: newFloating,
+            bounds: { x: newX, y: newY, width: newWidth, height: newHeight },
+            mask: offCanvas.toDataURL(), // Update mask to match new transformed content bounds?
+            // In Photoshop, the selection border transforms with the content.
+          },
+        });
+        context.updateSelectionEdges();
+      } else {
+        context.updateProject({
+          layers: context.project.layers.map((l) =>
+            l.id === layer.id
+              ? {
+                  ...l,
+                  x: newX,
+                  y: newY,
+                  width: newWidth,
+                  height: newHeight,
+                  data: offCanvas.toDataURL(),
+                }
+              : l,
+          ),
+        });
+      }
       context.invalidateCache(layer.id);
     }
 

@@ -9,24 +9,42 @@ export class MoveTool extends BaseTool {
   private initialLayerX = 0;
   private initialLayerY = 0;
   private layerId: string | null = null;
+  private isFloating = false;
 
-  onMouseDown(e: MouseEvent, context: ToolContext): void {
+  async onMouseDown(e: MouseEvent, context: ToolContext): Promise<void> {
     if (e.button !== 0) return;
 
-    const activeLayerId = context.project.activeLayerId;
+    const { project } = context;
+    const activeLayerId = project.activeLayerId;
     if (!activeLayerId) return;
 
-    const layer = context.project.layers.find((l) => l.id === activeLayerId);
+    const layer = project.layers.find((l) => l.id === activeLayerId);
     if (!layer || layer.locked) return;
 
-    this.isDragging = true;
-    this.layerId = activeLayerId;
-
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
+
+    // If we have a selection and no floating layer yet, we float it now
+    if (project.selection.hasSelection && !project.selection.floatingLayer) {
+      const success = await context.floatSelection(activeLayerId);
+      if (success) {
+        this.isFloating = true;
+      }
+    } else if (project.selection.floatingLayer) {
+      this.isFloating = true;
+    } else {
+      this.isFloating = false;
+    }
+
+    this.isDragging = true;
+    this.layerId = this.isFloating ? "floating-selection" : activeLayerId;
+
+    // IMPORTANT: use context.project (which was updated by floatSelection)
+    const targetLayer = this.isFloating ? context.project.selection.floatingLayer! : layer;
+
     this.startX = x;
     this.startY = y;
-    this.initialLayerX = layer.x;
-    this.initialLayerY = layer.y;
+    this.initialLayerX = targetLayer.x;
+    this.initialLayerY = targetLayer.y;
   }
 
   onMouseMove(e: MouseEvent, context: ToolContext): void {
@@ -36,14 +54,41 @@ export class MoveTool extends BaseTool {
     const dx = x - this.startX;
     const dy = y - this.startY;
 
-    const layers = context.project.layers.map((l) => {
-      if (l.id === this.layerId) {
-        return { ...l, x: this.initialLayerX + dx, y: this.initialLayerY + dy };
+    if (this.isFloating) {
+      const floatingLayer = context.project.selection.floatingLayer;
+      if (floatingLayer) {
+        const newFloating = {
+          ...floatingLayer,
+          x: this.initialLayerX + dx,
+          y: this.initialLayerY + dy,
+        };
+        context.updateProject({
+          selection: {
+            ...context.project.selection,
+            floatingLayer: newFloating,
+            bounds: {
+              ...context.project.selection.bounds!,
+              x: this.initialLayerX + dx,
+              y: this.initialLayerY + dy,
+            },
+          },
+        });
+        context.updateSelectionEdges();
       }
-      return l;
-    });
+    } else {
+      const layers = context.project.layers.map((l) => {
+        if (l.id === this.layerId) {
+          return {
+            ...l,
+            x: this.initialLayerX + dx,
+            y: this.initialLayerY + dy,
+          };
+        }
+        return l;
+      });
 
-    context.updateProject({ layers });
+      context.updateProject({ layers });
+    }
   }
 
   onMouseUp(e: MouseEvent, context: ToolContext): void {

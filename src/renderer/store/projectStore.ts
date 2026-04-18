@@ -23,6 +23,7 @@ export interface Selection {
   hasSelection: boolean;
   bounds: { x: number; y: number; width: number; height: number } | null;
   mask?: string; // dataURL of the mask
+  floatingLayer?: Layer | null;
 }
 
 export interface Project {

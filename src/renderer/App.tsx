@@ -68,11 +68,7 @@ function App() {
       // 1. Atalhos Globais (Independente de foco em input se for Cmd/Ctrl)
       if (isCmdOrCtrl && e.key.toLowerCase() === "d") {
         e.preventDefault();
-        if (activeProjectId) {
-          useProjectStore.getState().updateProject(activeProjectId, {
-            selection: { hasSelection: false, bounds: null, mask: undefined },
-          });
-        }
+        window.dispatchEvent(new CustomEvent("forge:clear-selection"));
         return;
       }
 
@@ -82,11 +78,15 @@ function App() {
         document.activeElement?.tagName === "TEXTAREA"
       ) {
         if (e.key === "Enter") {
-          if (activeToolId === "transform") window.dispatchEvent(new CustomEvent("forge:transform-apply"));
-          if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-apply"));
+          if (activeToolId === "transform")
+            window.dispatchEvent(new CustomEvent("forge:transform-apply"));
+          if (activeToolId === "crop")
+            window.dispatchEvent(new CustomEvent("forge:crop-apply"));
         } else if (e.key === "Escape") {
-          if (activeToolId === "transform") window.dispatchEvent(new CustomEvent("forge:transform-cancel"));
-          if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-cancel"));
+          if (activeToolId === "transform")
+            window.dispatchEvent(new CustomEvent("forge:transform-cancel"));
+          if (activeToolId === "crop")
+            window.dispatchEvent(new CustomEvent("forge:crop-cancel"));
         }
         return;
       }
@@ -111,13 +111,17 @@ function App() {
         if (checkDirty("transform")) setActiveTool("transform");
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "x") {
         // Prevent default browser cut if needed, although we handle it in ForgeEngine
-        // e.preventDefault(); 
+        // e.preventDefault();
       } else if (e.key === "Enter") {
-        if (activeToolId === "transform") window.dispatchEvent(new CustomEvent("forge:transform-apply"));
-        if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-apply"));
+        if (activeToolId === "transform")
+          window.dispatchEvent(new CustomEvent("forge:transform-apply"));
+        if (activeToolId === "crop")
+          window.dispatchEvent(new CustomEvent("forge:crop-apply"));
       } else if (e.key === "Escape") {
-        if (activeToolId === "transform") window.dispatchEvent(new CustomEvent("forge:transform-cancel"));
-        if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-cancel"));
+        if (activeToolId === "transform")
+          window.dispatchEvent(new CustomEvent("forge:transform-cancel"));
+        if (activeToolId === "crop")
+          window.dispatchEvent(new CustomEvent("forge:crop-cancel"));
       } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         // Tool shortcuts - only if no modifiers
         if (e.key.toLowerCase() === "v") {

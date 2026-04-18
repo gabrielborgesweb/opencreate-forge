@@ -86,6 +86,25 @@ export class ForgeEngine {
     window.addEventListener("mousemove", this.handleMouseMove);
     window.addEventListener("mouseup", this.handleMouseUp);
     window.addEventListener("keydown", this.handleKeyDown);
+    window.addEventListener("forge:clear-selection", () => {
+        if (this.project) {
+            this.clearSelection();
+        }
+    });
+  }
+
+  private async clearSelection() {
+    if (!this.project) return;
+    if (this.project.selection.floatingLayer) {
+        await this.commitFloatingLayer();
+    }
+    useProjectStore.getState().updateProject(this.project.id, {
+        selection: { hasSelection: false, bounds: null, mask: undefined, floatingLayer: null },
+    });
+    this.selectionCanvas.width = 1;
+    this.selectionCanvas.height = 1;
+    this.selectionCtx.clearRect(0, 0, 1, 1);
+    this.updateSelectionEdges();
   }
 
   private handleKeyDown(e: KeyboardEvent) {
@@ -359,8 +378,8 @@ export class ForgeEngine {
   private getToolContext(): ToolContext | null {
     if (!this.project) return null;
     const toolStore = useToolStore.getState();
-    return {
-      project: this.project,
+
+    const context = {
       activeToolId: toolStore.activeToolId,
       previousToolId: toolStore.previousToolId,
       get settings() {
@@ -368,27 +387,30 @@ export class ForgeEngine {
       },
       canvas: this.canvas,
       ctx: this.ctx,
-      updateProject: (updates) => {
+      updateProject: (updates: Partial<Project>) => {
         if (this.project) {
           useProjectStore.getState().updateProject(this.project.id, updates);
         }
       },
       invalidateCache: (layerId: string) => this.invalidateLayerCache(layerId),
-      screenToProject: (x, y) => this.screenToProject(x, y),
+      screenToProject: (x: number, y: number) => this.screenToProject(x, y),
       getSelectionCanvas: () => ({
         canvas: this.selectionCanvas,
         ctx: this.selectionCtx,
       }),
       updateSelectionEdges: () => this.updateSelectionEdges(),
-      setLastSelectionMask: (mask) => {
+      setLastSelectionMask: (mask: string | undefined) => {
         this.lastSelectionMask = mask;
       },
-      setInteracting: (isInteracting) =>
+      floatSelection: (layerId: string) => this.floatSelection(layerId),
+      commitFloatingLayer: () => this.commitFloatingLayer(),
+      clearSelection: () => this.clearSelection(),
+      setInteracting: (isInteracting: boolean) =>
         useToolStore.getState().setInteracting(isInteracting),
-      setActiveTool: (id) => useToolStore.getState().setActiveTool(id),
-      updateToolSettings: (id, settings) =>
+      setActiveTool: (id: any) => useToolStore.getState().setActiveTool(id),
+      updateToolSettings: (id: any, settings: any) =>
         useToolStore.getState().updateToolSettings(id, settings),
-      subscribe: (listener) =>
+      subscribe: (listener: any) =>
         useToolStore.subscribe((state) => listener(state.toolSettings)),
       setLayerCache: (layerId: string, canvas: HTMLCanvasElement) => {
         this.layerCanvasCache.set(layerId, canvas);
@@ -403,6 +425,14 @@ export class ForgeEngine {
       animateFitToScreen: (ow?: number, oh?: number) =>
         this.animateFitToScreen(ow, oh),
     };
+
+    Object.defineProperty(context, "project", {
+      get: () => this.project,
+      enumerable: true,
+      configurable: true,
+    });
+
+    return context as any as ToolContext;
   }
 
   public async ensureLayerCanvas(layer: Layer): Promise<HTMLCanvasElement> {
@@ -722,7 +752,9 @@ export class ForgeEngine {
       this.project.panY,
     );
 
-    const { x: bx, y: by } = this.project.selection.bounds;
+    // If we have a floating layer, use its coordinates for the selection border
+    const bounds = this.project.selection.floatingLayer || this.project.selection.bounds;
+    const { x: bx, y: by } = bounds;
     const zoom = this.project.zoom;
 
     this.marchingAntsOffset = (Date.now() / 100) % 8;
@@ -933,6 +965,11 @@ export class ForgeEngine {
       }
     }
 
+    // Render floating layer if it exists
+    if (this.project.selection.floatingLayer && this.project.selection.floatingLayer.visible && this.project.selection.floatingLayer.id !== editingLayerId) {
+      this.renderLayer(this.project.selection.floatingLayer);
+    }
+
     this.ctx.restore(); // Fim do clip do projeto
 
     // 2. PASSO: Camadas que NÃO INTERSECTAM o projeto (Desenhar sem clip)
@@ -985,44 +1022,46 @@ export class ForgeEngine {
 
     if (layer.type === "raster") {
       let lCanvas = this.layerCanvasCache.get(layer.id);
+      
+      // If not in cache and we have data, try to load it
       if (
         !lCanvas ||
         lCanvas.width !== layer.width ||
         lCanvas.height !== layer.height
       ) {
-        lCanvas = document.createElement("canvas");
-        lCanvas.width = layer.width;
-        lCanvas.height = layer.height;
-        this.layerCanvasCache.set(layer.id, lCanvas);
-
         if (layer.data) {
+          // Check if we are already loading or have an image
           let img = this.imageCache.get(layer.data);
           if (!img) {
             img = new Image();
             img.src = layer.data;
             this.imageCache.set(layer.data, img);
             img.onload = () => {
-              // CORREÇÃO: Garante que a imagem seja desenhada no cache assim que carregar
-              const cachedCanvas = this.layerCanvasCache.get(layer.id);
-              if (cachedCanvas && img) {
-                const ctx = cachedCanvas.getContext("2d")!;
-                ctx.clearRect(0, 0, cachedCanvas.width, cachedCanvas.height);
-                ctx.drawImage(img, 0, 0);
-                this.layerReadyCache.set(layer.id, true);
-              }
+              const cachedCanvas = document.createElement("canvas");
+              cachedCanvas.width = layer.width;
+              cachedCanvas.height = layer.height;
+              const ctx = cachedCanvas.getContext("2d")!;
+              ctx.drawImage(img!, 0, 0);
+              this.layerCanvasCache.set(layer.id, cachedCanvas);
+              this.layerReadyCache.set(layer.id, true);
               this.render();
             };
           } else if (img.complete) {
-            const lCtx = lCanvas.getContext("2d")!;
-            lCtx.drawImage(img, 0, 0);
+            const cachedCanvas = document.createElement("canvas");
+            cachedCanvas.width = layer.width;
+            cachedCanvas.height = layer.height;
+            const ctx = cachedCanvas.getContext("2d")!;
+            ctx.drawImage(img, 0, 0);
+            this.layerCanvasCache.set(layer.id, cachedCanvas);
             this.layerReadyCache.set(layer.id, true);
+            lCanvas = cachedCanvas;
           }
-        } else {
-          // Camada sem data (vazia) está "pronta"
-          this.layerReadyCache.set(layer.id, true);
         }
       }
-      this.ctx.drawImage(lCanvas, layer.x, layer.y);
+
+      if (lCanvas && this.layerReadyCache.get(layer.id)) {
+        this.ctx.drawImage(lCanvas, Math.round(layer.x), Math.round(layer.y));
+      }
     } else if (layer.type === "text") {
       this.ctx.fillStyle = layer.color || "#ffffff";
       this.ctx.font = `${layer.fontSize}px ${layer.fontFamily}`;
@@ -1038,5 +1077,143 @@ export class ForgeEngine {
   public invalidateLayerCache(layerId: string) {
     this.layerCanvasCache.delete(layerId);
     this.layerReadyCache.delete(layerId);
+  }
+
+  private async floatSelection(layerId: string): Promise<boolean> {
+    if (
+      !this.project ||
+      !this.project.selection.hasSelection ||
+      !this.project.selection.bounds
+    )
+      return false;
+
+    if (this.project.selection.floatingLayer) return true;
+
+    const layer = this.project.layers.find((l) => l.id === layerId);
+    if (!layer || layer.type !== "raster" || !layer.data) return false;
+
+    const { bounds } = this.project.selection;
+    const layerCanvas = await this.ensureLayerCanvas(layer);
+
+    // 1. Extract content
+    const floatCanvas = document.createElement("canvas");
+    floatCanvas.width = bounds.width;
+    floatCanvas.height = bounds.height;
+    const fctx = floatCanvas.getContext("2d")!;
+
+    fctx.drawImage(layerCanvas, layer.x - bounds.x, layer.y - bounds.y);
+    fctx.globalCompositeOperation = "destination-in";
+    fctx.drawImage(this.selectionCanvas, 0, 0);
+
+    // 2. Remove from original layer
+    const newLayerCanvas = document.createElement("canvas");
+    newLayerCanvas.width = layer.width;
+    newLayerCanvas.height = layer.height;
+    const nlctx = newLayerCanvas.getContext("2d")!;
+    nlctx.drawImage(layerCanvas, 0, 0);
+    nlctx.globalCompositeOperation = "destination-out";
+    nlctx.drawImage(
+      this.selectionCanvas,
+      bounds.x - layer.x,
+      bounds.y - layer.y,
+    );
+
+    const floatingLayer: Layer = {
+      id: "floating-selection",
+      name: "Floating Selection",
+      type: "raster",
+      visible: true,
+      locked: false,
+      opacity: 100,
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+      data: floatCanvas.toDataURL(), // We still need this for the store, but we'll use cache for rendering
+      blendMode: "source-over",
+    };
+
+    // Cache the new canvases immediately
+    this.layerCanvasCache.set(floatingLayer.id, floatCanvas);
+    this.layerReadyCache.set(floatingLayer.id, true);
+    this.layerCanvasCache.set(layer.id, newLayerCanvas);
+    this.layerReadyCache.set(layer.id, true);
+
+    // Update Store
+    useProjectStore.getState().updateLayer(this.project.id, layer.id, {
+      data: newLayerCanvas.toDataURL(),
+    });
+
+    useProjectStore.getState().updateProject(this.project.id, {
+      selection: {
+        ...this.project.selection,
+        floatingLayer: floatingLayer,
+      },
+    });
+
+    // Update local project reference immediately to avoid stale reads in the same frame
+    this.project.selection.floatingLayer = floatingLayer;
+
+    return true;
+  }
+
+  private async commitFloatingLayer() {
+    if (
+      !this.project ||
+      !this.project.selection.floatingLayer ||
+      !this.project.activeLayerId
+    )
+      return;
+
+    const activeLayer = this.project.layers.find(
+      (l) => l.id === this.project?.activeLayerId,
+    );
+    if (!activeLayer || activeLayer.type !== "raster") return;
+
+    const floatingLayer = this.project.selection.floatingLayer;
+    const activeCanvas = await this.ensureLayerCanvas(activeLayer);
+    const floatCanvas = await this.ensureLayerCanvas(floatingLayer);
+
+    const minX = Math.min(activeLayer.x, floatingLayer.x);
+    const minY = Math.min(activeLayer.y, floatingLayer.y);
+    const maxX = Math.max(
+      activeLayer.x + activeLayer.width,
+      floatingLayer.x + floatingLayer.width,
+    );
+    const maxY = Math.max(
+      activeLayer.y + activeLayer.height,
+      floatingLayer.y + floatingLayer.height,
+    );
+
+    const newW = Math.ceil(maxX - minX);
+    const newH = Math.ceil(maxY - minY);
+
+    const finalCanvas = document.createElement("canvas");
+    finalCanvas.width = newW;
+    finalCanvas.height = newH;
+    const fctx = finalCanvas.getContext("2d")!;
+
+    fctx.drawImage(activeCanvas, Math.round(activeLayer.x - minX), Math.round(activeLayer.y - minY));
+    fctx.drawImage(floatCanvas, Math.round(floatingLayer.x - minX), Math.round(floatingLayer.y - minY));
+
+    this.layerCanvasCache.set(activeLayer.id, finalCanvas);
+    this.layerReadyCache.set(activeLayer.id, true);
+
+    useProjectStore.getState().updateLayer(this.project.id, activeLayer.id, {
+      x: minX,
+      y: minY,
+      width: newW,
+      height: newH,
+      data: finalCanvas.toDataURL(),
+    });
+
+    useProjectStore.getState().updateProject(this.project.id, {
+      selection: {
+        ...this.project.selection,
+        floatingLayer: null,
+      },
+    });
+    
+    this.project.selection.floatingLayer = null;
   }
 }

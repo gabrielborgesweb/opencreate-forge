@@ -178,23 +178,21 @@ export class SelectTool extends BaseTool {
     return pixelData[3] > 0;
   }
 
-  private clearSelection(context: ToolContext) {
-    context.setLastSelectionMask(undefined);
-    context.updateProject({
-      selection: { hasSelection: false, bounds: null, mask: undefined },
-    });
-    const { canvas, ctx } = context.getSelectionCanvas();
-    canvas.width = 1;
-    canvas.height = 1;
-    ctx.clearRect(0, 0, 1, 1);
-    context.updateSelectionEdges();
+  private async clearSelection(context: ToolContext) {
+    await context.clearSelection();
   }
 
-  private updateSelectionWithRect(
+  private async updateSelectionWithRect(
     context: ToolContext,
     rect: { x: number; y: number; width: number; height: number },
   ) {
     const mode = (this as any).effectiveMode || context.settings.select.mode;
+    
+    // Commit if creating new selection in replace mode
+    if (mode === 'replace' && context.project.selection.floatingLayer) {
+        await context.commitFloatingLayer();
+    }
+    
     const { canvas: selCanvas, ctx: selCtx } = context.getSelectionCanvas();
     const { selection } = context.project;
 

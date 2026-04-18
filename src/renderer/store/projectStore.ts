@@ -83,7 +83,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
     set((state) => ({
       projects: state.projects.map((p) =>
         p.id === id
-          ? { ...p, ...updates, isDirty: updates.isDirty !== undefined ? updates.isDirty : true }
+          ? {
+              ...p,
+              ...updates,
+              isDirty: updates.isDirty !== undefined ? updates.isDirty : p.isDirty,
+            }
           : p,
       ),
     })),

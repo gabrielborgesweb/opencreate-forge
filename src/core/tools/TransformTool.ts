@@ -603,9 +603,9 @@ export class TransformTool extends BaseTool {
             ...context.project.selection,
             floatingLayer: newFloating,
             bounds: { x: newX, y: newY, width: newWidth, height: newHeight },
-            mask: offCanvas.toDataURL(), // Update mask to match new transformed content bounds?
-            // In Photoshop, the selection border transforms with the content.
+            mask: offCanvas.toDataURL(),
           },
+          isDirty: true,
         });
         context.updateSelectionEdges();
       } else {
@@ -622,6 +622,7 @@ export class TransformTool extends BaseTool {
                 }
               : l,
           ),
+          isDirty: true,
         });
       }
       context.invalidateCache(layer.id);

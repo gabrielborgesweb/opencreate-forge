@@ -32,7 +32,6 @@ const CanvasViewport: React.FC = () => {
             zoom,
             panX: x,
             panY: y,
-            isDirty: false,
           });
         }
       });

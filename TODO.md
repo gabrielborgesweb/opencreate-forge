@@ -4,7 +4,7 @@ TODO: OpenCreate Forge
 [-] Marcar como pendente
 
 - [-] Tipos de Camada
-  - [ ] Camada de Imagem (raster)
+  - [-] Camada de Imagem (raster)
   - [ ] Camada de Texto
 - [ ] Ferramenta Texto (depois de Tipos de Camada)
 - [ ] Régua
@@ -14,7 +14,11 @@ TODO: OpenCreate Forge
   - [ ] Foreground atual
   - [ ] Background atual
 - [ ] Salvar Projeto
-- [ ] Atalhos de Ctrl+N e Ctrl+W para gerenciar projetos
+- [ ] Histórico (com descrição da mudança)
+- [ ] Poder expandir o sidebar de camada
+- [ ] Melhor UI/UX do NewProjectModal
+  - [ ] Mais opções de templates
+- [x] Atalhos de Ctrl+N e Ctrl+W para gerenciar projetos
 - [x] Grade de Pixels em zoom 1000%
 - [x] Novo projeto ao colar uma imagem na Home
 - [x] Novo projeto ao arrastar um arquivo de imagem na Home

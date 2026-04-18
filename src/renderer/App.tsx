@@ -13,7 +13,8 @@ import Toast from "./components/ui/Toast";
 
 function App() {
   const activeTab = useUIStore((state) => state.activeTab);
-  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = React.useState(false);
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] =
+    React.useState(false);
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
   const setActiveTool = useToolStore((state) => state.setActiveTool);
   const activeToolId = useToolStore((state) => state.activeToolId);
@@ -193,11 +194,12 @@ function App() {
   React.useEffect(() => {
     const handleNewProject = () => setIsNewProjectModalOpen(true);
     window.addEventListener("forge:new-project", handleNewProject);
-    return () => window.removeEventListener("forge:new-project", handleNewProject);
+    return () =>
+      window.removeEventListener("forge:new-project", handleNewProject);
   }, []);
 
   return (
-    <div className="flex flex-col h-screen bg-bg-primary text-[#eee] overflow-hidden relative">
+    <div className="flex flex-col h-screen bg-bg-primary text-text overflow-hidden relative">
       <Toast />
 
       <NewProjectModal

@@ -28,7 +28,7 @@ export const CropOptions: React.FC = () => {
           onChange={(e) =>
             updateSettings("crop", { mode: e.target.value as CropMode })
           }
-          className="bg-[#333] border border-white/10 text-[#eee] rounded px-1 outline-none h-6"
+          className="bg-[#333] border border-white/10 text-text rounded px-1 outline-none h-6"
         >
           <option value="Free">Free</option>
           <option value="Original Ratio">Original Ratio</option>

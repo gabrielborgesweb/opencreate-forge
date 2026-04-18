@@ -129,7 +129,7 @@ const HomeScreen: React.FC = () => {
 
   return (
     <div
-      className={`flex-1 flex flex-col items-center justify-center bg-bg-primary text-[#eee] gap-8 ${
+      className={`flex-1 flex flex-col items-center justify-center bg-bg-primary text-text gap-8 ${
         isDraggingOver
           ? "ring-2 ring-accent ring-inset relative after:absolute after:inset-0 after:bg-accent after:opacity-[20%]"
           : ""

@@ -90,7 +90,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
         maskCanvas.width = bounds.width;
         maskCanvas.height = bounds.height;
         const mctx = maskCanvas.getContext("2d")!;
-        
+
         mctx.drawImage(
           canvas,
           bounds.x,
@@ -100,7 +100,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
           0,
           0,
           bounds.width,
-          bounds.height
+          bounds.height,
         );
         mctx.globalCompositeOperation = "source-in";
         mctx.fillStyle = "white";
@@ -172,7 +172,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
         onClick={toggleVisibility}
         tabIndex={-1}
         className={`bg-none border-none cursor-pointer flex transition-colors mr-2 ${
-          layer.visible ? "text-[#eee]" : "text-[#666]"
+          layer.visible ? "text-text" : "text-[#666]"
         }`}
       >
         {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -200,7 +200,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
         {isEditing ? (
           <input
             ref={inputRef}
-            className="w-full bg-transparent text-[#eee] text-[0.85rem] px-1 rounded outline-none -m-1 selection:bg-accent"
+            className="w-full bg-transparent text-text text-[0.85rem] px-1 rounded outline-none -m-1 selection:bg-accent"
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
             onBlur={handleRename}
@@ -238,7 +238,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
           onClick={toggleLock}
           tabIndex={-1}
           className={`p-1 transition-colors ${
-            layer.locked ? "text-[#ffcc00]" : "text-[#666] hover:text-[#eee]"
+            layer.locked ? "text-[#ffcc00]" : "text-[#666] hover:text-text"
           }`}
         >
           {layer.locked ? <Lock size={16} /> : <Unlock size={16} />}

@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "tsc": "tsc --noEmit",
-    "verify": "npm run tsc && npm run lint"
+    "check": "npm run tsc && npm run lint"
   },
   "dependencies": {
     "lucide-react": "^1.8.0",

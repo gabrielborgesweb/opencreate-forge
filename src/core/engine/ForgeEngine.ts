@@ -10,6 +10,9 @@ import { CropTool } from "../tools/CropTool";
 import { useToolStore } from "@/renderer/store/toolStore";
 import { useUIStore } from "@/renderer/store/uiStore";
 import { getOptimizedBoundingBox } from "../utils/imageUtils";
+import { RasterLayer } from "../layers/RasterLayer";
+import { TextLayer } from "../layers/TextLayer";
+import { GroupLayer } from "../layers/GroupLayer";
 
 export interface ViewportState {
   scale: number;
@@ -980,48 +983,23 @@ export class ForgeEngine {
     this.ctx.globalAlpha = layer.opacity / 100;
     this.ctx.globalCompositeOperation = layer.blendMode;
 
-    if (layer.type === "raster") {
-      let lCanvas = this.layerCanvasCache.get(layer.id);
-
-      // If not in cache and we have data, try to load it
-      if (!lCanvas || lCanvas.width !== layer.width || lCanvas.height !== layer.height) {
-        if (layer.data) {
-          // Check if we are already loading or have an image
-          let img = this.imageCache.get(layer.data);
-          if (!img) {
-            img = new Image();
-            img.src = layer.data;
-            this.imageCache.set(layer.data, img);
-            img.onload = () => {
-              const cachedCanvas = document.createElement("canvas");
-              cachedCanvas.width = layer.width;
-              cachedCanvas.height = layer.height;
-              const ctx = cachedCanvas.getContext("2d")!;
-              ctx.drawImage(img!, 0, 0);
-              this.layerCanvasCache.set(layer.id, cachedCanvas);
-              this.layerReadyCache.set(layer.id, true);
-              this.render();
-            };
-          } else if (img.complete) {
-            const cachedCanvas = document.createElement("canvas");
-            cachedCanvas.width = layer.width;
-            cachedCanvas.height = layer.height;
-            const ctx = cachedCanvas.getContext("2d")!;
-            ctx.drawImage(img, 0, 0);
-            this.layerCanvasCache.set(layer.id, cachedCanvas);
-            this.layerReadyCache.set(layer.id, true);
-            lCanvas = cachedCanvas;
-          }
-        }
-      }
-
-      if (lCanvas && this.layerReadyCache.get(layer.id)) {
-        this.ctx.drawImage(lCanvas, Math.round(layer.x), Math.round(layer.y));
-      }
-    } else if (layer.type === "text") {
-      this.ctx.fillStyle = layer.color || "#ffffff";
-      this.ctx.font = `${layer.fontSize}px ${layer.fontFamily}`;
-      this.ctx.fillText(layer.text || "", layer.x, layer.y + (layer.fontSize || 0));
+    switch (layer.type) {
+      case "raster":
+        RasterLayer.render(
+          this.ctx,
+          layer,
+          this.layerCanvasCache,
+          this.layerReadyCache,
+          this.imageCache,
+          () => this.render(),
+        );
+        break;
+      case "text":
+        TextLayer.render(this.ctx, layer);
+        break;
+      case "group":
+        GroupLayer.render(this.ctx, layer);
+        break;
     }
     this.ctx.restore();
   }

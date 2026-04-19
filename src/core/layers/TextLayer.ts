@@ -4,10 +4,116 @@ export class TextLayer {
   public static render(
     ctx: CanvasRenderingContext2D,
     layer: Layer,
+    cache: Map<string, HTMLCanvasElement>,
+    readyCache: Map<string, boolean>,
     editingState?: { caretIndex: number; selectionStart?: number; isFocused: boolean },
   ) {
     if (!layer.text && !editingState?.isFocused) return;
 
+    const matrix = ctx.getTransform();
+    const zoom = matrix.a;
+
+    // 1. Text Rendering (Nearest look via 1:1 cache)
+    const propsKey = `${layer.text}|${layer.fontSize}|${layer.fontFamily}|${layer.fontWeight}|${layer.color}|${layer.textAlign}|${layer.tracking}|${layer.lineHeight}|${layer.width}|${layer.height}`;
+    
+    let cachedCanvas = cache.get(layer.id);
+    const isReady = readyCache.get(layer.id);
+    const cachedKey = (cachedCanvas as any)?._propsKey;
+
+    if (!cachedCanvas || !isReady || cachedKey !== propsKey || cachedCanvas.width !== Math.max(1, layer.width) || cachedCanvas.height !== Math.max(1, layer.height)) {
+      cachedCanvas = document.createElement("canvas");
+      cachedCanvas.width = Math.max(1, layer.width);
+      cachedCanvas.height = Math.max(1, layer.height);
+      (cachedCanvas as any)._propsKey = propsKey;
+      const cctx = cachedCanvas.getContext("2d")!;
+      
+      // Render text at 1:1 scale into the cache
+      this.drawTextToContext(cctx, { ...layer, x: 0, y: 0 });
+      
+      cache.set(layer.id, cachedCanvas);
+      readyCache.set(layer.id, true);
+    }
+
+    // Draw the cached text at the project coordinates
+    // Since main ctx has zoom and imageSmoothingEnabled=false, this will look 'nearest'
+    ctx.save();
+    ctx.drawImage(cachedCanvas, layer.x, layer.y);
+    ctx.restore();
+
+    // 2. UI Rendering (Caret, Selection, Pivot) - Rendered 'Normally' at zoom level
+    if (editingState?.isFocused) {
+      const text = layer.text || "";
+      const fontSize = layer.fontSize || 24;
+      const fontFamily = layer.fontFamily || "Arial";
+      const fontWeight = layer.fontWeight || "normal";
+      const textAlign = layer.textAlign || "left";
+      const lineHeightMult = layer.lineHeight || 1.2;
+      const tracking = layer.tracking || 0;
+      const lineHeight = fontSize * lineHeightMult;
+
+      ctx.save();
+      ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+      ctx.textAlign = textAlign === "justify" ? "left" : textAlign;
+      ctx.textBaseline = "alphabetic";
+
+      const lines = this.layoutText(ctx, layer, text, fontSize, tracking);
+
+      let currentY = layer.y + fontSize;
+
+      lines.forEach((line, lineIndex) => {
+        let currentX = layer.x;
+        if (textAlign === "center") {
+          currentX = layer.x + layer.width / 2;
+        } else if (textAlign === "right") {
+          currentX = layer.x + layer.width;
+        }
+
+        // Render Caret if editing this line
+        if (editingState.caretIndex !== undefined && editingState.selectionStart === editingState.caretIndex) {
+          this.renderCaret(
+            ctx,
+            line,
+            lineIndex,
+            lines,
+            editingState.caretIndex,
+            currentX,
+            currentY,
+            fontSize,
+            lineHeight,
+            textAlign,
+            tracking,
+            zoom
+          );
+        }
+
+        currentY += lineHeight;
+      });
+
+      // Handle selection rendering
+      if (editingState.selectionStart !== undefined && editingState.selectionStart !== editingState.caretIndex) {
+        this.renderSelection(
+          ctx,
+          lines,
+          editingState.selectionStart,
+          editingState.caretIndex,
+          layer.x,
+          layer.y,
+          layer.width,
+          fontSize,
+          lineHeight,
+          textAlign,
+          tracking
+        );
+      }
+
+      // Render pivot point during editing
+      this.renderPivot(ctx, layer);
+
+      ctx.restore();
+    }
+  }
+
+  private static drawTextToContext(ctx: CanvasRenderingContext2D, layer: Layer) {
     const text = layer.text || "";
     const fontSize = layer.fontSize || 24;
     const fontFamily = layer.fontFamily || "Arial";
@@ -28,7 +134,7 @@ export class TextLayer {
     let currentY = layer.y + fontSize;
 
     ctx.fillStyle = color;
-    lines.forEach((line, lineIndex) => {
+    lines.forEach((line) => {
       let currentX = layer.x;
       if (textAlign === "center") {
         currentX = layer.x + layer.width / 2;
@@ -36,51 +142,9 @@ export class TextLayer {
         currentX = layer.x + layer.width;
       }
 
-      // Render line
       this.drawTextLine(ctx, line, currentX, currentY, tracking);
-
-      // Render Caret if editing this line
-      if (editingState?.isFocused && editingState.caretIndex !== undefined && editingState.selectionStart === editingState.caretIndex) {
-        this.renderCaret(
-          ctx,
-          line,
-          lineIndex,
-          lines,
-          editingState.caretIndex,
-          currentX,
-          currentY,
-          fontSize,
-          lineHeight,
-          textAlign,
-          tracking,
-        );
-      }
-
       currentY += lineHeight;
     });
-
-    // Handle selection rendering (drawn AFTER text for negative effect)
-    if (editingState?.isFocused && editingState.selectionStart !== undefined && editingState.selectionStart !== editingState.caretIndex) {
-      this.renderSelection(
-        ctx,
-        lines,
-        editingState.selectionStart,
-        editingState.caretIndex,
-        layer.x,
-        layer.y,
-        layer.width,
-        fontSize,
-        lineHeight,
-        textAlign,
-        tracking
-      );
-    }
-
-    // Render pivot point during editing
-    if (editingState?.isFocused) {
-      this.renderPivot(ctx, layer);
-    }
-
     ctx.restore();
   }
 
@@ -319,6 +383,7 @@ export class TextLayer {
     lineHeight: number,
     textAlign: string,
     tracking: number,
+    zoom: number,
   ) {
     // Determine if caret is in this line
     let charsBeforeLine = 0;
@@ -344,7 +409,7 @@ export class TextLayer {
       ctx.beginPath();
       ctx.moveTo(caretX, lineY + fontSize * 0.2);
       ctx.lineTo(caretX, lineY - fontSize * 0.8);
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.5 / zoom;
       ctx.strokeStyle = "white";
       ctx.stroke();
       ctx.restore();

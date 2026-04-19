@@ -422,6 +422,7 @@ export class TextTool extends BaseTool {
     }
 
     useProjectStore.getState().updateLayer(context.project.id, this.editingLayerId, updates);
+    context.invalidateCache(this.editingLayerId);
   }
 
   private commit(context: ToolContext) {

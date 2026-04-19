@@ -1023,7 +1023,13 @@ export class ForgeEngine {
         );
         break;
       case "text":
-        TextLayer.render(this.ctx, layer, editingState);
+        TextLayer.render(
+          this.ctx,
+          layer,
+          this.layerCanvasCache,
+          this.layerReadyCache,
+          editingState
+        );
         break;
       case "group":
         GroupLayer.render(this.ctx, layer);

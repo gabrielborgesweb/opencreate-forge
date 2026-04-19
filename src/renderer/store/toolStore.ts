@@ -19,6 +19,16 @@ export interface ToolSettings {
   brush: { size: number; color: string; hardness: number };
   pencil: { size: number; color: string; shape: "circle" | "square" };
   eraser: { size: number; hardness: number; mode: "brush" | "pencil"; shape: "circle" | "square" };
+  text: {
+    fontFamily: string;
+    fontSize: number;
+    fontWeight: string | number;
+    color: string;
+    textAlign: "left" | "center" | "right" | "justify";
+    lineHeight: number;
+    tracking: number;
+    isEditing: boolean;
+  };
   crop: {
     mode: CropMode;
     ratioW: number;
@@ -60,6 +70,16 @@ export const useToolStore = create<ToolState>((set) => ({
     brush: { size: 50, color: "#000000", hardness: 1.0 },
     pencil: { size: 1, color: "#000000", shape: "square" },
     eraser: { size: 100, hardness: 1.0, mode: "brush", shape: "circle" },
+    text: {
+      fontFamily: "Arial",
+      fontSize: 24,
+      fontWeight: "normal",
+      color: "#000000",
+      textAlign: "left",
+      lineHeight: 1.2,
+      tracking: 0,
+      isEditing: false,
+    },
     crop: {
       mode: "Free",
       ratioW: 1,

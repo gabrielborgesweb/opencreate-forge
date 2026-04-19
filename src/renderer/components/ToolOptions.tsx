@@ -9,6 +9,7 @@ import { EraserOptions } from "./tools/EraserOptions";
 import { SelectOptions } from "./tools/SelectOptions";
 import { TransformOptions } from "./tools/TransformOptions";
 import { CropOptions } from "./tools/CropOptions";
+import { TextOptions } from "./tools/TextOptions";
 
 const TOOL_COMPONENTS: Partial<Record<ToolId, React.FC>> = {
   brush: BrushOptions,
@@ -17,6 +18,7 @@ const TOOL_COMPONENTS: Partial<Record<ToolId, React.FC>> = {
   select: SelectOptions,
   transform: TransformOptions,
   crop: CropOptions,
+  text: TextOptions,
 };
 
 const ToolOptions: React.FC = () => {

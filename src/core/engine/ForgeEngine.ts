@@ -7,6 +7,7 @@ import { EraserTool } from "../tools/EraserTool";
 import { TransformTool } from "../tools/TransformTool";
 import { SelectTool } from "../tools/SelectTool";
 import { CropTool } from "../tools/CropTool";
+import { TextTool } from "../tools/TextTool";
 import { useToolStore } from "@/renderer/store/toolStore";
 import { useUIStore } from "@/renderer/store/uiStore";
 import { getOptimizedBoundingBox } from "../utils/imageUtils";
@@ -71,10 +72,12 @@ export class ForgeEngine {
       eraser: new EraserTool(),
       transform: new TransformTool(),
       crop: new CropTool(),
+      text: new TextTool(),
     };
 
     this.handleWheel = this.handleWheel.bind(this);
     this.handleMouseDown = this.handleMouseDown.bind(this);
+    this.handleDoubleClick = this.handleDoubleClick.bind(this);
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleMouseUp = this.handleMouseUp.bind(this);
     this.handleKeyDown = this.handleKeyDown.bind(this);
@@ -86,6 +89,7 @@ export class ForgeEngine {
   private setupEventListeners() {
     this.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
     this.canvas.addEventListener("mousedown", this.handleMouseDown);
+    this.canvas.addEventListener("dblclick", this.handleDoubleClick);
     window.addEventListener("mousemove", this.handleMouseMove);
     window.addEventListener("mouseup", this.handleMouseUp);
     window.addEventListener("keydown", this.handleKeyDown);
@@ -111,6 +115,17 @@ export class ForgeEngine {
   }
 
   private handleKeyDown(e: KeyboardEvent) {
+    const tool = this.getActiveTool();
+    const context = this.getToolContext();
+    if (tool && context) {
+      const consumed = tool.onKeyDown(e, context);
+      if (consumed) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        return;
+      }
+    }
+
     const isCtrl = e.ctrlKey || e.metaKey;
 
     if (isCtrl && e.key.toLowerCase() === "c") {
@@ -514,6 +529,15 @@ export class ForgeEngine {
     }
   }
 
+  private handleDoubleClick(e: MouseEvent) {
+    if (!this.project) return;
+    const tool = this.getActiveTool();
+    const context = this.getToolContext();
+    if (tool && context) {
+      tool.onDoubleClick(e, context);
+    }
+  }
+
   private stopViewportAnimation() {
     if (this.viewportAnimationId) {
       cancelAnimationFrame(this.viewportAnimationId);
@@ -911,7 +935,6 @@ export class ForgeEngine {
     );
 
     const tool = this.getActiveTool();
-    const editingLayerId = tool?.getEditingLayerId();
 
     // 1. PASSO: Camadas que INTERSECTAM o projeto (Serão clipadas)
     this.ctx.save();
@@ -920,7 +943,7 @@ export class ForgeEngine {
     this.ctx.clip();
 
     for (const layer of this.project.layers) {
-      if (layer.visible && layer.id !== editingLayerId) {
+      if (layer.visible) {
         if (this.intersects(layer, this.project.width, this.project.height)) {
           this.renderLayer(layer);
         }
@@ -930,8 +953,7 @@ export class ForgeEngine {
     // Render floating layer if it exists
     if (
       this.project.selection.floatingLayer &&
-      this.project.selection.floatingLayer.visible &&
-      this.project.selection.floatingLayer.id !== editingLayerId
+      this.project.selection.floatingLayer.visible
     ) {
       this.renderLayer(this.project.selection.floatingLayer);
     }
@@ -940,7 +962,7 @@ export class ForgeEngine {
 
     // 2. PASSO: Camadas que NÃO INTERSECTAM o projeto (Desenhar sem clip)
     for (const layer of this.project.layers) {
-      if (layer.visible && layer.id !== editingLayerId) {
+      if (layer.visible) {
         if (!this.intersects(layer, this.project.width, this.project.height)) {
           this.renderLayer(layer);
         }
@@ -954,9 +976,11 @@ export class ForgeEngine {
     const context = this.getToolContext();
     if (tool && context) tool.onRender(this.ctx, context);
 
+    const editingLayerId = tool?.getEditingLayerId();
+
     if (this.project.activeLayerId && activeToolId !== "transform" && activeToolId !== "crop") {
       const activeLayer = this.project.layers.find((l) => l.id === this.project?.activeLayerId);
-      if (activeLayer) {
+      if (activeLayer && activeLayer.id !== editingLayerId) {
         this.ctx.save();
 
         if (!activeLayer.visible) {
@@ -983,6 +1007,10 @@ export class ForgeEngine {
     this.ctx.globalAlpha = layer.opacity / 100;
     this.ctx.globalCompositeOperation = layer.blendMode;
 
+    const tool = this.getActiveTool();
+    const isEditing = tool?.getEditingLayerId() === layer.id;
+    const editingState = isEditing ? (tool as any).getEditingState?.() : undefined;
+
     switch (layer.type) {
       case "raster":
         RasterLayer.render(
@@ -995,7 +1023,7 @@ export class ForgeEngine {
         );
         break;
       case "text":
-        TextLayer.render(this.ctx, layer);
+        TextLayer.render(this.ctx, layer, editingState);
         break;
       case "group":
         GroupLayer.render(this.ctx, layer);

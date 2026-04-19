@@ -12,10 +12,16 @@ export interface Layer {
   width: number;
   height: number;
   data?: string; // dataURL (Base64)
+  // Text properties
   text?: string;
+  textType?: "point" | "area";
   fontSize?: number;
   fontFamily?: string;
+  fontWeight?: string | number;
   color?: string;
+  textAlign?: "left" | "center" | "right" | "justify";
+  lineHeight?: number; // leading
+  tracking?: number; // letter spacing
   blendMode: GlobalCompositeOperation;
 }
 

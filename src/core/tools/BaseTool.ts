@@ -39,11 +39,16 @@ export abstract class BaseTool {
   abstract id: ToolId;
 
   onMouseDown(_e: MouseEvent, _context: ToolContext): void {}
+  onDoubleClick(_e: MouseEvent, _context: ToolContext): void {}
   onMouseMove(_e: MouseEvent, _context: ToolContext): void {}
   onMouseUp(_e: MouseEvent, _context: ToolContext): void {}
 
   onActivate(_context: ToolContext): void {}
   onDeactivate(_context: ToolContext): void {}
+
+  onKeyDown(_e: KeyboardEvent, _context: ToolContext): boolean {
+    return false; // Retorna true se o evento foi consumido
+  }
 
   getEditingLayerId(): string | null {
     return null;

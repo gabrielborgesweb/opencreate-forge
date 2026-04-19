@@ -139,6 +139,8 @@ function App() {
           if (checkDirty("select")) setActiveTool("select");
         } else if (e.key.toLowerCase() === "c") {
           if (checkDirty("crop")) setActiveTool("crop");
+        } else if (e.key.toLowerCase() === "t") {
+          if (checkDirty("text")) setActiveTool("text");
         }
       }
     };

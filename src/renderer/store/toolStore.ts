@@ -27,6 +27,7 @@ export interface ToolSettings {
     textAlign: "left" | "center" | "right" | "justify";
     lineHeight: number;
     tracking: number;
+    textRendering: "nearest" | "bilinear";
     isEditing: boolean;
   };
   crop: {
@@ -78,6 +79,7 @@ export const useToolStore = create<ToolState>((set) => ({
       textAlign: "left",
       lineHeight: 1.2,
       tracking: 0,
+      textRendering: "bilinear",
       isEditing: false,
     },
     crop: {

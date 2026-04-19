@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { useToolStore } from "@/renderer/store/toolStore";
 import { useProjectStore } from "@/renderer/store/projectStore";
 import ToolSettingInput from "@/renderer/components/ui/ToolSettingInput";
 import { AlignLeft, AlignCenter, AlignRight, AlignJustify, X, Check } from "lucide-react";
+import { TextLayer } from "@/core/layers/TextLayer";
 
 export const TextOptions: React.FC = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(document.createElement("canvas"));
   const toolSettings = useToolStore((state) => state.toolSettings);
   const updateToolSettings = useToolStore((state) => state.updateToolSettings);
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
@@ -12,7 +14,47 @@ export const TextOptions: React.FC = () => {
     state.projects.find((p) => p.id === activeProjectId),
   );
 
-  const textAlign = toolSettings.text.textAlign;
+  const textSettings = toolSettings.text;
+  const textAlign = textSettings.textAlign;
+
+  // Live updates
+  useEffect(() => {
+    if (activeProject && activeProject.activeLayerId) {
+      const layer = activeProject.layers.find((l) => l.id === activeProject.activeLayerId);
+      if (layer && layer.type === "text" && textSettings.isEditing) {
+        const baseUpdates: any = {
+          fontSize: textSettings.fontSize,
+          fontFamily: textSettings.fontFamily,
+          color: textSettings.color,
+          textAlign: textSettings.textAlign,
+          tracking: textSettings.tracking,
+          lineHeight: textSettings.lineHeight,
+          textRendering: textSettings.textRendering,
+        };
+
+        // For point text, we must recalculate width/height to avoid clipping
+        let dimensionUpdates = {};
+        if (layer.textType === "point") {
+          const ctx = canvasRef.current.getContext("2d")!;
+          const metrics = TextLayer.calculateMetrics(ctx, { ...layer, ...baseUpdates });
+          dimensionUpdates = {
+            width: metrics.width,
+            height: metrics.height,
+            x: metrics.x,
+          };
+        }
+
+        const updates = { ...baseUpdates, ...dimensionUpdates };
+        
+        // Only update if there's a real change to avoid infinite loops or unnecessary renders
+        const hasChange = Object.keys(updates).some(key => (updates as any)[key] !== (layer as any)[key]);
+        
+        if (hasChange) {
+           useProjectStore.getState().updateLayer(activeProject.id, layer.id, updates);
+        }
+      }
+    }
+  }, [textSettings, activeProject]);
 
   const handleApply = () => {
     window.dispatchEvent(new CustomEvent("forge:text-apply"));
@@ -24,37 +66,16 @@ export const TextOptions: React.FC = () => {
 
   const setAlign = (align: "left" | "center" | "right" | "justify") => {
     updateToolSettings("text", { textAlign: align });
-
-    if (activeProject && activeProject.activeLayerId) {
-      const layer = activeProject.layers.find((l) => l.id === activeProject.activeLayerId);
-      if (layer && layer.type === "text") {
-        const updates: any = { textAlign: align };
-
-        if (layer.textType === "point") {
-          // Calculate current anchor point before change
-          let anchorX = layer.x;
-          if (layer.textAlign === "center") anchorX = layer.x + layer.width / 2;
-          else if (layer.textAlign === "right") anchorX = layer.x + layer.width;
-
-          // Adjust X based on NEW alignment to keep anchor fixed
-          if (align === "center") updates.x = anchorX - layer.width / 2;
-          else if (align === "right") updates.x = anchorX - layer.width;
-          else updates.x = anchorX; // left
-        }
-
-        useProjectStore.getState().updateLayer(activeProject.id, layer.id, updates);
-      }
-    }
   };
 
   return (
-    <div className="flex items-center gap-6 w-full px-4">
+    <div className="flex items-center gap-6 w-full px-4 overflow-x-auto no-scrollbar">
       <div className="flex flex-col gap-0.5">
         <label className="text-[0.65rem] text-[#999] font-medium uppercase tracking-tight">
           Font Family
         </label>
         <select
-          value={toolSettings.text.fontFamily}
+          value={textSettings.fontFamily}
           onChange={(e) => updateToolSettings("text", { fontFamily: e.target.value })}
           className="bg-zinc-800 border-none text-[0.75rem] text-white px-2 py-0.5 rounded outline-none focus:ring-1 focus:ring-accent"
         >
@@ -72,7 +93,7 @@ export const TextOptions: React.FC = () => {
         unit="pt"
         min={1}
         max={1000}
-        value={toolSettings.text.fontSize}
+        value={textSettings.fontSize}
         onChange={(val) => updateToolSettings("text", { fontSize: val })}
       />
 
@@ -114,7 +135,7 @@ export const TextOptions: React.FC = () => {
           </label>
           <input
             type="color"
-            value={toolSettings.text.color}
+            value={textSettings.color}
             onChange={(e) => updateToolSettings("text", { color: e.target.value })}
             className="border-none bg-none w-5 h-5 cursor-pointer rounded overflow-hidden"
           />
@@ -126,7 +147,7 @@ export const TextOptions: React.FC = () => {
         unit="px"
         min={-50}
         max={200}
-        value={toolSettings.text.tracking}
+        value={textSettings.tracking}
         onChange={(val) => updateToolSettings("text", { tracking: val })}
       />
 
@@ -136,11 +157,25 @@ export const TextOptions: React.FC = () => {
         min={0.1}
         max={10}
         step={0.1}
-        value={toolSettings.text.lineHeight}
+        value={textSettings.lineHeight}
         onChange={(val) => updateToolSettings("text", { lineHeight: val })}
       />
 
-      {toolSettings.text.isEditing && (
+      <div className="flex flex-col gap-0.5">
+        <label className="text-[0.65rem] text-[#999] font-medium uppercase tracking-tight">
+          Rendering
+        </label>
+        <select
+          value={textSettings.textRendering}
+          onChange={(e) => updateToolSettings("text", { textRendering: e.target.value })}
+          className="bg-zinc-800 border-none text-[0.75rem] text-white px-2 py-0.5 rounded outline-none focus:ring-1 focus:ring-accent"
+        >
+          <option value="bilinear">Smooth (Bilinear)</option>
+          <option value="nearest">Pixelated (Nearest)</option>
+        </select>
+      </div>
+
+      {textSettings.isEditing && (
         <div className="flex items-center gap-2 ml-auto border-l border-zinc-800 pl-4 h-8 animate-in fade-in slide-in-from-right-2 duration-200">
           <button
             onClick={handleCancel}

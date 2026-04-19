@@ -390,37 +390,19 @@ export class TextTool extends BaseTool {
     const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
     if (!layer) return;
 
-    const updates: Partial<Layer> = { text };
+    const baseUpdates: Partial<Layer> = { text };
+    let dimensionUpdates = {};
 
     if (layer.textType === "point") {
-      let anchorX = layer.x;
-      if (layer.textAlign === "center") anchorX = layer.x + layer.width / 2;
-      else if (layer.textAlign === "right") anchorX = layer.x + layer.width;
-
-      const ctx = context.ctx;
-      ctx.save();
-      ctx.font = `${layer.fontWeight || "normal"} ${layer.fontSize || 24}px ${layer.fontFamily || "Arial"}`;
-      
-      const lines = text.split("\n");
-      const tracking = layer.tracking || 0;
-      let maxWidth = 0;
-      
-      lines.forEach(line => {
-        const width = TextLayer.measureTextWithTracking(ctx, line, tracking);
-        maxWidth = Math.max(maxWidth, width);
-      });
-      
-      const newWidth = Math.max(1, maxWidth);
-      updates.width = newWidth;
-      updates.height = lines.length * (layer.fontSize || 24) * (layer.lineHeight || 1.2);
-
-      if (layer.textAlign === "center") updates.x = anchorX - newWidth / 2;
-      else if (layer.textAlign === "right") updates.x = anchorX - newWidth;
-      else updates.x = anchorX;
-
-      ctx.restore();
+      const metrics = TextLayer.calculateMetrics(context.ctx, { ...layer, ...baseUpdates });
+      dimensionUpdates = {
+        width: metrics.width,
+        height: metrics.height,
+        x: metrics.x,
+      };
     }
 
+    const updates = { ...baseUpdates, ...dimensionUpdates };
     useProjectStore.getState().updateLayer(context.project.id, this.editingLayerId, updates);
     context.invalidateCache(this.editingLayerId);
   }

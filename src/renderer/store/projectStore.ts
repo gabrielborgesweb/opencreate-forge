@@ -1,5 +1,13 @@
 import { create } from "zustand";
 
+export interface TextSpan {
+  text: string;
+  color?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  fontWeight?: string | number;
+}
+
 export interface Layer {
   id: string;
   name: string;
@@ -14,6 +22,7 @@ export interface Layer {
   data?: string; // dataURL (Base64)
   // Text properties
   text?: string;
+  textSpans?: TextSpan[];
   textType?: "point" | "area";
   fontSize?: number;
   fontFamily?: string;
@@ -22,6 +31,7 @@ export interface Layer {
   textAlign?: "left" | "center" | "right" | "justify";
   lineHeight?: number; // leading
   tracking?: number; // letter spacing
+  textRendering?: "nearest" | "bilinear";
   blendMode: GlobalCompositeOperation;
 }
 

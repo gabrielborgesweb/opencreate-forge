@@ -13,8 +13,10 @@ export class TextLayer {
     const matrix = ctx.getTransform();
     const zoom = matrix.a;
 
-    // 1. Text Rendering (Nearest look via 1:1 cache)
-    const propsKey = `${layer.text}|${layer.fontSize}|${layer.fontFamily}|${layer.fontWeight}|${layer.color}|${layer.textAlign}|${layer.tracking}|${layer.lineHeight}|${layer.width}|${layer.height}`;
+    // 1. Text Rendering (Always pixel-based, tied to project resolution)
+    const textRendering = layer.textRendering || "bilinear";
+    const spansKey = JSON.stringify(layer.textSpans || []);
+    const propsKey = `${layer.text}|${spansKey}|${layer.fontSize}|${layer.fontFamily}|${layer.fontWeight}|${layer.color}|${layer.textAlign}|${layer.tracking}|${layer.lineHeight}|${layer.width}|${layer.height}|${textRendering}`;
     
     let cachedCanvas = cache.get(layer.id);
     const isReady = readyCache.get(layer.id);
@@ -29,14 +31,19 @@ export class TextLayer {
       
       // Render text at 1:1 scale into the cache
       this.drawTextToContext(cctx, { ...layer, x: 0, y: 0 });
+
+      if (textRendering === "nearest") {
+        // Apply binary threshold to alpha to remove anti-aliasing (crunchy pixel look)
+        this.applyAlphaThreshold(cctx, cachedCanvas.width, cachedCanvas.height);
+      }
       
       cache.set(layer.id, cachedCanvas);
       readyCache.set(layer.id, true);
     }
 
-    // Draw the cached text at the project coordinates
-    // Since main ctx has zoom and imageSmoothingEnabled=false, this will look 'nearest'
     ctx.save();
+    // Draw the cached text (1:1) at project coordinates.
+    // Since ForgeEngine sets imageSmoothingEnabled = false, this will look pixelated on zoom.
     ctx.drawImage(cachedCanvas, layer.x, layer.y);
     ctx.restore();
 
@@ -82,7 +89,8 @@ export class TextLayer {
             lineHeight,
             textAlign,
             tracking,
-            zoom
+            zoom,
+            layer
           );
         }
 
@@ -102,7 +110,8 @@ export class TextLayer {
           fontSize,
           lineHeight,
           textAlign,
-          tracking
+          tracking,
+          layer
         );
       }
 
@@ -113,38 +122,161 @@ export class TextLayer {
     }
   }
 
-  private static drawTextToContext(ctx: CanvasRenderingContext2D, layer: Layer) {
+  private static applyAlphaThreshold(ctx: CanvasRenderingContext2D, width: number, height: number) {
+    if (width <= 0 || height <= 0) return;
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    for (let i = 3; i < data.length; i += 4) {
+      // If alpha > 127 (50%), make it fully opaque, otherwise transparent
+      data[i] = data[i] > 127 ? 255 : 0;
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  public static calculateMetrics(
+    ctx: CanvasRenderingContext2D,
+    layer: Partial<Layer>
+  ): { width: number; height: number; x?: number } {
     const text = layer.text || "";
     const fontSize = layer.fontSize || 24;
     const fontFamily = layer.fontFamily || "Arial";
     const fontWeight = layer.fontWeight || "normal";
-    const color = layer.color || "#000000";
-    const textAlign = layer.textAlign || "left";
     const lineHeightMult = layer.lineHeight || 1.2;
     const tracking = layer.tracking || 0;
+    const textAlign = layer.textAlign || "left";
     const lineHeight = fontSize * lineHeightMult;
 
     ctx.save();
     ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
-    ctx.textAlign = textAlign === "justify" ? "left" : textAlign;
+    
+    const lines = text.split("\n");
+    let maxWidth = 0;
+    
+    lines.forEach((line, index) => {
+      // Pass a partial layer to measureTextWithTracking
+      const lineStartPos = lines.slice(0, index).join("\n").length + (index > 0 ? 1 : 0);
+      const width = this.measureTextWithTracking(ctx, line, tracking, layer as Layer, lineStartPos);
+      maxWidth = Math.max(maxWidth, width);
+    });
+
+    const newWidth = Math.max(1, maxWidth);
+    const newHeight = Math.max(1, lines.length * lineHeight);
+    
+    const result: any = { width: newWidth, height: newHeight };
+
+    // For point text, we need to adjust X to maintain alignment anchor
+    if (layer.textType === "point" && layer.width !== undefined && layer.x !== undefined) {
+      let anchorX = layer.x;
+      if (layer.textAlign === "center") anchorX = layer.x + layer.width / 2;
+      else if (layer.textAlign === "right") anchorX = layer.x + layer.width;
+
+      if (textAlign === "center") result.x = anchorX - newWidth / 2;
+      else if (textAlign === "right") result.x = anchorX - newWidth;
+      else result.x = anchorX;
+    }
+
+    ctx.restore();
+    return result;
+  }
+
+  private static drawTextToContext(ctx: CanvasRenderingContext2D, layer: Layer) {
+    const text = layer.text || "";
+    const baseFontSize = layer.fontSize || 24;
+    const textAlign = layer.textAlign || "left";
+    const lineHeightMult = layer.lineHeight || 1.2;
+    const tracking = layer.tracking || 0;
+    const lineHeight = baseFontSize * lineHeightMult;
+
+    const lines = this.layoutText(ctx, layer, text, baseFontSize, tracking);
+
+    ctx.save();
     ctx.textBaseline = "alphabetic";
 
-    const lines = this.layoutText(ctx, layer, text, fontSize, tracking);
+    let currentY = layer.y + baseFontSize;
+    let charsProcessed = 0;
 
-    let currentY = layer.y + fontSize;
-
-    ctx.fillStyle = color;
     lines.forEach((line) => {
       let currentX = layer.x;
+      const lineWidth = this.measureTextWithTracking(ctx, line, tracking, layer, charsProcessed);
+      
       if (textAlign === "center") {
-        currentX = layer.x + layer.width / 2;
+        currentX = layer.x + layer.width / 2 - lineWidth / 2;
       } else if (textAlign === "right") {
-        currentX = layer.x + layer.width;
+        currentX = layer.x + layer.width - lineWidth;
       }
 
-      this.drawTextLine(ctx, line, currentX, currentY, tracking);
+      this.drawStyledLine(ctx, line, currentX, currentY, layer, tracking, charsProcessed);
       currentY += lineHeight;
+      charsProcessed += line.length + 1; // +1 for newline
     });
+    ctx.restore();
+  }
+
+  private static drawStyledLine(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    layer: Layer,
+    tracking: number,
+    lineStartIndex: number
+  ) {
+    const baseFontSize = layer.fontSize || 24;
+    const baseFontFamily = layer.fontFamily || "Arial";
+    const baseFontWeight = layer.fontWeight || "normal";
+    const baseColor = layer.color || "#000000";
+    
+    let currentX = x;
+    
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const style = this.getStyleAt(layer, lineStartIndex + i);
+      
+      const fontSize = style.fontSize || baseFontSize;
+      const fontFamily = style.fontFamily || baseFontFamily;
+      const fontWeight = style.fontWeight || baseFontWeight;
+      const color = style.color || baseColor;
+
+      ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+      ctx.fillStyle = color;
+      
+      ctx.fillText(char, currentX, y);
+      currentX += ctx.measureText(char).width + tracking;
+    }
+  }
+
+  private static getStyleAt(layer: Layer, charIndex: number): Partial<import("@/renderer/store/projectStore").TextSpan> {
+    if (!layer.textSpans || layer.textSpans.length === 0) return {};
+    
+    let currentPos = 0;
+    for (const span of layer.textSpans) {
+      if (charIndex >= currentPos && charIndex < currentPos + span.text.length) {
+        return span;
+      }
+      currentPos += span.text.length;
+    }
+    return {};
+  }
+
+  private static renderPivot(ctx: CanvasRenderingContext2D, layer: Layer) {
+    const size = 6;
+    const matrix = ctx.getTransform();
+    const zoom = matrix.a; 
+    const s = size / zoom;
+
+    ctx.save();
+    ctx.fillStyle = layer.color || "#000000";
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 1 / zoom;
+    
+    let px = layer.x;
+    if (layer.textAlign === "center") px = layer.x + layer.width / 2;
+    else if (layer.textAlign === "right") px = layer.x + layer.width;
+
+    const py = layer.y + (layer.fontSize || 24);
+    
+    ctx.fillRect(px - s / 2, py - s / 2, s, s);
+    ctx.strokeRect(px - s / 2, py - s / 2, s, s);
     ctx.restore();
   }
 
@@ -159,17 +291,15 @@ export class TextLayer {
     fontSize: number,
     lineHeight: number,
     textAlign: string,
-    tracking: number
+    tracking: number,
+    layer?: Layer // Added layer for rich text measurement
   ) {
     const selStart = Math.min(start, end);
     const selEnd = Math.max(start, end);
     
     ctx.save();
-    // Negative effect: we use 'difference' composition
-    // or we can draw a solid color. Photoshop uses a solid blue-ish color often,
-    // but the user asked for negative/invert.
     ctx.globalCompositeOperation = "difference";
-    ctx.fillStyle = "white"; // Difference with white inverts colors
+    ctx.fillStyle = "white";
 
     let charsProcessed = 0;
     lines.forEach((line, lineIndex) => {
@@ -183,14 +313,15 @@ export class TextLayer {
         const textBefore = line.substring(0, intersectionStart - lineStart);
         const textSelected = line.substring(intersectionStart - lineStart, intersectionEnd - lineStart);
         
-        const offset = this.measureTextWithTracking(ctx, textBefore, tracking);
-        const width = this.measureTextWithTracking(ctx, textSelected, tracking);
+        const offset = this.measureTextWithTracking(ctx, textBefore, tracking, layer, lineStart);
+        const width = this.measureTextWithTracking(ctx, textSelected, tracking, layer, intersectionStart);
         
         let currentX = layerX;
+        const totalLineWidth = this.measureTextWithTracking(ctx, line, tracking, layer, lineStart);
         if (textAlign === "center") {
-          currentX = layerX + layerWidth / 2 - this.measureTextWithTracking(ctx, line, tracking) / 2;
+          currentX = layerX + layerWidth / 2 - totalLineWidth / 2;
         } else if (textAlign === "right") {
-          currentX = layerX + layerWidth - this.measureTextWithTracking(ctx, line, tracking);
+          currentX = layerX + layerWidth - totalLineWidth;
         }
 
         const rectX = currentX + offset;
@@ -199,7 +330,7 @@ export class TextLayer {
         ctx.fillRect(rectX, rectY, width, lineHeight);
       }
 
-      charsProcessed += line.length + 1; // +1 for newline
+      charsProcessed += line.length + 1;
     });
 
     ctx.restore();
@@ -213,86 +344,46 @@ export class TextLayer {
   ): number {
     const text = layer.text || "";
     const fontSize = layer.fontSize || 24;
-    const fontFamily = layer.fontFamily || "Arial";
-    const fontWeight = layer.fontWeight || "normal";
     const textAlign = layer.textAlign || "left";
     const lineHeightMult = layer.lineHeight || 1.2;
     const tracking = layer.tracking || 0;
     const lineHeight = fontSize * lineHeightMult;
 
-    ctx.save();
-    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
-    ctx.textAlign = textAlign === "justify" ? "left" : textAlign;
-    ctx.textBaseline = "alphabetic";
-
     const lines = this.layoutText(ctx, layer, text, fontSize, tracking);
     
-    // Find line index
     const relativeY = y - layer.y;
     let lineIndex = Math.floor(relativeY / lineHeight);
     lineIndex = Math.max(0, Math.min(lineIndex, lines.length - 1));
 
     const line = lines[lineIndex];
+    let lineStartPos = 0;
+    for (let i = 0; i < lineIndex; i++) lineStartPos += lines[i].length + 1;
+
     let currentX = layer.x;
+    const lineWidth = this.measureTextWithTracking(ctx, line, tracking, layer, lineStartPos);
     if (textAlign === "center") {
-      currentX = layer.x + layer.width / 2 - this.measureTextWithTracking(ctx, line, tracking) / 2;
+      currentX = layer.x + layer.width / 2 - lineWidth / 2;
     } else if (textAlign === "right") {
-      currentX = layer.x + layer.width - this.measureTextWithTracking(ctx, line, tracking);
+      currentX = layer.x + layer.width - lineWidth;
     }
 
     const relativeX = x - currentX;
     
-    // Find char index in line
     let charIndexInLine = 0;
     let bestDist = Math.abs(relativeX);
     
     for (let i = 1; i <= line.length; i++) {
-      const width = this.measureTextWithTracking(ctx, line.substring(0, i), tracking);
+      const width = this.measureTextWithTracking(ctx, line.substring(0, i), tracking, layer, lineStartPos);
       const dist = Math.abs(relativeX - width);
       if (dist < bestDist) {
         bestDist = dist;
         charIndexInLine = i;
       } else {
-        // Since widths are increasing, we can break once it starts getting worse
         break;
       }
     }
 
-    // Convert to absolute caret index
-    let charsBefore = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charsBefore += lines[i].length + 1;
-    }
-
-    ctx.restore();
-    return charsBefore + charIndexInLine;
-  }
-
-  private static renderPivot(ctx: CanvasRenderingContext2D, layer: Layer) {
-    const size = 6;
-    // We need the zoom to keep the pivot size constant on screen, 
-    // but render() doesn't receive it directly. 
-    // However, the ctx transform already has zoom applied.
-    // To keep it 6px on screen:
-    const matrix = ctx.getTransform();
-    const zoom = matrix.a; 
-    const s = size / zoom;
-
-    ctx.save();
-    ctx.fillStyle = layer.color || "#000000";
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 1 / zoom;
-    
-    // Position depends on alignment
-    let px = layer.x;
-    if (layer.textAlign === "center") px = layer.x + layer.width / 2;
-    else if (layer.textAlign === "right") px = layer.x + layer.width;
-
-    const py = layer.y + (layer.fontSize || 24); // Baseline of the first line
-    
-    ctx.fillRect(px - s / 2, py - s / 2, s, s);
-    ctx.strokeRect(px - s / 2, py - s / 2, s, s);
-    ctx.restore();
+    return lineStartPos + charIndexInLine;
   }
 
   private static layoutText(
@@ -308,65 +399,70 @@ export class TextLayer {
     const wrappedLines: string[] = [];
     const maxWidth = layer.width;
 
+    let charsProcessed = 0;
     rawLines.forEach((rawLine) => {
       const words = rawLine.split(" ");
       let currentLine = "";
+      let currentLineStart = charsProcessed;
 
       words.forEach((word) => {
         const testLine = currentLine ? currentLine + " " + word : word;
-        const metrics = this.measureTextWithTracking(ctx, testLine, tracking);
+        const metrics = this.measureTextWithTracking(ctx, testLine, tracking, layer, currentLineStart);
         if (metrics > maxWidth && currentLine !== "") {
           wrappedLines.push(currentLine);
           currentLine = word;
+          currentLineStart += wrappedLines[wrappedLines.length - 1].length + 1;
         } else {
           currentLine = testLine;
         }
       });
       wrappedLines.push(currentLine);
+      charsProcessed += rawLine.length + 1;
     });
 
     return wrappedLines;
-  }
-
-  private static drawTextLine(
-    ctx: CanvasRenderingContext2D,
-    text: string,
-    x: number,
-    y: number,
-    tracking: number,
-  ) {
-    if (tracking === 0) {
-      ctx.fillText(text, x, y);
-      return;
-    }
-
-    let currentX = x;
-    if (ctx.textAlign === "center") {
-      currentX -= this.measureTextWithTracking(ctx, text, tracking) / 2;
-    } else if (ctx.textAlign === "right") {
-      currentX -= this.measureTextWithTracking(ctx, text, tracking);
-    }
-
-    const prevAlign = ctx.textAlign;
-    ctx.textAlign = "left";
-
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      ctx.fillText(char, currentX, y);
-      currentX += ctx.measureText(char).width + tracking;
-    }
-    ctx.textAlign = prevAlign;
   }
 
   public static measureTextWithTracking(
     ctx: CanvasRenderingContext2D,
     text: string,
     tracking: number,
+    layer?: Layer,
+    lineStartIndex: number = 0
   ): number {
-    if (tracking === 0) return ctx.measureText(text).width;
+    if (!layer || (!layer.textSpans || layer.textSpans.length === 0)) {
+       if (tracking === 0) {
+         ctx.save();
+         ctx.font = `${layer?.fontWeight || "normal"} ${layer?.fontSize || 24}px ${layer?.fontFamily || "Arial"}`;
+         const w = ctx.measureText(text).width;
+         ctx.restore();
+         return w;
+       }
+       let width = 0;
+       ctx.save();
+       ctx.font = `${layer?.fontWeight || "normal"} ${layer?.fontSize || 24}px ${layer?.fontFamily || "Arial"}`;
+       for (let i = 0; i < text.length; i++) {
+         width += ctx.measureText(text[i]).width + tracking;
+       }
+       ctx.restore();
+       return width > 0 ? width - tracking : 0;
+    }
+
     let width = 0;
+    const baseFontSize = layer.fontSize || 24;
+    const baseFontFamily = layer.fontFamily || "Arial";
+    const baseFontWeight = layer.fontWeight || "normal";
+
     for (let i = 0; i < text.length; i++) {
+      const style = this.getStyleAt(layer, lineStartIndex + i);
+      const fontSize = style.fontSize || baseFontSize;
+      const fontFamily = style.fontFamily || baseFontFamily;
+      const fontWeight = style.fontWeight || baseFontWeight;
+      
+      ctx.save();
+      ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
       width += ctx.measureText(text[i]).width + tracking;
+      ctx.restore();
     }
     return width > 0 ? width - tracking : 0;
   }
@@ -384,24 +480,25 @@ export class TextLayer {
     textAlign: string,
     tracking: number,
     zoom: number,
+    layer?: Layer // Added layer for rich text
   ) {
-    // Determine if caret is in this line
     let charsBeforeLine = 0;
     for (let i = 0; i < lineIndex; i++) {
-      charsBeforeLine += allLines[i].length + 1; // +1 for newline
+      charsBeforeLine += allLines[i].length + 1;
     }
 
     const relativeCaretIndex = caretIndex - charsBeforeLine;
 
     if (relativeCaretIndex >= 0 && relativeCaretIndex <= lineText.length) {
       const textBeforeCaret = lineText.substring(0, relativeCaretIndex);
-      const offset = this.measureTextWithTracking(ctx, textBeforeCaret, tracking);
+      const offset = this.measureTextWithTracking(ctx, textBeforeCaret, tracking, layer, charsBeforeLine);
 
+      const lineWidth = this.measureTextWithTracking(ctx, lineText, tracking, layer, charsBeforeLine);
       let caretX = lineX + offset;
       if (textAlign === "center") {
-        caretX = lineX - this.measureTextWithTracking(ctx, lineText, tracking) / 2 + offset;
+        caretX = lineX - lineWidth / 2 + offset;
       } else if (textAlign === "right") {
-        caretX = lineX - this.measureTextWithTracking(ctx, lineText, tracking) + offset;
+        caretX = lineX - lineWidth + offset;
       }
 
       ctx.save();

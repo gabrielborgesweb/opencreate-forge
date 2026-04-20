@@ -611,12 +611,15 @@ export class TextTool extends BaseTool {
     const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
     if (!layer) return;
 
+    // Normalize text to NFC to ensure accented characters are single characters (not decomposed)
+    const normalizedChar = char.normalize("NFC");
+
     const start = Math.min(this.caretIndex, this.selectionStart);
     const end = Math.max(this.caretIndex, this.selectionStart);
-    const text = layer.text || "";
+    const text = (layer.text || "").normalize("NFC");
 
-    const newText = text.substring(0, start) + char + text.substring(end);
-    this.caretIndex = start + char.length;
+    const newText = text.substring(0, start) + normalizedChar + text.substring(end);
+    this.caretIndex = start + normalizedChar.length;
     this.selectionStart = this.caretIndex;
     this.updateText(newText, context);
   }

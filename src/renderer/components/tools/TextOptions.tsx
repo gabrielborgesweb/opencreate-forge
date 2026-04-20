@@ -134,25 +134,32 @@ export const TextOptions: React.FC = () => {
   useEffect(() => {
     if (activeProject && activeProject.activeLayerId) {
       const layer = activeProject.layers.find((l) => l.id === activeProject.activeLayerId);
-      if (layer && layer.type === "text") {
-        // Update tool settings to match the selected layer
-        // We only do this if NOT currently editing to avoid jumping values while typing
-        if (!textSettings.isEditing) {
-          updateToolSettings("text", {
-            fontSize: layer.fontSize || 24,
-            fontFamily: layer.fontFamily || "Arial",
-            fontWeight: layer.fontWeight || "normal",
-            color: layer.color || "#000000",
-            textAlign: layer.textAlign || "left",
-            tracking: layer.tracking || 0,
-            lineHeight: layer.lineHeight || 1.2,
-            textRendering: layer.textRendering || "bilinear",
-            textOverflow: layer.textOverflow !== false,
-          });
+      if (layer && layer.type === "text" && !textSettings.isEditing) {
+        // Only update if values are actually different to avoid cycles
+        const currentLayerProps = {
+          fontSize: layer.fontSize || 24,
+          fontFamily: layer.fontFamily || "Arial",
+          fontWeight: layer.fontWeight || "normal",
+          color: layer.color || "#000000",
+          textAlign: layer.textAlign || "left",
+          tracking: layer.tracking || 0,
+          lineHeight: layer.lineHeight || 1.2,
+          textRendering: layer.textRendering || "bilinear",
+          textOverflow: layer.textOverflow !== false,
+        };
+
+        const needsUpdate = Object.entries(currentLayerProps).some(
+          ([key, value]) => (textSettings as any)[key] !== value,
+        );
+
+        if (needsUpdate) {
+          updateToolSettings("text", currentLayerProps);
         }
       }
     }
-  }, [activeProject, textSettings.isEditing, updateToolSettings]);
+    // We only want to sync when the active layer ID changes or when we stop editing
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProject?.activeLayerId, textSettings.isEditing]);
 
   // 2. Live updates from ToolOptions to the layer
   useEffect(() => {
@@ -208,7 +215,8 @@ export const TextOptions: React.FC = () => {
         }
       }
     }
-  }, [textSettings, activeProject, activeToolId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [textSettings, activeProject?.activeLayerId, activeToolId]);
 
   const handleApply = () => {
     window.dispatchEvent(new CustomEvent("forge:text-apply"));

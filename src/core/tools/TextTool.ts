@@ -16,18 +16,27 @@ export class TextTool extends BaseTool {
   private selectionStart: number = 0;
   private isEditing = false;
   private isSelecting = false;
+  private isResizing = false;
+  private resizeHandle: string | null = null;
+  private isCtrlPressed = false;
   private originalText: string = "";
   private hiddenInput: HTMLTextAreaElement | null = null;
   private isComposing = false;
+  private lastContext: ToolContext | null = null;
 
   private onApply = () => this.commit(this.lastContext!);
   private onCancel = () => this.cancel(this.lastContext!);
-  private lastContext: ToolContext | null = null;
+  private handleKeyChange = (e: KeyboardEvent) => {
+    this.isCtrlPressed = e.ctrlKey || e.metaKey;
+    if (this.lastContext) this.lastContext.invalidateCache("render-only");
+  };
 
   onActivate(context: ToolContext): void {
     this.lastContext = context;
     window.addEventListener("forge:text-apply", this.onApply);
     window.addEventListener("forge:text-cancel", this.onCancel);
+    window.addEventListener("keydown", this.handleKeyChange);
+    window.addEventListener("keyup", this.handleKeyChange);
     this.createHiddenInput(context);
   }
 
@@ -37,6 +46,8 @@ export class TextTool extends BaseTool {
     }
     window.removeEventListener("forge:text-apply", this.onApply);
     window.removeEventListener("forge:text-cancel", this.onCancel);
+    window.removeEventListener("keydown", this.handleKeyChange);
+    window.removeEventListener("keyup", this.handleKeyChange);
     this.removeHiddenInput();
   }
 
@@ -97,6 +108,44 @@ export class TextTool extends BaseTool {
     return this.isEditing ? this.editingLayerId : null;
   }
 
+  private getTransformHandles(layer: Layer) {
+    const { x, y, width, height } = layer;
+    const midX = x + width / 2;
+    const midY = y + height / 2;
+
+    const handles = [
+      { name: "top-left", x, y, cursor: "nwse-resize" },
+      { name: "top-middle", x: midX, y, cursor: "ns-resize" },
+      { name: "top-right", x: x + width, y, cursor: "nesw-resize" },
+      { name: "center-left", x, y: midY, cursor: "ew-resize" },
+      { name: "center-right", x: x + width, y: midY, cursor: "ew-resize" },
+      { name: "bottom-left", x, y: y + height, cursor: "nesw-resize" },
+      { name: "bottom-middle", x: midX, y: y + height, cursor: "ns-resize" },
+      { name: "bottom-right", x: x + width, y: y + height, cursor: "nwse-resize" },
+    ];
+
+    return handles;
+  }
+
+  private getHandleAtPoint(x: number, y: number, layer: Layer, zoom: number) {
+    const handles = this.getTransformHandles(layer);
+    const handleSize = 8 / zoom;
+    const threshold = handleSize * 1.5;
+
+    // Filter out bottom-left if it's at pivot position
+    // (Actually, the requirement says "esconder o pivô e o handle canto inferior esquerdo na mesma possição do pivô")
+    // Pivot is at (px, py) where py = y + fontSize.
+    // If it's a single line, bottom-left (y + height) might be near pivot.
+    // But we'll just implement the hide logic in render and click detection.
+
+    for (const h of handles) {
+      if (h.name === "bottom-left") continue; // Requirement: hide bottom-left
+      const dist = Math.sqrt(Math.pow(x - h.x, 2) + Math.pow(y - h.y, 2));
+      if (dist < threshold) return h;
+    }
+    return null;
+  }
+
   getEditingState() {
     return {
       caretIndex: this.caretIndex,
@@ -116,6 +165,18 @@ export class TextTool extends BaseTool {
 
     if (this.isEditing && this.editingLayerId) {
       const editingLayer = context.project.layers.find((l) => l.id === this.editingLayerId);
+
+      if (this.isCtrlPressed && editingLayer) {
+        const handle = this.getHandleAtPoint(x, y, editingLayer, context.project.zoom);
+        if (handle) {
+          this.isResizing = true;
+          this.resizeHandle = handle.name;
+          this.layerStartPos = { x: editingLayer.x, y: editingLayer.y };
+          this.startPos = { x, y };
+          context.setInteracting(true);
+          return;
+        }
+      }
 
       // Focus hidden input to ensure we catch keyboard
       setTimeout(() => this.hiddenInput?.focus(), 50);
@@ -170,12 +231,48 @@ export class TextTool extends BaseTool {
       return;
     }
 
+    if (this.isResizing && this.editingLayerId && this.resizeHandle) {
+      const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
+      if (!layer) return;
+
+      const dx = x - this.startPos.x;
+      const dy = y - this.startPos.y;
+
+      let newX = layer.x;
+      let newY = layer.y;
+      let newW = layer.width;
+      let newH = layer.height;
+
+      if (this.resizeHandle.includes("right")) newW = Math.max(10, layer.width + dx);
+      if (this.resizeHandle.includes("left")) {
+        const delta = Math.min(layer.width - 10, dx);
+        newX = layer.x + delta;
+        newW = layer.width - delta;
+      }
+      if (this.resizeHandle.includes("bottom")) newH = Math.max(10, layer.height + dy);
+      if (this.resizeHandle.includes("top")) {
+        const delta = Math.min(layer.height - 10, dy);
+        newY = layer.y + delta;
+        newH = layer.height - delta;
+      }
+
+      useProjectStore.getState().updateLayer(context.project.id, this.editingLayerId, {
+        x: Math.round(newX),
+        y: Math.round(newY),
+        width: Math.round(newW),
+        height: Math.round(newH),
+      });
+
+      this.startPos = { x, y };
+      return;
+    }
+
     if (this.isMoving && this.editingLayerId) {
       const dx = x - this.startPos.x;
       const dy = y - this.startPos.y;
       useProjectStore.getState().updateLayer(context.project.id, this.editingLayerId, {
-        x: this.layerStartPos.x + dx,
-        y: this.layerStartPos.y + dy,
+        x: Math.round(this.layerStartPos.x + dx),
+        y: Math.round(this.layerStartPos.y + dy),
       });
       return;
     }
@@ -184,7 +281,16 @@ export class TextTool extends BaseTool {
       this.currentPos = { x, y };
     } else {
       const hitLayer = this.findTextLayerAt(x, y, context);
-      if (this.isEditing) {
+
+      if (this.isEditing && this.editingLayerId) {
+        const editingLayer = context.project.layers.find((l) => l.id === this.editingLayerId);
+        if (this.isCtrlPressed && editingLayer) {
+          const handle = this.getHandleAtPoint(x, y, editingLayer, context.project.zoom);
+          if (handle) {
+            context.canvas.style.cursor = handle.cursor;
+            return;
+          }
+        }
         context.canvas.style.cursor = hitLayer ? "text" : "move";
       } else {
         context.canvas.style.cursor = hitLayer ? "text" : "default";
@@ -196,6 +302,13 @@ export class TextTool extends BaseTool {
     this.lastContext = context;
     if (this.isSelecting) {
       this.isSelecting = false;
+      context.setInteracting(false);
+      return;
+    }
+
+    if (this.isResizing) {
+      this.isResizing = false;
+      this.resizeHandle = null;
       context.setInteracting(false);
       return;
     }
@@ -312,10 +425,10 @@ export class TextTool extends BaseTool {
       id,
       name: "Text Layer",
       type: "text",
-      x,
-      y,
-      width,
-      height,
+      x: Math.round(x),
+      y: Math.round(y),
+      width: Math.round(width),
+      height: Math.round(height),
       text: "",
       textType: type,
       fontSize: settings.fontSize,
@@ -506,9 +619,9 @@ export class TextTool extends BaseTool {
     if (layer.textType === "point") {
       const metrics = TextLayer.calculateMetrics(context.ctx, { ...layer, ...baseUpdates });
       dimensionUpdates = {
-        width: metrics.width,
-        height: metrics.height,
-        x: metrics.x,
+        width: Math.round(metrics.width),
+        height: Math.round(metrics.height),
+        x: Math.round(metrics.x ?? layer.x),
       };
     }
 
@@ -576,6 +689,50 @@ export class TextTool extends BaseTool {
       context.project.activeLayerId !== this.editingLayerId
     ) {
       this.commit(context);
+    }
+
+    // Render active layer border and handles
+    if (this.isEditing && this.editingLayerId) {
+      const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
+      if (!layer) return;
+
+      const scale = context.project.zoom;
+
+      if (this.isCtrlPressed) {
+        // Render Transform-like handles
+        const handles = this.getTransformHandles(layer);
+        ctx.save();
+        ctx.strokeStyle = "#0078ff";
+        ctx.lineWidth = 1 / scale;
+
+        // Draw connections
+        ctx.beginPath();
+        ctx.moveTo(layer.x, layer.y);
+        ctx.lineTo(layer.x + layer.width, layer.y);
+        ctx.lineTo(layer.x + layer.width, layer.y + layer.height);
+        ctx.lineTo(layer.x, layer.y + layer.height);
+        ctx.closePath();
+        ctx.stroke();
+
+        const handleSize = 8 / scale;
+        handles.forEach((h) => {
+          if (h.name === "bottom-left") return; // Hide bottom-left handle near pivot
+          ctx.fillStyle = "white";
+          ctx.strokeStyle = "#0078ff";
+          ctx.lineWidth = 1 / scale;
+          ctx.fillRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+          ctx.strokeRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+        });
+        ctx.restore();
+      } else if (layer.textType !== "point") {
+        // Show boundary for area text
+        ctx.save();
+        ctx.strokeStyle = "#0078ff";
+        ctx.lineWidth = 1 / scale;
+        ctx.setLineDash([4 / scale, 2 / scale]);
+        ctx.strokeRect(layer.x, layer.y, layer.width, layer.height);
+        ctx.restore();
+      }
     }
   }
 }

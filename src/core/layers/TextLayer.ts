@@ -6,7 +6,12 @@ export class TextLayer {
     layer: Layer,
     cache: Map<string, HTMLCanvasElement>,
     readyCache: Map<string, boolean>,
-    editingState?: { caretIndex: number; selectionStart?: number; isFocused: boolean },
+    editingState?: {
+      caretIndex: number;
+      selectionStart?: number;
+      isFocused: boolean;
+      isCtrlPressed?: boolean;
+    },
   ) {
     if (!layer.text && !editingState?.isFocused) return;
 
@@ -17,18 +22,24 @@ export class TextLayer {
     const textRendering = layer.textRendering || "bilinear";
     const spansKey = JSON.stringify(layer.textSpans || []);
     const propsKey = `${layer.text}|${spansKey}|${layer.fontSize}|${layer.fontFamily}|${layer.fontWeight}|${layer.color}|${layer.textAlign}|${layer.tracking}|${layer.lineHeight}|${layer.width}|${layer.height}|${textRendering}`;
-    
+
     let cachedCanvas = cache.get(layer.id);
     const isReady = readyCache.get(layer.id);
     const cachedKey = (cachedCanvas as any)?._propsKey;
 
-    if (!cachedCanvas || !isReady || cachedKey !== propsKey || cachedCanvas.width !== Math.max(1, layer.width) || cachedCanvas.height !== Math.max(1, layer.height)) {
+    if (
+      !cachedCanvas ||
+      !isReady ||
+      cachedKey !== propsKey ||
+      cachedCanvas.width !== Math.max(1, layer.width) ||
+      cachedCanvas.height !== Math.max(1, layer.height)
+    ) {
       cachedCanvas = document.createElement("canvas");
       cachedCanvas.width = Math.max(1, layer.width);
       cachedCanvas.height = Math.max(1, layer.height);
       (cachedCanvas as any)._propsKey = propsKey;
       const cctx = cachedCanvas.getContext("2d")!;
-      
+
       // Render text at 1:1 scale into the cache
       this.drawTextToContext(cctx, { ...layer, x: 0, y: 0 });
 
@@ -36,7 +47,7 @@ export class TextLayer {
         // Apply binary threshold to alpha to remove anti-aliasing (crunchy pixel look)
         this.applyAlphaThreshold(cctx, cachedCanvas.width, cachedCanvas.height);
       }
-      
+
       cache.set(layer.id, cachedCanvas);
       readyCache.set(layer.id, true);
     }
@@ -75,8 +86,14 @@ export class TextLayer {
           currentX = layer.x + layer.width;
         }
 
+        // Render Underlines (Visual Aid)
+        this.renderUnderline(ctx, line, currentX, currentY, textAlign, tracking, layer);
+
         // Render Caret if editing this line
-        if (editingState.caretIndex !== undefined && editingState.selectionStart === editingState.caretIndex) {
+        if (
+          editingState.caretIndex !== undefined &&
+          editingState.selectionStart === editingState.caretIndex
+        ) {
           this.renderCaret(
             ctx,
             line,
@@ -90,7 +107,7 @@ export class TextLayer {
             textAlign,
             tracking,
             zoom,
-            layer
+            layer,
           );
         }
 
@@ -98,7 +115,10 @@ export class TextLayer {
       });
 
       // Handle selection rendering
-      if (editingState.selectionStart !== undefined && editingState.selectionStart !== editingState.caretIndex) {
+      if (
+        editingState.selectionStart !== undefined &&
+        editingState.selectionStart !== editingState.caretIndex
+      ) {
         this.renderSelection(
           ctx,
           lines,
@@ -111,15 +131,50 @@ export class TextLayer {
           lineHeight,
           textAlign,
           tracking,
-          layer
+          layer,
         );
       }
 
       // Render pivot point during editing
-      this.renderPivot(ctx, layer);
+      if (!editingState.isCtrlPressed) {
+        this.renderPivot(ctx, layer);
+      }
 
       ctx.restore();
     }
+  }
+
+  private static renderUnderline(
+    ctx: CanvasRenderingContext2D,
+    lineText: string,
+    lineX: number,
+    lineY: number,
+    textAlign: string,
+    tracking: number,
+    layer: Layer,
+  ) {
+    if (!lineText && layer.textType === "area") return;
+
+    // For empty point text, draw a small underline representing the start
+    const textToMeasure = lineText || " ";
+    const lineWidth = this.measureTextWithTracking(ctx, textToMeasure, tracking, layer);
+
+    let startX = lineX;
+    if (textAlign === "center") {
+      startX = lineX - lineWidth / 2;
+    } else if (textAlign === "right") {
+      startX = lineX - lineWidth;
+    }
+
+    ctx.save();
+    ctx.globalCompositeOperation = "difference";
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 1 / ctx.getTransform().a;
+    ctx.beginPath();
+    ctx.moveTo(startX, lineY);
+    ctx.lineTo(startX + lineWidth, lineY);
+    ctx.stroke();
+    ctx.restore();
   }
 
   private static applyAlphaThreshold(ctx: CanvasRenderingContext2D, width: number, height: number) {
@@ -135,7 +190,7 @@ export class TextLayer {
 
   public static calculateMetrics(
     ctx: CanvasRenderingContext2D,
-    layer: Partial<Layer>
+    layer: Partial<Layer>,
   ): { width: number; height: number; x?: number } {
     const text = layer.text || "";
     const fontSize = layer.fontSize || 24;
@@ -148,10 +203,10 @@ export class TextLayer {
 
     ctx.save();
     ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
-    
+
     const lines = text.split("\n");
     let maxWidth = 0;
-    
+
     lines.forEach((line, index) => {
       // Pass a partial layer to measureTextWithTracking
       const lineStartPos = lines.slice(0, index).join("\n").length + (index > 0 ? 1 : 0);
@@ -161,7 +216,7 @@ export class TextLayer {
 
     const newWidth = Math.max(1, maxWidth);
     const newHeight = Math.max(1, lines.length * lineHeight);
-    
+
     const result: any = { width: newWidth, height: newHeight };
 
     // For point text, we need to adjust X to maintain alignment anchor
@@ -198,7 +253,7 @@ export class TextLayer {
     lines.forEach((line) => {
       let currentX = layer.x;
       const lineWidth = this.measureTextWithTracking(ctx, line, tracking, layer, charsProcessed);
-      
+
       if (textAlign === "center") {
         currentX = layer.x + layer.width / 2 - lineWidth / 2;
       } else if (textAlign === "right") {
@@ -219,19 +274,19 @@ export class TextLayer {
     y: number,
     layer: Layer,
     tracking: number,
-    lineStartIndex: number
+    lineStartIndex: number,
   ) {
     const baseFontSize = layer.fontSize || 24;
     const baseFontFamily = layer.fontFamily || "Arial";
     const baseFontWeight = layer.fontWeight || "normal";
     const baseColor = layer.color || "#000000";
-    
+
     let currentX = x;
-    
+
     for (let i = 0; i < text.length; i++) {
       const char = text[i];
       const style = this.getStyleAt(layer, lineStartIndex + i);
-      
+
       const fontSize = style.fontSize || baseFontSize;
       const fontFamily = style.fontFamily || baseFontFamily;
       const fontWeight = style.fontWeight || baseFontWeight;
@@ -239,15 +294,18 @@ export class TextLayer {
 
       ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
       ctx.fillStyle = color;
-      
+
       ctx.fillText(char, currentX, y);
       currentX += ctx.measureText(char).width + tracking;
     }
   }
 
-  private static getStyleAt(layer: Layer, charIndex: number): Partial<import("@/renderer/store/projectStore").TextSpan> {
+  private static getStyleAt(
+    layer: Layer,
+    charIndex: number,
+  ): Partial<import("@/renderer/store/projectStore").TextSpan> {
     if (!layer.textSpans || layer.textSpans.length === 0) return {};
-    
+
     let currentPos = 0;
     for (const span of layer.textSpans) {
       if (charIndex >= currentPos && charIndex < currentPos + span.text.length) {
@@ -259,24 +317,32 @@ export class TextLayer {
   }
 
   private static renderPivot(ctx: CanvasRenderingContext2D, layer: Layer) {
-    const size = 6;
+    const size = 8;
     const matrix = ctx.getTransform();
-    const zoom = matrix.a; 
+    const zoom = matrix.a;
     const s = size / zoom;
 
     ctx.save();
-    ctx.fillStyle = layer.color || "#000000";
-    ctx.strokeStyle = "white";
+    // ctx.fillStyle = layer.color || "#000000";
+    // ctx.strokeStyle = "white";
+    ctx.fillStyle = "white";
+    ctx.strokeStyle = "#0078ff";
     ctx.lineWidth = 1 / zoom;
-    
+
     let px = layer.x;
     if (layer.textAlign === "center") px = layer.x + layer.width / 2;
     else if (layer.textAlign === "right") px = layer.x + layer.width;
 
     const py = layer.y + (layer.fontSize || 24);
-    
-    ctx.fillRect(px - s / 2, py - s / 2, s, s);
-    ctx.strokeRect(px - s / 2, py - s / 2, s, s);
+
+    ctx.translate(px, py);
+    ctx.rotate(Math.PI / 4); // Rotate 45 degrees to make it a diamond
+
+    ctx.beginPath();
+    ctx.rect(-s / 2, -s / 2, s, s);
+    ctx.fill();
+    ctx.stroke();
+
     ctx.restore();
   }
 
@@ -292,11 +358,11 @@ export class TextLayer {
     lineHeight: number,
     textAlign: string,
     tracking: number,
-    layer?: Layer // Added layer for rich text measurement
+    layer?: Layer, // Added layer for rich text measurement
   ) {
     const selStart = Math.min(start, end);
     const selEnd = Math.max(start, end);
-    
+
     ctx.save();
     ctx.globalCompositeOperation = "difference";
     ctx.fillStyle = "white";
@@ -305,17 +371,26 @@ export class TextLayer {
     lines.forEach((line, lineIndex) => {
       const lineStart = charsProcessed;
       const lineEnd = charsProcessed + line.length;
-      
+
       const intersectionStart = Math.max(selStart, lineStart);
       const intersectionEnd = Math.min(selEnd, lineEnd);
 
       if (intersectionStart < intersectionEnd) {
         const textBefore = line.substring(0, intersectionStart - lineStart);
-        const textSelected = line.substring(intersectionStart - lineStart, intersectionEnd - lineStart);
-        
+        const textSelected = line.substring(
+          intersectionStart - lineStart,
+          intersectionEnd - lineStart,
+        );
+
         const offset = this.measureTextWithTracking(ctx, textBefore, tracking, layer, lineStart);
-        const width = this.measureTextWithTracking(ctx, textSelected, tracking, layer, intersectionStart);
-        
+        const width = this.measureTextWithTracking(
+          ctx,
+          textSelected,
+          tracking,
+          layer,
+          intersectionStart,
+        );
+
         let currentX = layerX;
         const totalLineWidth = this.measureTextWithTracking(ctx, line, tracking, layer, lineStart);
         if (textAlign === "center") {
@@ -325,8 +400,8 @@ export class TextLayer {
         }
 
         const rectX = currentX + offset;
-        const rectY = layerY + (lineIndex * lineHeight);
-        
+        const rectY = layerY + lineIndex * lineHeight;
+
         ctx.fillRect(rectX, rectY, width, lineHeight);
       }
 
@@ -340,7 +415,7 @@ export class TextLayer {
     ctx: CanvasRenderingContext2D,
     layer: Layer,
     x: number,
-    y: number
+    y: number,
   ): number {
     const text = layer.text || "";
     const fontSize = layer.fontSize || 24;
@@ -350,7 +425,7 @@ export class TextLayer {
     const lineHeight = fontSize * lineHeightMult;
 
     const lines = this.layoutText(ctx, layer, text, fontSize, tracking);
-    
+
     const relativeY = y - layer.y;
     let lineIndex = Math.floor(relativeY / lineHeight);
     lineIndex = Math.max(0, Math.min(lineIndex, lines.length - 1));
@@ -368,12 +443,18 @@ export class TextLayer {
     }
 
     const relativeX = x - currentX;
-    
+
     let charIndexInLine = 0;
     let bestDist = Math.abs(relativeX);
-    
+
     for (let i = 1; i <= line.length; i++) {
-      const width = this.measureTextWithTracking(ctx, line.substring(0, i), tracking, layer, lineStartPos);
+      const width = this.measureTextWithTracking(
+        ctx,
+        line.substring(0, i),
+        tracking,
+        layer,
+        lineStartPos,
+      );
       const dist = Math.abs(relativeX - width);
       if (dist < bestDist) {
         bestDist = dist;
@@ -407,7 +488,13 @@ export class TextLayer {
 
       words.forEach((word) => {
         const testLine = currentLine ? currentLine + " " + word : word;
-        const metrics = this.measureTextWithTracking(ctx, testLine, tracking, layer, currentLineStart);
+        const metrics = this.measureTextWithTracking(
+          ctx,
+          testLine,
+          tracking,
+          layer,
+          currentLineStart,
+        );
         if (metrics > maxWidth && currentLine !== "") {
           wrappedLines.push(currentLine);
           currentLine = word;
@@ -428,24 +515,24 @@ export class TextLayer {
     text: string,
     tracking: number,
     layer?: Layer,
-    lineStartIndex: number = 0
+    lineStartIndex: number = 0,
   ): number {
-    if (!layer || (!layer.textSpans || layer.textSpans.length === 0)) {
-       if (tracking === 0) {
-         ctx.save();
-         ctx.font = `${layer?.fontWeight || "normal"} ${layer?.fontSize || 24}px ${layer?.fontFamily || "Arial"}`;
-         const w = ctx.measureText(text).width;
-         ctx.restore();
-         return w;
-       }
-       let width = 0;
-       ctx.save();
-       ctx.font = `${layer?.fontWeight || "normal"} ${layer?.fontSize || 24}px ${layer?.fontFamily || "Arial"}`;
-       for (let i = 0; i < text.length; i++) {
-         width += ctx.measureText(text[i]).width + tracking;
-       }
-       ctx.restore();
-       return width > 0 ? width - tracking : 0;
+    if (!layer || !layer.textSpans || layer.textSpans.length === 0) {
+      if (tracking === 0) {
+        ctx.save();
+        ctx.font = `${layer?.fontWeight || "normal"} ${layer?.fontSize || 24}px ${layer?.fontFamily || "Arial"}`;
+        const w = ctx.measureText(text).width;
+        ctx.restore();
+        return w;
+      }
+      let width = 0;
+      ctx.save();
+      ctx.font = `${layer?.fontWeight || "normal"} ${layer?.fontSize || 24}px ${layer?.fontFamily || "Arial"}`;
+      for (let i = 0; i < text.length; i++) {
+        width += ctx.measureText(text[i]).width + tracking;
+      }
+      ctx.restore();
+      return width > 0 ? width - tracking : 0;
     }
 
     let width = 0;
@@ -458,7 +545,7 @@ export class TextLayer {
       const fontSize = style.fontSize || baseFontSize;
       const fontFamily = style.fontFamily || baseFontFamily;
       const fontWeight = style.fontWeight || baseFontWeight;
-      
+
       ctx.save();
       ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
       width += ctx.measureText(text[i]).width + tracking;
@@ -480,7 +567,7 @@ export class TextLayer {
     textAlign: string,
     tracking: number,
     zoom: number,
-    layer?: Layer // Added layer for rich text
+    layer?: Layer, // Added layer for rich text
   ) {
     let charsBeforeLine = 0;
     for (let i = 0; i < lineIndex; i++) {
@@ -491,9 +578,21 @@ export class TextLayer {
 
     if (relativeCaretIndex >= 0 && relativeCaretIndex <= lineText.length) {
       const textBeforeCaret = lineText.substring(0, relativeCaretIndex);
-      const offset = this.measureTextWithTracking(ctx, textBeforeCaret, tracking, layer, charsBeforeLine);
+      const offset = this.measureTextWithTracking(
+        ctx,
+        textBeforeCaret,
+        tracking,
+        layer,
+        charsBeforeLine,
+      );
 
-      const lineWidth = this.measureTextWithTracking(ctx, lineText, tracking, layer, charsBeforeLine);
+      const lineWidth = this.measureTextWithTracking(
+        ctx,
+        lineText,
+        tracking,
+        layer,
+        charsBeforeLine,
+      );
       let caretX = lineX + offset;
       if (textAlign === "center") {
         caretX = lineX - lineWidth / 2 + offset;

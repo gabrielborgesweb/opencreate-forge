@@ -57,14 +57,22 @@ export const TextOptions: React.FC = () => {
         };
 
         // For point text, we must recalculate width/height to avoid clipping
-        let dimensionUpdates = {};
+        let dimensionUpdates: any = {};
+        
+        // Baseline Pivot scaling: oldY + oldFontSize = newY + newFontSize
+        // So newY = oldY + oldFontSize - newFontSize
+        if (layer.fontSize !== textSettings.fontSize) {
+          dimensionUpdates.y = Math.round(layer.y + (layer.fontSize || 24) - textSettings.fontSize);
+        }
+
         if (layer.textType === "point") {
           const ctx = canvasRef.current.getContext("2d")!;
-          const metrics = TextLayer.calculateMetrics(ctx, { ...layer, ...baseUpdates });
+          const metrics = TextLayer.calculateMetrics(ctx, { ...layer, ...baseUpdates, ...dimensionUpdates });
           dimensionUpdates = {
-            width: metrics.width,
-            height: metrics.height,
-            x: metrics.x,
+            ...dimensionUpdates,
+            width: Math.round(metrics.width),
+            height: Math.round(metrics.height),
+            x: Math.round(metrics.x ?? layer.x),
           };
         }
 

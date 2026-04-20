@@ -45,6 +45,7 @@ export class ForgeEngine {
   private selectionEdges: { horizontal: any[]; vertical: any[] } | null = null;
   private marchingAntsOffset = 0;
   private lastSelectionMask: string | undefined = undefined;
+  private isCtrlPressed = false;
 
   private tools: Record<string, BaseTool>;
 
@@ -92,7 +93,13 @@ export class ForgeEngine {
     this.canvas.addEventListener("dblclick", this.handleDoubleClick);
     window.addEventListener("mousemove", this.handleMouseMove);
     window.addEventListener("mouseup", this.handleMouseUp);
-    window.addEventListener("keydown", this.handleKeyDown);
+    window.addEventListener("keydown", (e) => {
+      this.isCtrlPressed = e.ctrlKey || e.metaKey;
+      this.handleKeyDown(e);
+    });
+    window.addEventListener("keyup", (e) => {
+      this.isCtrlPressed = e.ctrlKey || e.metaKey;
+    });
     window.addEventListener("forge:clear-selection", () => {
       if (this.project) {
         this.clearSelection();
@@ -1010,6 +1017,10 @@ export class ForgeEngine {
     const tool = this.getActiveTool();
     const isEditing = tool?.getEditingLayerId() === layer.id;
     const editingState = isEditing ? (tool as any).getEditingState?.() : undefined;
+
+    if (editingState) {
+      editingState.isCtrlPressed = this.isCtrlPressed;
+    }
 
     switch (layer.type) {
       case "raster":

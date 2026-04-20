@@ -1,0 +1,668 @@
+diff --git a/src/core/layers/TextLayer.ts b/src/core/layers/TextLayer.ts
+index d5920e9..f15fe2c 100644
+--- a/src/core/layers/TextLayer.ts
++++ b/src/core/layers/TextLayer.ts
+@@ -29,6 +29,7 @@ export class TextLayer {
+     const cachedKey = (cachedCanvas as any)?._propsKey;
+ 
+     const metrics = this.calculateMetrics(ctx, layer);
++    const textOffsetY = metrics.offsetY || 0;
+     
+     // Width: For area text, it's constrained by layer.width, but point text can overflow.
+     // If textOverflow is true, we allow the canvas to grow to fit the content.
+@@ -56,17 +57,17 @@ export class TextLayer {
+       !isReady ||
+       cachedKey !== propsKey ||
+       cachedCanvas.width !== Math.ceil(targetWidth + offsetX) ||
+-      cachedCanvas.height !== Math.ceil(targetHeight)
++      cachedCanvas.height !== Math.ceil(targetHeight + textOffsetY)
+     ) {
+       cachedCanvas = document.createElement("canvas");
+       cachedCanvas.width = Math.ceil(targetWidth + offsetX);
+-      cachedCanvas.height = Math.ceil(targetHeight);
++      cachedCanvas.height = Math.ceil(targetHeight + textOffsetY);
+       (cachedCanvas as any)._propsKey = propsKey;
+       const cctx = cachedCanvas.getContext("2d")!;
+ 
+       // Render text at 1:1 scale into the cache
+-      // Apply offset if text overflows to the left
+-      this.drawTextToContext(cctx, { ...layer, x: offsetX, y: 0 });
++      // Apply offsets if text overflows
++      this.drawTextToContext(cctx, { ...layer, x: offsetX, y: textOffsetY });
+ 
+       if (textRendering === "nearest") {
+         this.applyAlphaThreshold(cctx, cachedCanvas.width, cachedCanvas.height);
+@@ -77,8 +78,8 @@ export class TextLayer {
+     }
+ 
+     ctx.save();
+-    // Draw the cached text, compensating for the horizontal offset
+-    ctx.drawImage(cachedCanvas, layer.x - offsetX, layer.y);
++    // Draw the cached text, compensating for offsets
++    ctx.drawImage(cachedCanvas, layer.x - offsetX, layer.y - textOffsetY);
+     ctx.restore();
+ 
+     // 2. UI Rendering (Caret, Selection, Pivot) - Rendered 'Normally' at zoom level
+@@ -103,11 +104,14 @@ export class TextLayer {
+       let currentY = layer.y + fontSize;
+ 
+       lines.forEach((line, lineIndex) => {
++        const charsProcessed = lines.slice(0, lineIndex).join("\n").length + (lineIndex > 0 ? 1 : 0);
++        const lineWidth = this.measureTextWithTracking(ctx, line, tracking, layer, charsProcessed);
++
+         let currentX = layer.x;
+         if (textAlign === "center") {
+-          currentX = layer.x + layer.width / 2;
++          currentX = layer.x + layer.width / 2 - lineWidth / 2;
+         } else if (textAlign === "right") {
+-          currentX = layer.x + layer.width;
++          currentX = layer.x + layer.width - lineWidth;
+         }
+ 
+         // Render Underlines (Visual Aid)
+@@ -215,7 +219,7 @@ export class TextLayer {
+   public static calculateMetrics(
+     ctx: CanvasRenderingContext2D,
+     layer: Partial<Layer>,
+-  ): { width: number; height: number; x?: number } {
++  ): { width: number; height: number; x?: number; offsetY: number } {
+     const text = layer.text || "";
+     const fontSize = layer.fontSize || 24;
+     const lineHeightMult = layer.lineHeight || 1.2;
+@@ -234,11 +238,26 @@ export class TextLayer {
+       maxWidth = Math.max(maxWidth, width);
+     });
+ 
++    // Calculate max font size in the first line to avoid top clipping
++    let maxFontSizeFirstLine = fontSize;
++    if (layer.textSpans && lines.length > 0) {
++      const firstLineLen = lines[0].length;
++      let currentPos = 0;
++      for (const span of layer.textSpans) {
++        if (currentPos < firstLineLen) {
++          if (span.fontSize && span.fontSize > maxFontSizeFirstLine) {
++            maxFontSizeFirstLine = span.fontSize;
++          }
++        }
++        currentPos += span.text.length;
++      }
++    }
++
++    const offsetY = Math.max(0, maxFontSizeFirstLine - fontSize);
+     const newWidth = Math.max(1, maxWidth);
+-    // Use the total lines from layoutText to calculate total height
+-    const newHeight = Math.max(1, lines.length * lineHeight);
++    const newHeight = Math.max(1, lines.length * lineHeight + offsetY);
+ 
+-    const result: any = { width: newWidth, height: newHeight };
++    const result: any = { width: newWidth, height: newHeight, offsetY };
+ 
+     // For point text, we need to adjust X to maintain alignment anchor
+     if (layer.textType === "point" && layer.width !== undefined && layer.x !== undefined) {
+@@ -322,7 +341,7 @@ export class TextLayer {
+     }
+   }
+ 
+-  private static getStyleAt(
++  public static getStyleAt(
+     layer: Layer,
+     charIndex: number,
+   ): Partial<import("@/renderer/store/projectStore").TextSpan> {
+@@ -448,7 +467,7 @@ export class TextLayer {
+ 
+     const lines = this.layoutText(ctx, layer, text, fontSize, tracking);
+ 
+-    const relativeY = y - (layer.y + fontSize - lineHeight / 2);
++    const relativeY = y - layer.y;
+     let lineIndex = Math.floor(relativeY / lineHeight);
+     lineIndex = Math.max(0, Math.min(lineIndex, lines.length - 1));
+ 
+@@ -622,11 +641,14 @@ export class TextLayer {
+         caretX = lineX - lineWidth + offset;
+       }
+ 
++      const style = layer ? this.getStyleAt(layer, caretIndex) : {};
++      const actualFontSize = (style as any).fontSize || fontSize;
++
+       ctx.save();
+       ctx.globalCompositeOperation = "difference";
+       ctx.beginPath();
+-      ctx.moveTo(caretX, lineY + fontSize * 0.2);
+-      ctx.lineTo(caretX, lineY - fontSize * 0.8);
++      ctx.moveTo(caretX, lineY + actualFontSize * 0.2);
++      ctx.lineTo(caretX, lineY - actualFontSize * 0.8);
+       ctx.lineWidth = 1.5 / zoom;
+       ctx.strokeStyle = "white";
+       ctx.stroke();
+diff --git a/src/core/tools/TextTool.ts b/src/core/tools/TextTool.ts
+index cf7e2b6..878e11b 100644
+--- a/src/core/tools/TextTool.ts
++++ b/src/core/tools/TextTool.ts
+@@ -1,5 +1,5 @@
+ import { BaseTool, ToolContext, ToolId } from "./BaseTool";
+-import { Layer, useProjectStore } from "@/renderer/store/projectStore";
++import { Layer, TextSpan, useProjectStore } from "@/renderer/store/projectStore";
+ import { TextLayer } from "../layers/TextLayer";
+ 
+ export class TextTool extends BaseTool {
+@@ -26,6 +26,16 @@ export class TextTool extends BaseTool {
+ 
+   private onApply = () => this.commit(this.lastContext!);
+   private onCancel = () => this.cancel(this.lastContext!);
++  private onStyleChange = (e: any) => {
++    if (this.lastContext && this.isEditing) {
++      this.applyStyleToSelection(e.detail, this.lastContext);
++    }
++  };
++  private onScaleChange = (e: any) => {
++    if (this.lastContext && this.isEditing) {
++      this.scaleLayerStyle(e.detail.fontSize, this.lastContext);
++    }
++  };
+   private handleKeyChange = (e: KeyboardEvent) => {
+     this.isCtrlPressed = e.ctrlKey || e.metaKey;
+     if (this.lastContext) this.lastContext.invalidateCache("render-only");
+@@ -35,6 +45,8 @@ export class TextTool extends BaseTool {
+     this.lastContext = context;
+     window.addEventListener("forge:text-apply", this.onApply);
+     window.addEventListener("forge:text-cancel", this.onCancel);
++    window.addEventListener("forge:text-style", this.onStyleChange);
++    window.addEventListener("forge:text-scale", this.onScaleChange);
+     window.addEventListener("keydown", this.handleKeyChange);
+     window.addEventListener("keyup", this.handleKeyChange);
+     this.createHiddenInput(context);
+@@ -46,6 +58,8 @@ export class TextTool extends BaseTool {
+     }
+     window.removeEventListener("forge:text-apply", this.onApply);
+     window.removeEventListener("forge:text-cancel", this.onCancel);
++    window.removeEventListener("forge:text-style", this.onStyleChange);
++    window.removeEventListener("forge:text-scale", this.onScaleChange);
+     window.removeEventListener("keydown", this.handleKeyChange);
+     window.removeEventListener("keyup", this.handleKeyChange);
+     this.removeHiddenInput();
+@@ -207,6 +221,7 @@ export class TextTool extends BaseTool {
+         if (!e.shiftKey) {
+           this.selectionStart = index;
+         }
++        this.syncStyleFromCaret(context);
+         this.isSelecting = true;
+         context.setInteracting(true);
+         return;
+@@ -375,6 +390,7 @@ export class TextTool extends BaseTool {
+ 
+       this.selectionStart = start;
+       this.caretIndex = end;
++      this.syncStyleFromCaret(context);
+     }
+   }
+ 
+@@ -480,6 +496,7 @@ export class TextTool extends BaseTool {
+ 
+     // Helper to consume event
+     const consume = () => {
++      this.syncStyleFromCaret(context);
+       e.preventDefault();
+       e.stopPropagation();
+       return true;
+@@ -597,39 +614,301 @@ export class TextTool extends BaseTool {
+ 
+   private deleteSelection(context: ToolContext) {
+     const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
+-    if (!layer) return;
+-    const text = layer.text || "";
++    if (!layer || layer.type !== "text") return;
++
+     const start = Math.min(this.caretIndex, this.selectionStart);
+     const end = Math.max(this.caretIndex, this.selectionStart);
+-    const newText = text.substring(0, start) + text.substring(end);
++
++    let currentPos = 0;
++    const oldSpans: TextSpan[] =
++      layer.textSpans ||
++      (layer.text
++        ? [
++            {
++              text: layer.text,
++              fontSize: layer.fontSize,
++              fontFamily: layer.fontFamily,
++              fontWeight: layer.fontWeight,
++              color: layer.color,
++            },
++          ]
++        : []);
++    const newSpans: TextSpan[] = [];
++
++    for (const span of oldSpans) {
++      const spanStart = currentPos;
++      const spanEnd = currentPos + span.text.length;
++
++      // Span is before selection
++      if (spanEnd <= start) {
++        newSpans.push(span);
++      }
++      // Span is after selection
++      else if (spanStart >= end) {
++        newSpans.push(span);
++      }
++      // Span intersects with selection
++      else {
++        const spanText = span.text;
++        const relativeStart = Math.max(0, start - spanStart);
++        const relativeEnd = Math.min(span.text.length, end - spanStart);
++
++        const leftText = spanText.substring(0, relativeStart);
++        const rightText = spanText.substring(relativeEnd);
++
++        if (leftText || rightText) {
++          newSpans.push({ ...span, text: leftText + rightText });
++        }
++      }
++      currentPos = spanEnd;
++    }
++
++    const mergedSpans = this.mergeSpans(newSpans);
++    const newText = mergedSpans.map((s) => s.text).join("");
++
+     this.caretIndex = start;
+     this.selectionStart = start;
+-    this.updateText(newText, context);
++    this.updateText(newText, context, mergedSpans);
+   }
+ 
+   private insertText(char: string, context: ToolContext) {
+     const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
+-    if (!layer) return;
++    if (!layer || layer.type !== "text") return;
+ 
+-    // Normalize text to NFC to ensure accented characters are single characters (not decomposed)
+     const normalizedChar = char.normalize("NFC");
+-
+     const start = Math.min(this.caretIndex, this.selectionStart);
+     const end = Math.max(this.caretIndex, this.selectionStart);
+-    const text = (layer.text || "").normalize("NFC");
+ 
+-    const newText = text.substring(0, start) + normalizedChar + text.substring(end);
+-    this.caretIndex = start + normalizedChar.length;
++    // If there's a selection, delete it first
++    if (start !== end) {
++      this.deleteSelection(context);
++      // Re-fetch layer after deletion
++      const updatedLayer = context.project.layers.find((l) => l.id === this.editingLayerId);
++      if (!updatedLayer) return;
++      this.insertTextAt(normalizedChar, updatedLayer, context);
++    } else {
++      this.insertTextAt(normalizedChar, layer, context);
++    }
++  }
++
++  private insertTextAt(char: string, layer: Layer, context: ToolContext) {
++    const start = this.caretIndex;
++    let currentPos = 0;
++    const oldSpans: TextSpan[] =
++      layer.textSpans ||
++      (layer.text
++        ? [
++            {
++              text: layer.text,
++              fontSize: layer.fontSize,
++              fontFamily: layer.fontFamily,
++              fontWeight: layer.fontWeight,
++              color: layer.color,
++            },
++          ]
++        : []);
++    const newSpans: TextSpan[] = [];
++    let inserted = false;
++
++    if (oldSpans.length === 0) {
++      newSpans.push({
++        text: char,
++        fontSize: layer.fontSize,
++        fontFamily: layer.fontFamily,
++        fontWeight: layer.fontWeight,
++        color: layer.color,
++      });
++      inserted = true;
++    } else {
++      for (let i = 0; i < oldSpans.length; i++) {
++        const span = oldSpans[i];
++        const spanStart = currentPos;
++        const spanEnd = currentPos + span.text.length;
++
++        // Try to insert into this span if the caret is within its range.
++        // If at a boundary between spans, we prefer the left span to inherit style.
++        if (
++          !inserted &&
++          start >= spanStart &&
++          (start < spanEnd || (start === spanEnd && i === oldSpans.length - 1))
++        ) {
++          const relativeStart = start - spanStart;
++          const leftText = span.text.substring(0, relativeStart);
++          const rightText = span.text.substring(relativeStart);
++          newSpans.push({ ...span, text: leftText + char + rightText });
++          inserted = true;
++        } else {
++          newSpans.push(span);
++        }
++        currentPos = spanEnd;
++      }
++    }
++
++    const mergedSpans = this.mergeSpans(newSpans);
++    const newText = mergedSpans.map((s) => s.text).join("");
++
++    this.caretIndex = start + char.length;
+     this.selectionStart = this.caretIndex;
+-    this.updateText(newText, context);
++    this.updateText(newText, context, mergedSpans);
++  }
++
++  private mergeSpans(spans: TextSpan[]): TextSpan[] {
++    const filtered = spans.filter((s) => s.text.length > 0);
++    if (filtered.length <= 1) return filtered;
++
++    const merged: TextSpan[] = [];
++    let current = { ...filtered[0] };
++
++    for (let i = 1; i < filtered.length; i++) {
++      const next = filtered[i];
++
++      const isSameStyle =
++        next.fontSize === current.fontSize &&
++        next.fontFamily === current.fontFamily &&
++        next.fontWeight === current.fontWeight &&
++        next.color === current.color;
++
++      if (isSameStyle) {
++        current.text += next.text;
++      } else {
++        merged.push(current);
++        current = { ...next };
++      }
++    }
++    merged.push(current);
++
++    return merged;
++  }
++
++  public applyStyleToSelection(style: Partial<TextSpan>, context: ToolContext) {
++    if (!this.editingLayerId) return;
++    const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
++    if (!layer || layer.type !== "text") return;
++
++    const start = Math.min(this.caretIndex, this.selectionStart);
++    const end = Math.max(this.caretIndex, this.selectionStart);
++
++    // If no selection, update the whole tool settings (which will affect new typing)
++    if (start === end) {
++      context.updateToolSettings("text", style);
++      return;
++    }
++
++    let currentPos = 0;
++    const oldSpans: TextSpan[] =
++      layer.textSpans ||
++      (layer.text
++        ? [
++            {
++              text: layer.text,
++              fontSize: layer.fontSize,
++              fontFamily: layer.fontFamily,
++              fontWeight: layer.fontWeight,
++              color: layer.color,
++            },
++          ]
++        : []);
++    const newSpans: TextSpan[] = [];
++
++    for (const span of oldSpans) {
++      const spanStart = currentPos;
++      const spanEnd = currentPos + span.text.length;
++
++      if (spanEnd <= start || spanStart >= end) {
++        newSpans.push(span);
++      } else {
++        const relativeStart = Math.max(0, start - spanStart);
++        const relativeEnd = Math.min(span.text.length, end - spanStart);
++
++        // Before selection
++        if (relativeStart > 0) {
++          newSpans.push({ ...span, text: span.text.substring(0, relativeStart) });
++        }
++
++        // Inside selection
++        newSpans.push({
++          ...span,
++          ...style,
++          text: span.text.substring(relativeStart, relativeEnd),
++        });
++
++        // After selection
++        if (relativeEnd < span.text.length) {
++          newSpans.push({ ...span, text: span.text.substring(relativeEnd) });
++        }
++      }
++      currentPos = spanEnd;
++    }
++
++    const mergedSpans = this.mergeSpans(newSpans);
++    const newText = mergedSpans.map((s) => s.text).join("");
++    this.updateText(newText, context, mergedSpans);
++  }
++
++  public scaleLayerStyle(newFontSize: number, context: ToolContext) {
++    if (!this.editingLayerId) return;
++    const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
++    if (!layer || layer.type !== "text") return;
++
++    const oldFontSize = layer.fontSize || 24;
++    if (oldFontSize === newFontSize) return;
++
++    const ratio = newFontSize / oldFontSize;
++
++    const updates: Partial<Layer> = {
++      fontSize: newFontSize,
++    };
++
++    // Scale all spans proportionally
++    if (layer.textSpans && layer.textSpans.length > 0) {
++      updates.textSpans = layer.textSpans.map((span) => ({
++        ...span,
++        fontSize: span.fontSize
++          ? Math.round(span.fontSize * ratio * 10) / 10
++          : Math.round(oldFontSize * ratio * 10) / 10,
++      }));
++    }
++
++    // Baseline Pivot scaling: keep pivot fixed
++    updates.y = Math.round(layer.y + oldFontSize - newFontSize);
++
++    // Update dimensions too
++    const metrics = TextLayer.calculateMetrics(context.ctx, { ...layer, ...updates });
++    updates.width = Math.round(metrics.width);
++    updates.height = Math.round(metrics.height);
++    if (layer.textType === "point") {
++      updates.x = Math.round(metrics.x ?? layer.x);
++    }
++
++    useProjectStore.getState().updateLayer(context.project.id, layer.id, updates);
++    context.invalidateCache(layer.id);
++  }
++
++  private syncStyleFromCaret(context: ToolContext) {
++    if (!this.editingLayerId) return;
++    const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
++    if (!layer || layer.type !== "text") return;
++
++    // Use character before caret, or first char if at 0
++    const index = Math.max(0, this.caretIndex - 1);
++    const style = TextLayer.getStyleAt(layer, index);
++
++    context.updateToolSettings("text", {
++      fontSize: style.fontSize || layer.fontSize || 24,
++      fontFamily: style.fontFamily || layer.fontFamily || "Arial",
++      fontWeight: style.fontWeight || layer.fontWeight || "normal",
++      color: style.color || layer.color || "#000000",
++      caretIndex: this.caretIndex,
++      selectionStart: this.selectionStart,
++    });
+   }
+ 
+-  private updateText(text: string, context: ToolContext) {
++  private updateText(text: string, context: ToolContext, textSpans?: TextSpan[]) {
+     if (!this.editingLayerId) return;
+     const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
+     if (!layer) return;
+ 
+-    const baseUpdates: Partial<Layer> = { text };
++    const baseUpdates: Partial<Layer> = { text, textSpans };
+     let dimensionUpdates = {};
+ 
+     if (layer.textType === "point") {
+diff --git a/src/renderer/components/tools/TextOptions.tsx b/src/renderer/components/tools/TextOptions.tsx
+index 4801496..3b848b1 100644
+--- a/src/renderer/components/tools/TextOptions.tsx
++++ b/src/renderer/components/tools/TextOptions.tsx
+@@ -168,10 +168,6 @@ export const TextOptions: React.FC = () => {
+       // Update if editing OR if the layer is selected while the text tool is active
+       if (layer && layer.type === "text" && (textSettings.isEditing || activeToolId === "text")) {
+         const baseUpdates: any = {
+-          fontSize: textSettings.fontSize,
+-          fontFamily: textSettings.fontFamily,
+-          fontWeight: textSettings.fontWeight,
+-          color: textSettings.color,
+           textAlign: textSettings.textAlign,
+           tracking: textSettings.tracking,
+           lineHeight: textSettings.lineHeight,
+@@ -179,28 +175,41 @@ export const TextOptions: React.FC = () => {
+           textRendering: textSettings.textRendering,
+         };
+ 
++        // Only update character-level styles if NO textSpans exist OR if NOT editing
++        // (If editing, the tool handles individual spans via events to support Rich Text)
++        if (!layer.textSpans || layer.textSpans.length === 0 || !textSettings.isEditing) {
++          baseUpdates.fontSize = textSettings.fontSize;
++          baseUpdates.fontFamily = textSettings.fontFamily;
++          baseUpdates.fontWeight = textSettings.fontWeight;
++          baseUpdates.color = textSettings.color;
++        }
++
+         // For point text, we must recalculate width/height to avoid clipping
+         let dimensionUpdates: any = {};
+ 
+         // Baseline Pivot scaling: oldY + oldFontSize = newY + newFontSize
+         // So newY = oldY + oldFontSize - newFontSize
+-        if (layer.fontSize !== textSettings.fontSize) {
++        const isGlobalStyleChange = !layer.textSpans || layer.textSpans.length === 0 || !textSettings.isEditing;
++        if (isGlobalStyleChange && layer.fontSize !== textSettings.fontSize) {
+           dimensionUpdates.y = Math.round(layer.y + (layer.fontSize || 24) - textSettings.fontSize);
+         }
+ 
++        // Always recalculate metrics to ensure layer box correctly matches content height
++        const ctx = canvasRef.current.getContext("2d")!;
++        const metrics = TextLayer.calculateMetrics(ctx, {
++          ...layer,
++          ...baseUpdates,
++          ...dimensionUpdates,
++        });
++
++        dimensionUpdates = {
++          ...dimensionUpdates,
++          width: layer.textType === "point" ? Math.round(metrics.width) : layer.width,
++          height: Math.round(metrics.height),
++        };
++
+         if (layer.textType === "point") {
+-          const ctx = canvasRef.current.getContext("2d")!;
+-          const metrics = TextLayer.calculateMetrics(ctx, {
+-            ...layer,
+-            ...baseUpdates,
+-            ...dimensionUpdates,
+-          });
+-          dimensionUpdates = {
+-            ...dimensionUpdates,
+-            width: Math.round(metrics.width),
+-            height: Math.round(metrics.height),
+-            x: Math.round(metrics.x ?? layer.x),
+-          };
++          dimensionUpdates.x = Math.round(metrics.x ?? layer.x);
+         }
+ 
+         const updates = { ...baseUpdates, ...dimensionUpdates };
+@@ -226,6 +235,18 @@ export const TextOptions: React.FC = () => {
+     window.dispatchEvent(new CustomEvent("forge:text-cancel"));
+   };
+ 
++  const updateStyle = (style: Partial<import("@/renderer/store/projectStore").TextSpan>) => {
++    updateToolSettings("text", style);
++    if (textSettings.isEditing) {
++      const hasSelection = textSettings.caretIndex !== textSettings.selectionStart;
++      if (style.fontSize !== undefined && !hasSelection) {
++        window.dispatchEvent(new CustomEvent("forge:text-scale", { detail: style }));
++      } else {
++        window.dispatchEvent(new CustomEvent("forge:text-style", { detail: style }));
++      }
++    }
++  };
++
+   const setAlign = (align: "left" | "center" | "right" | "justify") => {
+     updateToolSettings("text", { textAlign: align });
+   };
+@@ -237,7 +258,7 @@ export const TextOptions: React.FC = () => {
+         <TypeOutline size={16} className="text-zinc-500" />
+         <select
+           value={textSettings.fontFamily}
+-          onChange={(e) => updateToolSettings("text", { fontFamily: e.target.value })}
++          onChange={(e) => updateStyle({ fontFamily: e.target.value })}
+           className="bg-zinc-800 border-none text-[0.75rem] text-white px-2 py-1 rounded outline-none focus:ring-1 focus:ring-accent min-w-[100px]"
+         >
+           <option value="Arial">Arial</option>
+@@ -250,7 +271,7 @@ export const TextOptions: React.FC = () => {
+ 
+         <select
+           value={textSettings.fontWeight}
+-          onChange={(e) => updateToolSettings("text", { fontWeight: e.target.value })}
++          onChange={(e) => updateStyle({ fontWeight: e.target.value })}
+           className="bg-zinc-800 border-none text-[0.75rem] text-white px-2 py-1 rounded outline-none focus:ring-1 focus:ring-accent w-24"
+         >
+           {availableWeights.map((w) => (
+@@ -267,7 +288,7 @@ export const TextOptions: React.FC = () => {
+         min={1}
+         max={1000}
+         value={textSettings.fontSize}
+-        onChange={(val) => updateToolSettings("text", { fontSize: val })}
++        onChange={(val) => updateStyle({ fontSize: val })}
+       />
+ 
+       {/* Alignment */}
+@@ -308,7 +329,7 @@ export const TextOptions: React.FC = () => {
+         <input
+           type="color"
+           value={textSettings.color}
+-          onChange={(e) => updateToolSettings("text", { color: e.target.value })}
++          onChange={(e) => updateStyle({ color: e.target.value })}
+           className="border-none bg-none w-5 h-5 cursor-pointer rounded overflow-hidden"
+         />
+       </div>
+diff --git a/src/renderer/store/toolStore.ts b/src/renderer/store/toolStore.ts
+index dd8322f..037f963 100644
+--- a/src/renderer/store/toolStore.ts
++++ b/src/renderer/store/toolStore.ts
+@@ -30,6 +30,8 @@ export interface ToolSettings {
+     textOverflow: boolean;
+     textRendering: "nearest" | "bilinear";
+     isEditing: boolean;
++    caretIndex: number;
++    selectionStart: number;
+   };
+   crop: {
+     mode: CropMode;
+@@ -83,6 +85,8 @@ export const useToolStore = create<ToolState>((set) => ({
+       textOverflow: true,
+       textRendering: "bilinear",
+       isEditing: false,
++      caretIndex: 0,
++      selectionStart: 0,
+     },
+     crop: {
+       mode: "Free",

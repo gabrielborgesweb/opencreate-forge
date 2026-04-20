@@ -4,9 +4,9 @@ TODO: OpenCreate Forge
 [-] Marcar como pendente
 
 - [-] Tipos de Camada
-  - [-] Camada de Imagem (raster)
-  - [ ] Camada de Texto
-- [ ] Ferramenta Texto (depois de Tipos de Camada)
+  - [x] Camada de Imagem (raster)
+  - [-] Camada de Texto
+- [-] Ferramenta Texto (depois de Tipos de Camada)
 - [ ] Régua
 - [ ] Guias (depois de Régua)
 - [ ] Salvamento local

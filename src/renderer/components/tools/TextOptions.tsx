@@ -16,12 +16,36 @@ export const TextOptions: React.FC = () => {
 
   const textSettings = toolSettings.text;
   const textAlign = textSettings.textAlign;
+  const activeToolId = useToolStore((state) => state.activeToolId);
 
-  // Live updates
+  // 1. Sync ToolOptions UI with selected layer properties
   useEffect(() => {
     if (activeProject && activeProject.activeLayerId) {
       const layer = activeProject.layers.find((l) => l.id === activeProject.activeLayerId);
-      if (layer && layer.type === "text" && textSettings.isEditing) {
+      if (layer && layer.type === "text") {
+        // Update tool settings to match the selected layer
+        // We only do this if NOT currently editing to avoid jumping values while typing
+        if (!textSettings.isEditing) {
+          updateToolSettings("text", {
+            fontSize: layer.fontSize || 24,
+            fontFamily: layer.fontFamily || "Arial",
+            color: layer.color || "#000000",
+            textAlign: layer.textAlign || "left",
+            tracking: layer.tracking || 0,
+            lineHeight: layer.lineHeight || 1.2,
+            textRendering: layer.textRendering || "bilinear",
+          });
+        }
+      }
+    }
+  }, [activeProject, textSettings.isEditing, updateToolSettings]);
+
+  // 2. Live updates from ToolOptions to the layer
+  useEffect(() => {
+    if (activeProject && activeProject.activeLayerId) {
+      const layer = activeProject.layers.find((l) => l.id === activeProject.activeLayerId);
+      // Update if editing OR if the layer is selected while the text tool is active
+      if (layer && layer.type === "text" && (textSettings.isEditing || activeToolId === "text")) {
         const baseUpdates: any = {
           fontSize: textSettings.fontSize,
           fontFamily: textSettings.fontFamily,
@@ -54,7 +78,7 @@ export const TextOptions: React.FC = () => {
         }
       }
     }
-  }, [textSettings, activeProject]);
+  }, [textSettings, activeProject, activeToolId]);
 
   const handleApply = () => {
     window.dispatchEvent(new CustomEvent("forge:text-apply"));

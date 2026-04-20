@@ -84,16 +84,24 @@ function App() {
         document.activeElement?.tagName === "INPUT" ||
         document.activeElement?.tagName === "TEXTAREA"
       ) {
-        if (e.key === "Enter") {
-          if (activeToolId === "transform")
-            window.dispatchEvent(new CustomEvent("forge:transform-apply"));
-          if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-apply"));
-        } else if (e.key === "Escape") {
-          if (activeToolId === "transform")
-            window.dispatchEvent(new CustomEvent("forge:transform-cancel"));
-          if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-cancel"));
+        // Exception: allow shortcuts if it's the hidden text input and we're not actively editing
+        if (
+          document.activeElement.id === "forge-text-input" &&
+          !toolSettings.text.isEditing
+        ) {
+          // Continue to global shortcuts
+        } else {
+          if (e.key === "Enter") {
+            if (activeToolId === "transform")
+              window.dispatchEvent(new CustomEvent("forge:transform-apply"));
+            if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-apply"));
+          } else if (e.key === "Escape") {
+            if (activeToolId === "transform")
+              window.dispatchEvent(new CustomEvent("forge:transform-cancel"));
+            if (activeToolId === "crop") window.dispatchEvent(new CustomEvent("forge:crop-cancel"));
+          }
+          return;
         }
-        return;
       }
 
       const checkDirty = (nextToolId: string) => {
@@ -177,6 +185,7 @@ function App() {
     transformSettings.isDirty,
     showToast,
     toolSettings.select.mode,
+    toolSettings.text.isEditing,
     updateToolSettings,
     activeProjectId,
     isInteracting,

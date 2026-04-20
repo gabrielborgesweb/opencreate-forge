@@ -20,31 +20,55 @@ export class TextLayer {
 
     // 1. Text Rendering (Always pixel-based, tied to project resolution)
     const textRendering = layer.textRendering || "bilinear";
+    const textOverflow = layer.textOverflow !== false; // Default to true if undefined
     const spansKey = JSON.stringify(layer.textSpans || []);
-    const propsKey = `${layer.text}|${spansKey}|${layer.fontSize}|${layer.fontFamily}|${layer.fontWeight}|${layer.color}|${layer.textAlign}|${layer.tracking}|${layer.lineHeight}|${layer.width}|${layer.height}|${textRendering}`;
+    const propsKey = `${layer.text}|${spansKey}|${layer.fontSize}|${layer.fontFamily}|${layer.fontWeight}|${layer.color}|${layer.textAlign}|${layer.tracking}|${layer.lineHeight}|${layer.width}|${layer.height}|${textRendering}|${textOverflow}`;
 
     let cachedCanvas = cache.get(layer.id);
     const isReady = readyCache.get(layer.id);
     const cachedKey = (cachedCanvas as any)?._propsKey;
 
+    const metrics = this.calculateMetrics(ctx, layer);
+    
+    // Width: For area text, it's constrained by layer.width, but point text can overflow.
+    // If textOverflow is true, we allow the canvas to grow to fit the content.
+    const targetWidth = textOverflow ? Math.max(layer.width, metrics.width) : Math.max(1, layer.width);
+    
+    // Height: Allow expansion if textOverflow is true. 
+    // We add a safety margin for character descents (like 'g', 'j', 'p', 'y').
+    const safetyMargin = (layer.fontSize || 24) * 0.5;
+    const targetHeight = textOverflow 
+      ? Math.max(layer.height, metrics.height + safetyMargin) 
+      : Math.max(1, layer.height);
+
+    // Calculate horizontal offset for center/right aligned text that overflows the left boundary
+    let offsetX = 0;
+    if (textOverflow) {
+      if (layer.textAlign === "center") {
+        offsetX = Math.max(0, (metrics.width - layer.width) / 2);
+      } else if (layer.textAlign === "right") {
+        offsetX = Math.max(0, metrics.width - layer.width);
+      }
+    }
+
     if (
       !cachedCanvas ||
       !isReady ||
       cachedKey !== propsKey ||
-      cachedCanvas.width !== Math.max(1, layer.width) ||
-      cachedCanvas.height !== Math.max(1, layer.height)
+      cachedCanvas.width !== Math.ceil(targetWidth + offsetX) ||
+      cachedCanvas.height !== Math.ceil(targetHeight)
     ) {
       cachedCanvas = document.createElement("canvas");
-      cachedCanvas.width = Math.max(1, layer.width);
-      cachedCanvas.height = Math.max(1, layer.height);
+      cachedCanvas.width = Math.ceil(targetWidth + offsetX);
+      cachedCanvas.height = Math.ceil(targetHeight);
       (cachedCanvas as any)._propsKey = propsKey;
       const cctx = cachedCanvas.getContext("2d")!;
 
       // Render text at 1:1 scale into the cache
-      this.drawTextToContext(cctx, { ...layer, x: 0, y: 0 });
+      // Apply offset if text overflows to the left
+      this.drawTextToContext(cctx, { ...layer, x: offsetX, y: 0 });
 
       if (textRendering === "nearest") {
-        // Apply binary threshold to alpha to remove anti-aliasing (crunchy pixel look)
         this.applyAlphaThreshold(cctx, cachedCanvas.width, cachedCanvas.height);
       }
 
@@ -53,9 +77,8 @@ export class TextLayer {
     }
 
     ctx.save();
-    // Draw the cached text (1:1) at project coordinates.
-    // Since ForgeEngine sets imageSmoothingEnabled = false, this will look pixelated on zoom.
-    ctx.drawImage(cachedCanvas, layer.x, layer.y);
+    // Draw the cached text, compensating for the horizontal offset
+    ctx.drawImage(cachedCanvas, layer.x - offsetX, layer.y);
     ctx.restore();
 
     // 2. UI Rendering (Caret, Selection, Pivot) - Rendered 'Normally' at zoom level
@@ -76,6 +99,7 @@ export class TextLayer {
 
       const lines = this.layoutText(ctx, layer, text, fontSize, tracking);
 
+      // Keep first line fixed to pivot (baseline at layer.y + fontSize)
       let currentY = layer.y + fontSize;
 
       lines.forEach((line, lineIndex) => {
@@ -194,27 +218,24 @@ export class TextLayer {
   ): { width: number; height: number; x?: number } {
     const text = layer.text || "";
     const fontSize = layer.fontSize || 24;
-    const fontFamily = layer.fontFamily || "Arial";
-    const fontWeight = layer.fontWeight || "normal";
     const lineHeightMult = layer.lineHeight || 1.2;
     const tracking = layer.tracking || 0;
     const textAlign = layer.textAlign || "left";
     const lineHeight = fontSize * lineHeightMult;
 
     ctx.save();
-    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
-
-    const lines = text.split("\n");
+    // Using layoutText to handle word wrapping correctly for Area text
+    const lines = this.layoutText(ctx, layer as Layer, text, fontSize, tracking);
     let maxWidth = 0;
 
     lines.forEach((line, index) => {
-      // Pass a partial layer to measureTextWithTracking
       const lineStartPos = lines.slice(0, index).join("\n").length + (index > 0 ? 1 : 0);
       const width = this.measureTextWithTracking(ctx, line, tracking, layer as Layer, lineStartPos);
       maxWidth = Math.max(maxWidth, width);
     });
 
     const newWidth = Math.max(1, maxWidth);
+    // Use the total lines from layoutText to calculate total height
     const newHeight = Math.max(1, lines.length * lineHeight);
 
     const result: any = { width: newWidth, height: newHeight };
@@ -247,6 +268,7 @@ export class TextLayer {
     ctx.save();
     ctx.textBaseline = "alphabetic";
 
+    // Keep first line fixed to pivot (baseline at layer.y + baseFontSize)
     let currentY = layer.y + baseFontSize;
     let charsProcessed = 0;
 
@@ -426,7 +448,7 @@ export class TextLayer {
 
     const lines = this.layoutText(ctx, layer, text, fontSize, tracking);
 
-    const relativeY = y - layer.y;
+    const relativeY = y - (layer.y + fontSize - lineHeight / 2);
     let lineIndex = Math.floor(relativeY / lineHeight);
     lineIndex = Math.max(0, Math.min(lineIndex, lines.length - 1));
 

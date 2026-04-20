@@ -27,6 +27,7 @@ export interface ToolSettings {
     textAlign: "left" | "center" | "right" | "justify";
     lineHeight: number;
     tracking: number;
+    textOverflow: boolean;
     textRendering: "nearest" | "bilinear";
     isEditing: boolean;
   };
@@ -79,6 +80,7 @@ export const useToolStore = create<ToolState>((set) => ({
       textAlign: "left",
       lineHeight: 1.2,
       tracking: 0,
+      textOverflow: true,
       textRendering: "bilinear",
       isEditing: false,
     },
@@ -128,3 +130,4 @@ export const useToolStore = create<ToolState>((set) => ({
       },
     })),
 }));
+

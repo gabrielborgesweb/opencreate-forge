@@ -31,6 +31,7 @@ export interface Layer {
   textAlign?: "left" | "center" | "right" | "justify";
   lineHeight?: number; // leading
   tracking?: number; // letter spacing
+  textOverflow?: boolean;
   textRendering?: "nearest" | "bilinear";
   blendMode: GlobalCompositeOperation;
 }

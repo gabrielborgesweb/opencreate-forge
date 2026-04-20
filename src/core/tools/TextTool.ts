@@ -87,7 +87,19 @@ export class TextTool extends BaseTool {
 
     this.hiddenInput.addEventListener("blur", () => {
       setTimeout(() => {
-        if (this.isEditing && this.hiddenInput && document.activeElement !== this.hiddenInput) {
+        if (!this.isEditing || !this.hiddenInput) return;
+
+        // Don't steal focus if user clicked on another interactive UI element
+        const active = document.activeElement;
+        const isInteractiveUI =
+          active &&
+          (active.tagName === "INPUT" ||
+            active.tagName === "SELECT" ||
+            active.tagName === "TEXTAREA" ||
+            active.tagName === "BUTTON" ||
+            (active as HTMLElement).isContentEditable);
+
+        if (!isInteractiveUI && active !== this.hiddenInput) {
           this.hiddenInput.focus();
         }
       }, 50);
@@ -139,7 +151,7 @@ export class TextTool extends BaseTool {
     // But we'll just implement the hide logic in render and click detection.
 
     for (const h of handles) {
-      if (h.name === "bottom-left") continue; // Requirement: hide bottom-left
+      // if (h.name === "bottom-left") continue; // Requirement: hide bottom-left
       const dist = Math.sqrt(Math.pow(x - h.x, 2) + Math.pow(y - h.y, 2));
       if (dist < threshold) return h;
     }
@@ -438,6 +450,7 @@ export class TextTool extends BaseTool {
       textAlign: settings.textAlign,
       lineHeight: settings.lineHeight,
       tracking: settings.tracking,
+      textOverflow: settings.textOverflow,
       opacity: 100,
       visible: true,
       blendMode: "source-over",
@@ -716,7 +729,7 @@ export class TextTool extends BaseTool {
 
         const handleSize = 8 / scale;
         handles.forEach((h) => {
-          if (h.name === "bottom-left") return; // Hide bottom-left handle near pivot
+          // if (h.name === "bottom-left") return; // Hide bottom-left handle near pivot
           ctx.fillStyle = "white";
           ctx.strokeStyle = "#0078ff";
           ctx.lineWidth = 1 / scale;

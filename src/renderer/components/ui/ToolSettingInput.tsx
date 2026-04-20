@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 
 interface ToolSettingInputProps {
-  label: string;
+  label: React.ReactNode;
   value: number;
   onChange: (value: number) => void;
   min?: number;
@@ -46,9 +46,15 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!isDragging.current) return;
       const delta = moveEvent.clientX - startX.current;
-      // Sensibilidade: 1px de movimento = 1 unidade da UI (ajustado pelo multiplicador)
-      const sensitivity = 1 / displayMultiplier;
-      const newValue = startValue.current + delta * sensitivity;
+
+      // 1px = 1 unit of display value
+      const startDisplayValue = startValue.current * displayMultiplier;
+      let newDisplayValue = startDisplayValue + delta;
+
+      // Snap to step
+      newDisplayValue = Math.round(newDisplayValue / step) * step;
+
+      const newValue = newDisplayValue / displayMultiplier;
       clampAndSave(newValue);
     };
 

@@ -105,6 +105,7 @@ button {
   &:active {
     translate: 0 1px;
     filter: brightness(0.9);
+    transition: 0;
   }
 }
 

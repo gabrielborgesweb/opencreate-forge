@@ -29,16 +29,18 @@ export class TextLayer {
     const cachedKey = (cachedCanvas as any)?._propsKey;
 
     const metrics = this.calculateMetrics(ctx, layer);
-    
+
     // Width: For area text, it's constrained by layer.width, but point text can overflow.
     // If textOverflow is true, we allow the canvas to grow to fit the content.
-    const targetWidth = textOverflow ? Math.max(layer.width, metrics.width) : Math.max(1, layer.width);
-    
-    // Height: Allow expansion if textOverflow is true. 
+    const targetWidth = textOverflow
+      ? Math.max(layer.width, metrics.width)
+      : Math.max(1, layer.width);
+
+    // Height: Allow expansion if textOverflow is true.
     // We add a safety margin for character descents (like 'g', 'j', 'p', 'y').
     const safetyMargin = (layer.fontSize || 24) * 0.5;
-    const targetHeight = textOverflow 
-      ? Math.max(layer.height, metrics.height + safetyMargin) 
+    const targetHeight = textOverflow
+      ? Math.max(layer.height, metrics.height + safetyMargin)
       : Math.max(1, layer.height);
 
     // Calculate horizontal offset for center/right aligned text that overflows the left boundary

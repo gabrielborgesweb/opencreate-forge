@@ -958,10 +958,7 @@ export class ForgeEngine {
     }
 
     // Render floating layer if it exists
-    if (
-      this.project.selection.floatingLayer &&
-      this.project.selection.floatingLayer.visible
-    ) {
+    if (this.project.selection.floatingLayer && this.project.selection.floatingLayer.visible) {
       this.renderLayer(this.project.selection.floatingLayer);
     }
 
@@ -1039,7 +1036,7 @@ export class ForgeEngine {
           layer,
           this.layerCanvasCache,
           this.layerReadyCache,
-          editingState
+          editingState,
         );
         break;
       case "group":

@@ -85,10 +85,7 @@ function App() {
         document.activeElement?.tagName === "TEXTAREA"
       ) {
         // Exception: allow shortcuts if it's the hidden text input and we're not actively editing
-        if (
-          document.activeElement.id === "forge-text-input" &&
-          !toolSettings.text.isEditing
-        ) {
+        if (document.activeElement.id === "forge-text-input" && !toolSettings.text.isEditing) {
           // Continue to global shortcuts
         } else {
           if (e.key === "Enter") {
@@ -201,10 +198,7 @@ function App() {
     <div className="flex flex-col h-screen bg-bg-primary text-text overflow-hidden relative">
       <Toast />
 
-      <NewProject
-        isOpen={isNewProjectModalOpen}
-        onClose={() => setIsNewProjectModalOpen(false)}
-      />
+      <NewProject isOpen={isNewProjectModalOpen} onClose={() => setIsNewProjectModalOpen(false)} />
 
       {/* 1. Abas de Projeto */}
       <ProjectTabs />

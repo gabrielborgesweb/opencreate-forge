@@ -125,7 +125,10 @@ export const TextOptions: React.FC = () => {
 
   // Fallback if current weight is missing in new font
   useEffect(() => {
-    if (availableWeights.length > 0 && !availableWeights.includes(String(textSettings.fontWeight))) {
+    if (
+      availableWeights.length > 0 &&
+      !availableWeights.includes(String(textSettings.fontWeight))
+    ) {
       updateToolSettings("text", { fontWeight: "400" });
     }
   }, [availableWeights, textSettings.fontWeight, updateToolSettings]);

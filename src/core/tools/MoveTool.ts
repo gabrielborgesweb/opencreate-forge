@@ -23,6 +23,8 @@ export class MoveTool extends BaseTool {
 
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
 
+    context.pushHistory("Move");
+
     // If we have a selection and no floating layer yet, we float it now
     if (project.selection.hasSelection && !project.selection.floatingLayer) {
       const success = await context.floatSelection(activeLayerId);

@@ -30,7 +30,9 @@ const LayerItem: React.FC<LayerItemProps> = ({
   onDragOver,
   onDrop,
 }) => {
-  const updateLayer = useProjectStore((state) => state.updateLayer);
+  const renameLayer = useProjectStore((state) => state.renameLayer);
+  const toggleLayerVisibility = useProjectStore((state) => state.toggleLayerVisibility);
+  const toggleLayerLock = useProjectStore((state) => state.toggleLayerLock);
   const setActiveLayer = useProjectStore((state) => state.setActiveLayer);
   const updateProject = useProjectStore((state) => state.updateProject);
   const showToast = useUIStore((state) => state.showToast);
@@ -49,12 +51,12 @@ const LayerItem: React.FC<LayerItemProps> = ({
 
   const toggleVisibility = (e: React.MouseEvent) => {
     e.stopPropagation();
-    updateLayer(projectId, layer.id, { visible: !layer.visible });
+    toggleLayerVisibility(projectId, layer.id);
   };
 
   const toggleLock = (e: React.MouseEvent) => {
     e.stopPropagation();
-    updateLayer(projectId, layer.id, { locked: !layer.locked });
+    toggleLayerLock(projectId, layer.id);
   };
 
   const handleThumbnailClick = (e: React.MouseEvent) => {
@@ -106,6 +108,8 @@ const LayerItem: React.FC<LayerItemProps> = ({
         mctx.fillStyle = "white";
         mctx.fillRect(0, 0, bounds.width, bounds.height);
 
+        useProjectStore.getState().pushHistory(projectId, "Select");
+
         updateProject(projectId, {
           selection: {
             hasSelection: true,
@@ -125,7 +129,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
 
   const handleRename = () => {
     if (editName.trim() && editName !== layer.name) {
-      updateLayer(projectId, layer.id, { name: editName.trim() });
+      renameLayer(projectId, layer.id, editName.trim());
     }
     setIsEditing(false);
   };

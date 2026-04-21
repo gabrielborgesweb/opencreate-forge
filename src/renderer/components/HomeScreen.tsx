@@ -42,6 +42,8 @@ const HomeScreen: React.FC = () => {
         panX: 0,
         panY: 0,
         isDirty: false,
+        undoStack: [],
+        redoStack: [],
       };
       addProject(newProject);
       setActiveTab(id);

@@ -99,6 +99,8 @@ const NewProject: React.FC<NewProjectProps> = ({ isOpen, onClose }) => {
       panX: 0,
       panY: 0,
       isDirty: false,
+      undoStack: [],
+      redoStack: [],
     };
     addProject(newProject);
     setActiveTab(id);

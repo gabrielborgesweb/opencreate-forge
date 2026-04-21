@@ -531,6 +531,9 @@ export class TransformTool extends BaseTool {
 
   async apply(context: ToolContext) {
     if (!this.currentTransform || !this.originalLayer) return;
+
+    context.pushHistory("Transform");
+
     const t = this.currentTransform;
     const layer = this.isFloating
       ? context.project.selection.floatingLayer

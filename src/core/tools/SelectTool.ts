@@ -169,6 +169,9 @@ export class SelectTool extends BaseTool {
   }
 
   private async clearSelection(context: ToolContext) {
+    if (context.project.selection.hasSelection) {
+      context.pushHistory("Deselect");
+    }
     await context.clearSelection();
   }
 
@@ -177,6 +180,8 @@ export class SelectTool extends BaseTool {
     rect: { x: number; y: number; width: number; height: number },
   ) {
     const mode = (this as any).effectiveMode || context.settings.select.mode;
+
+    context.pushHistory("Select");
 
     // Commit if creating new selection in replace mode
     if (mode === "replace" && context.project.selection.floatingLayer) {

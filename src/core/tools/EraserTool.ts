@@ -75,6 +75,8 @@ export class EraserTool extends BaseTool {
     this.isDrawing = true;
     this.layerId = activeLayerId;
 
+    context.pushHistory("Eraser");
+
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
     const settings = context.settings.eraser;
 

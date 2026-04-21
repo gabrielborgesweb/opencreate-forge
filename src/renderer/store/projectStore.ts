@@ -43,6 +43,19 @@ export interface Selection {
   floatingLayer?: Layer | null;
 }
 
+export interface HistoryState {
+  width: number;
+  height: number;
+  layers: Layer[];
+  activeLayerId: string | null;
+  selection: Selection;
+}
+
+export interface HistoryEntry {
+  description: string;
+  state: HistoryState;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -56,6 +69,9 @@ export interface Project {
   panX: number;
   panY: number;
   isDirty: boolean; // Para saber se houve mudanças não salvas
+  // History
+  undoStack: HistoryEntry[];
+  redoStack: HistoryEntry[];
 }
 
 interface ProjectState {
@@ -71,8 +87,25 @@ interface ProjectState {
   duplicateLayer: (projectId: string, layerId: string) => void;
   moveLayer: (projectId: string, fromIndex: number, toIndex: number) => void;
   updateLayer: (projectId: string, layerId: string, updates: Partial<Layer>) => void;
+  renameLayer: (projectId: string, layerId: string, name: string) => void;
+  toggleLayerVisibility: (projectId: string, layerId: string) => void;
+  toggleLayerLock: (projectId: string, layerId: string) => void;
   setActiveLayer: (projectId: string, layerId: string | null) => void;
+  // History actions
+  pushHistory: (projectId: string, description: string) => void;
+  undo: (projectId: string) => void;
+  redo: (projectId: string) => void;
 }
+
+const MAX_HISTORY = 50;
+
+const createHistoryState = (project: Project): HistoryState => ({
+  width: project.width,
+  height: project.height,
+  layers: JSON.parse(JSON.stringify(project.layers)),
+  activeLayerId: project.activeLayerId,
+  selection: JSON.parse(JSON.stringify(project.selection)),
+});
 
 export const useProjectStore = create<ProjectState>((set) => ({
   projects: [],
@@ -80,7 +113,14 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   addProject: (project) =>
     set((state) => ({
-      projects: [...state.projects, project],
+      projects: [
+        ...state.projects,
+        {
+          ...project,
+          undoStack: project.undoStack || [],
+          redoStack: project.redoStack || [],
+        },
+      ],
       activeProjectId: project.id,
     })),
 
@@ -114,6 +154,17 @@ export const useProjectStore = create<ProjectState>((set) => ({
       const project = state.projects.find((p) => p.id === projectId);
       if (!project) return state;
 
+      // Push to history before change
+      const historyState: HistoryState = {
+        width: project.width,
+        height: project.height,
+        layers: JSON.parse(JSON.stringify(project.layers)),
+        activeLayerId: project.activeLayerId,
+        selection: JSON.parse(JSON.stringify(project.selection)),
+      };
+      const newUndoStack = [...project.undoStack, { description: "Add Layer", state: historyState }];
+      if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
+
       const id = partialLayer.id || Math.random().toString(36).substr(2, 9);
       const newLayer: Layer = {
         id,
@@ -133,7 +184,14 @@ export const useProjectStore = create<ProjectState>((set) => ({
       return {
         projects: state.projects.map((p) =>
           p.id === projectId
-            ? { ...p, layers: [...p.layers, newLayer], activeLayerId: id, isDirty: true }
+            ? {
+                ...p,
+                layers: [...p.layers, newLayer],
+                activeLayerId: id,
+                isDirty: true,
+                undoStack: newUndoStack,
+                redoStack: [],
+              }
             : p,
         ),
       };
@@ -142,7 +200,21 @@ export const useProjectStore = create<ProjectState>((set) => ({
   removeLayer: (projectId, layerId) =>
     set((state) => {
       const project = state.projects.find((p) => p.id === projectId);
-      if (!project || project.layers.length <= 1) return state; // Prevent deleting last layer for now
+      if (!project || project.layers.length <= 1) return state;
+
+      // Push to history
+      const historyState: HistoryState = {
+        width: project.width,
+        height: project.height,
+        layers: JSON.parse(JSON.stringify(project.layers)),
+        activeLayerId: project.activeLayerId,
+        selection: JSON.parse(JSON.stringify(project.selection)),
+      };
+      const newUndoStack = [
+        ...project.undoStack,
+        { description: "Remove Layer", state: historyState },
+      ];
+      if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
 
       const newLayers = project.layers.filter((l) => l.id !== layerId);
       let newActiveLayerId = project.activeLayerId;
@@ -154,7 +226,14 @@ export const useProjectStore = create<ProjectState>((set) => ({
       return {
         projects: state.projects.map((p) =>
           p.id === projectId
-            ? { ...p, layers: newLayers, activeLayerId: newActiveLayerId, isDirty: true }
+            ? {
+                ...p,
+                layers: newLayers,
+                activeLayerId: newActiveLayerId,
+                isDirty: true,
+                undoStack: newUndoStack,
+                redoStack: [],
+              }
             : p,
         ),
       };
@@ -168,6 +247,20 @@ export const useProjectStore = create<ProjectState>((set) => ({
       const layer = project.layers.find((l) => l.id === layerId);
       if (!layer) return state;
 
+      // Push to history
+      const historyState: HistoryState = {
+        width: project.width,
+        height: project.height,
+        layers: JSON.parse(JSON.stringify(project.layers)),
+        activeLayerId: project.activeLayerId,
+        selection: JSON.parse(JSON.stringify(project.selection)),
+      };
+      const newUndoStack = [
+        ...project.undoStack,
+        { description: "Duplicate Layer", state: historyState },
+      ];
+      if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
+
       const newId = Math.random().toString(36).substr(2, 9);
       const newLayer = { ...layer, id: newId, name: `${layer.name} copy` };
       const index = project.layers.findIndex((l) => l.id === layerId);
@@ -177,7 +270,16 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
       return {
         projects: state.projects.map((p) =>
-          p.id === projectId ? { ...p, layers: newLayers, activeLayerId: newId, isDirty: true } : p,
+          p.id === projectId
+            ? {
+                ...p,
+                layers: newLayers,
+                activeLayerId: newId,
+                isDirty: true,
+                undoStack: newUndoStack,
+                redoStack: [],
+              }
+            : p,
         ),
       };
     }),
@@ -187,13 +289,29 @@ export const useProjectStore = create<ProjectState>((set) => ({
       const project = state.projects.find((p) => p.id === projectId);
       if (!project) return state;
 
+      // Push to history
+      const historyState: HistoryState = {
+        width: project.width,
+        height: project.height,
+        layers: JSON.parse(JSON.stringify(project.layers)),
+        activeLayerId: project.activeLayerId,
+        selection: JSON.parse(JSON.stringify(project.selection)),
+      };
+      const newUndoStack = [
+        ...project.undoStack,
+        { description: "Move Layer", state: historyState },
+      ];
+      if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
+
       const newLayers = [...project.layers];
       const [movedLayer] = newLayers.splice(fromIndex, 1);
       newLayers.splice(toIndex, 0, movedLayer);
 
       return {
         projects: state.projects.map((p) =>
-          p.id === projectId ? { ...p, layers: newLayers, isDirty: true } : p,
+          p.id === projectId
+            ? { ...p, layers: newLayers, isDirty: true, undoStack: newUndoStack, redoStack: [] }
+            : p,
         ),
       };
     }),
@@ -211,10 +329,201 @@ export const useProjectStore = create<ProjectState>((set) => ({
       ),
     })),
 
+  renameLayer: (projectId, layerId, name) =>
+    set((state) => {
+      const project = state.projects.find((p) => p.id === projectId);
+      if (!project) return state;
+
+      const historyState = createHistoryState(project);
+      const newUndoStack = [
+        ...project.undoStack,
+        { description: "Rename Layer", state: historyState },
+      ];
+      if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
+
+      return {
+        projects: state.projects.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                layers: p.layers.map((l) => (l.id === layerId ? { ...l, name } : l)),
+                undoStack: newUndoStack,
+                redoStack: [],
+                isDirty: true,
+              }
+            : p,
+        ),
+      };
+    }),
+
+  toggleLayerVisibility: (projectId, layerId) =>
+    set((state) => {
+      const project = state.projects.find((p) => p.id === projectId);
+      if (!project) return state;
+
+      const historyState = createHistoryState(project);
+      const newUndoStack = [
+        ...project.undoStack,
+        { description: "Visibility Change", state: historyState },
+      ];
+      if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
+
+      return {
+        projects: state.projects.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                layers: p.layers.map((l) =>
+                  l.id === layerId ? { ...l, visible: !l.visible } : l,
+                ),
+                undoStack: newUndoStack,
+                redoStack: [],
+                isDirty: true,
+              }
+            : p,
+        ),
+      };
+    }),
+
+  toggleLayerLock: (projectId, layerId) =>
+    set((state) => {
+      const project = state.projects.find((p) => p.id === projectId);
+      if (!project) return state;
+
+      const historyState = createHistoryState(project);
+      const newUndoStack = [
+        ...project.undoStack,
+        { description: "Lock Change", state: historyState },
+      ];
+      if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
+
+      return {
+        projects: state.projects.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                layers: p.layers.map((l) => (l.id === layerId ? { ...l, locked: !l.locked } : l)),
+                undoStack: newUndoStack,
+                redoStack: [],
+                isDirty: true,
+              }
+            : p,
+        ),
+      };
+    }),
+
   setActiveLayer: (projectId, layerId) =>
     set((state) => ({
       projects: state.projects.map((p) =>
         p.id === projectId ? { ...p, activeLayerId: layerId } : p,
       ),
     })),
+
+  pushHistory: (projectId, description) =>
+    set((state) => {
+      const project = state.projects.find((p) => p.id === projectId);
+      if (!project) return state;
+
+      const historyState: HistoryState = {
+        width: project.width,
+        height: project.height,
+        layers: JSON.parse(JSON.stringify(project.layers)), // Deep copy to avoid reference issues
+        activeLayerId: project.activeLayerId,
+        selection: JSON.parse(JSON.stringify(project.selection)),
+      };
+
+      const newEntry: HistoryEntry = {
+        description,
+        state: historyState,
+      };
+
+      const newUndoStack = [...project.undoStack, newEntry];
+      if (newUndoStack.length > MAX_HISTORY) {
+        newUndoStack.shift();
+      }
+
+      return {
+        projects: state.projects.map((p) =>
+          p.id === projectId ? { ...p, undoStack: newUndoStack, redoStack: [] } : p,
+        ),
+      };
+    }),
+
+  undo: (projectId) =>
+    set((state) => {
+      const project = state.projects.find((p) => p.id === projectId);
+      if (!project || project.undoStack.length === 0) return state;
+
+      const newUndoStack = [...project.undoStack];
+      const lastEntry = newUndoStack.pop()!;
+
+      // Save current state to redo stack
+      const currentHistoryState: HistoryState = {
+        width: project.width,
+        height: project.height,
+        layers: JSON.parse(JSON.stringify(project.layers)),
+        activeLayerId: project.activeLayerId,
+        selection: JSON.parse(JSON.stringify(project.selection)),
+      };
+
+      const redoEntry: HistoryEntry = {
+        description: lastEntry.description,
+        state: currentHistoryState,
+      };
+
+      const newRedoStack = [...project.redoStack, redoEntry];
+
+      return {
+        projects: state.projects.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                ...lastEntry.state,
+                undoStack: newUndoStack,
+                redoStack: newRedoStack,
+                isDirty: true,
+              }
+            : p,
+        ),
+      };
+    }),
+
+  redo: (projectId) =>
+    set((state) => {
+      const project = state.projects.find((p) => p.id === projectId);
+      if (!project || project.redoStack.length === 0) return state;
+
+      const newRedoStack = [...project.redoStack];
+      const nextEntry = newRedoStack.pop()!;
+
+      // Save current state to undo stack
+      const currentHistoryState: HistoryState = {
+        width: project.width,
+        height: project.height,
+        layers: JSON.parse(JSON.stringify(project.layers)),
+        activeLayerId: project.activeLayerId,
+        selection: JSON.parse(JSON.stringify(project.selection)),
+      };
+
+      const undoEntry: HistoryEntry = {
+        description: nextEntry.description,
+        state: currentHistoryState,
+      };
+
+      const newUndoStack = [...project.undoStack, undoEntry];
+
+      return {
+        projects: state.projects.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                ...nextEntry.state,
+                undoStack: newUndoStack,
+                redoStack: newRedoStack,
+                isDirty: true,
+              }
+            : p,
+        ),
+      };
+    }),
 }));

@@ -93,13 +93,8 @@ export class ForgeEngine {
     this.canvas.addEventListener("dblclick", this.handleDoubleClick);
     window.addEventListener("mousemove", this.handleMouseMove);
     window.addEventListener("mouseup", this.handleMouseUp);
-    window.addEventListener("keydown", (e) => {
-      this.isCtrlPressed = e.ctrlKey || e.metaKey;
-      this.handleKeyDown(e);
-    });
-    window.addEventListener("keyup", (e) => {
-      this.isCtrlPressed = e.ctrlKey || e.metaKey;
-    });
+    window.addEventListener("keydown", this.handleKeyDown);
+    window.addEventListener("keyup", this.handleKeyUp);
     window.addEventListener("forge:clear-selection", () => {
       if (this.project) {
         this.clearSelection();
@@ -107,8 +102,15 @@ export class ForgeEngine {
     });
   }
 
+  private handleKeyUp = (e: KeyboardEvent) => {
+    this.isCtrlPressed = e.ctrlKey || e.metaKey;
+  };
+
   private async clearSelection() {
     if (!this.project) return;
+    if (this.project.selection.hasSelection) {
+      useProjectStore.getState().pushHistory(this.project.id, "Deselect");
+    }
     if (this.project.selection.floatingLayer) {
       await this.commitFloatingLayer();
     }
@@ -121,7 +123,9 @@ export class ForgeEngine {
     this.updateSelectionEdges();
   }
 
-  private handleKeyDown(e: KeyboardEvent) {
+  private handleKeyDown = (e: KeyboardEvent) => {
+    this.isCtrlPressed = e.ctrlKey || e.metaKey;
+
     const tool = this.getActiveTool();
     const context = this.getToolContext();
     if (tool && context) {
@@ -134,6 +138,30 @@ export class ForgeEngine {
     }
 
     const isCtrl = e.ctrlKey || e.metaKey;
+
+    if (isCtrl && e.shiftKey && e.key.toLowerCase() === "z") {
+      if (this.project) {
+        e.preventDefault();
+        useProjectStore.getState().redo(this.project.id);
+      }
+      return;
+    }
+
+    if (isCtrl && e.key.toLowerCase() === "z") {
+      if (this.project) {
+        e.preventDefault();
+        useProjectStore.getState().undo(this.project.id);
+      }
+      return;
+    }
+
+    if (isCtrl && e.key.toLowerCase() === "y") {
+      if (this.project) {
+        e.preventDefault();
+        useProjectStore.getState().redo(this.project.id);
+      }
+      return;
+    }
 
     if (isCtrl && e.key.toLowerCase() === "c") {
       this.copyToClipboard();
@@ -396,6 +424,11 @@ export class ForgeEngine {
           useProjectStore.getState().updateProject(this.project.id, updates);
         }
       },
+      pushHistory: (description: string) => {
+        if (this.project) {
+          useProjectStore.getState().pushHistory(this.project.id, description);
+        }
+      },
       invalidateCache: (layerId: string) => this.invalidateLayerCache(layerId),
       screenToProject: (x: number, y: number) => this.screenToProject(x, y),
       getSelectionCanvas: () => ({
@@ -600,6 +633,7 @@ export class ForgeEngine {
     window.removeEventListener("mousemove", this.handleMouseMove);
     window.removeEventListener("mouseup", this.handleMouseUp);
     window.removeEventListener("keydown", this.handleKeyDown);
+    window.removeEventListener("keyup", this.handleKeyUp);
   }
 
   private getCheckerPattern(): CanvasPattern {
@@ -622,6 +656,7 @@ export class ForgeEngine {
 
   public setProject(project: Project) {
     const prevProjectId = this.project?.id;
+    const prevLayers = this.project?.layers;
     const maskChanged = project.selection.mask !== this.lastSelectionMask;
     this.project = project;
 
@@ -630,6 +665,19 @@ export class ForgeEngine {
       this.layerCanvasCache.clear();
       this.layerReadyCache.clear();
       this.imageCache.clear();
+    } else if (prevLayers !== project.layers) {
+      // Invalidate specific layer caches only if data/size changed
+      for (const layer of project.layers) {
+        const prevLayer = prevLayers?.find((l) => l.id === layer.id);
+        if (
+          !prevLayer ||
+          prevLayer.data !== layer.data ||
+          prevLayer.width !== layer.width ||
+          prevLayer.height !== layer.height
+        ) {
+          this.invalidateLayerCache(layer.id);
+        }
+      }
     }
 
     if (maskChanged || prevProjectId !== project.id) {

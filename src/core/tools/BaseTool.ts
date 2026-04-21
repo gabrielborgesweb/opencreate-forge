@@ -11,6 +11,7 @@ export interface ToolContext {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   updateProject: (updates: Partial<Project>) => void;
+  pushHistory: (description: string) => void;
   invalidateCache: (layerId: string) => void;
   setLayerCache: (layerId: string, canvas: HTMLCanvasElement) => void;
   getLayerCanvas: (layerId: string) => { canvas: HTMLCanvasElement; ready: boolean } | null;

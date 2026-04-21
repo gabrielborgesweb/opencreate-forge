@@ -477,6 +477,9 @@ export class CropTool extends BaseTool {
 
   async apply(context: ToolContext) {
     if (!this.cropState) return;
+
+    context.pushHistory("Crop");
+
     const t = this.cropState;
     const settings = context.settings.crop;
 

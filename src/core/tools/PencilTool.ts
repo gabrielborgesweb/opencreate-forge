@@ -37,6 +37,8 @@ export class PencilTool extends BaseTool {
     this.isDrawing = true;
     this.layerId = activeLayerId;
 
+    context.pushHistory("Pencil");
+
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
     // Snap to pixel grid
     const snapX = Math.floor(x);

@@ -90,6 +90,8 @@ export class BrushTool extends BaseTool {
     this.isDrawing = true;
     this.layerId = activeLayerId;
 
+    context.pushHistory("Brush");
+
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
     this.mouseX = x;
     this.mouseY = y;

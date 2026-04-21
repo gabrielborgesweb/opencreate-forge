@@ -6,7 +6,8 @@ TODO: OpenCreate Forge
 - [-] Tipos de Camada
   - [x] Camada de Imagem (raster)
   - [-] Camada de Texto
-- [-] Ferramenta Texto (depois de Tipos de Camada)
+- [x] Ferramenta Texto (depois de Tipos de Camada)
+  - [ ] Suporte a RichText
 - [ ] Régua
 - [ ] Guias (depois de Régua)
 - [ ] Salvamento local
@@ -16,8 +17,8 @@ TODO: OpenCreate Forge
 - [ ] Salvar Projeto
 - [ ] Histórico (com descrição da mudança)
 - [ ] Poder expandir o sidebar de camada
-- [ ] Melhor UI/UX do NewProjectModal
-  - [ ] Mais opções de templates
+- [x] Melhor UI/UX do NewProjectModal
+  - [x] Mais opções de templates
 - [x] Atalhos de Ctrl+N e Ctrl+W para gerenciar projetos
 - [x] Grade de Pixels em zoom 1000%
 - [x] Novo projeto ao colar uma imagem na Home

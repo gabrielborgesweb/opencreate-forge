@@ -3,6 +3,7 @@ import { useUIStore } from "@store/uiStore";
 import { useProjectStore } from "@store/projectStore";
 import CanvasViewport from "./components/CanvasViewport";
 import LayerList from "./components/Sidebar/LayerList";
+import HistoryPanel from "./components/Sidebar/HistoryPanel";
 import Toolbar from "./components/Toolbar";
 import ToolOptions from "./components/ToolOptions";
 import ProjectTabs from "./components/ProjectTabs";
@@ -223,12 +224,12 @@ function App() {
             <CanvasViewport />
 
             <aside className="w-[250px] bg-[#222] border-l border-bg-tertiary flex flex-col">
-              {/* <div className="px-4 py-2 border-b border-bg-tertiary">
-                <h3 className="text-[0.8rem] m-0 text-[#999] font-bold uppercase">
-                  LAYERS
-                </h3>
-              </div> */}
-              <LayerList />
+              <div className="flex-1 flex flex-col min-h-0 border-b border-bg-tertiary">
+                <LayerList />
+              </div>
+              <div className="h-[200px] flex flex-col min-h-0">
+                <HistoryPanel projectId={activeTab} />
+              </div>
             </aside>
           </>
         )}

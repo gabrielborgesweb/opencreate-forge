@@ -34,6 +34,9 @@ export interface Layer {
   textOverflow?: boolean;
   textRendering?: "nearest" | "bilinear";
   blendMode: GlobalCompositeOperation;
+  // History for text
+  textUndoStack?: { text: string; textSpans?: TextSpan[] }[];
+  textRedoStack?: { text: string; textSpans?: TextSpan[] }[];
 }
 
 export interface Selection {
@@ -91,6 +94,8 @@ interface ProjectState {
   toggleLayerVisibility: (projectId: string, layerId: string) => void;
   toggleLayerLock: (projectId: string, layerId: string) => void;
   setActiveLayer: (projectId: string, layerId: string | null) => void;
+  undoText: (projectId: string, layerId: string) => void;
+  redoText: (projectId: string, layerId: string) => void;
   // History actions
   pushHistory: (projectId: string, description: string) => void;
   undo: (projectId: string) => void;
@@ -411,6 +416,48 @@ export const useProjectStore = create<ProjectState>((set) => ({
         ),
       };
     }),
+
+  undoText: (projectId, layerId) =>
+    set((state) => ({
+      projects: state.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const layer = p.layers.find((l) => l.id === layerId);
+        if (!layer || !layer.textUndoStack || layer.textUndoStack.length === 0) return p;
+
+        const undoStack = [...(layer.textUndoStack || [])];
+        const lastEntry = undoStack.pop()!;
+        const redoStack = [...(layer.textRedoStack || []), { text: layer.text || "", textSpans: layer.textSpans }];
+
+        return {
+          ...p,
+          layers: p.layers.map((l) =>
+            l.id === layerId ? { ...l, ...lastEntry, textUndoStack: undoStack, textRedoStack: redoStack } : l,
+          ),
+          isDirty: true,
+        };
+      }),
+    })),
+
+  redoText: (projectId, layerId) =>
+    set((state) => ({
+      projects: state.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const layer = p.layers.find((l) => l.id === layerId);
+        if (!layer || !layer.textRedoStack || layer.textRedoStack.length === 0) return p;
+
+        const redoStack = [...(layer.textRedoStack || [])];
+        const nextEntry = redoStack.pop()!;
+        const undoStack = [...(layer.textUndoStack || []), { text: layer.text || "", textSpans: layer.textSpans }];
+
+        return {
+          ...p,
+          layers: p.layers.map((l) =>
+            l.id === layerId ? { ...l, ...nextEntry, textUndoStack: undoStack, textRedoStack: redoStack } : l,
+          ),
+          isDirty: true,
+        };
+      }),
+    })),
 
   setActiveLayer: (projectId, layerId) =>
     set((state) => ({

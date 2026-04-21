@@ -402,6 +402,13 @@ export class TextTool extends BaseTool {
     this.originalText = layer.text || "";
     context.updateProject({ activeLayerId: layer.id });
 
+    // Save initial state to history for this layer
+    const newUndoStack = [
+      ...(layer.textUndoStack || []),
+      { text: layer.text || "", textSpans: layer.textSpans }
+    ];
+    useProjectStore.getState().updateLayer(context.project.id, layer.id, { textUndoStack: newUndoStack });
+
     if (hitX !== undefined && hitY !== undefined) {
       this.caretIndex = TextLayer.getCaretIndexAt(context.ctx, layer, hitX, hitY);
     } else {
@@ -629,7 +636,13 @@ export class TextTool extends BaseTool {
     const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
     if (!layer) return;
 
-    const baseUpdates: Partial<Layer> = { text };
+    // Push previous text to undo stack before updating
+    const newUndoStack = [
+      ...(layer.textUndoStack || []),
+      { text: layer.text || "", textSpans: layer.textSpans }
+    ];
+
+    const baseUpdates: Partial<Layer> = { text, textUndoStack: newUndoStack, textRedoStack: [] };
     let dimensionUpdates = {};
 
     if (layer.textType === "point") {

@@ -7,7 +7,7 @@ import Toolbar from "./components/Toolbar";
 import ToolOptions from "./components/ToolOptions";
 import ProjectTabs from "./components/ProjectTabs";
 import HomeScreen from "./components/HomeScreen";
-import NewProjectModal from "./components/NewProjectModal";
+import NewProject from "./components/modals/NewProject";
 import { useToolStore } from "@store/toolStore";
 import Toast from "./components/ui/Toast";
 
@@ -201,7 +201,7 @@ function App() {
     <div className="flex flex-col h-screen bg-bg-primary text-text overflow-hidden relative">
       <Toast />
 
-      <NewProjectModal
+      <NewProject
         isOpen={isNewProjectModalOpen}
         onClose={() => setIsNewProjectModalOpen(false)}
       />

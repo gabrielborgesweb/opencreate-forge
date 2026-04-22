@@ -89,6 +89,7 @@ interface ProjectState {
   removeLayer: (projectId: string, layerId: string, skipHistory?: boolean) => void;
   addHistoryEntry: (projectId: string, entry: HistoryEntry) => void;
   moveLayer: (projectId: string, fromIndex: number, toIndex: number) => void;
+  duplicateLayer: (projectId: string, layerId: string) => void;
   updateLayer: (projectId: string, layerId: string, updates: Partial<Layer>) => void;
   renameLayer: (projectId: string, layerId: string, name: string) => void;
   toggleLayerVisibility: (projectId: string, layerId: string) => void;
@@ -167,13 +168,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       let newUndoStack = project.undoStack;
 
       if (!skipHistory) {
-        const historyState: HistoryState = {
-          width: project.width,
-          height: project.height,
-          layers: JSON.parse(JSON.stringify(project.layers)),
-          activeLayerId: project.activeLayerId,
-          selection: JSON.parse(JSON.stringify(project.selection)),
-        };
+        const historyState = createHistoryState(project);
 
         let newDescrition = "Add Layer";
         switch (partialLayer.type) {
@@ -226,13 +221,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       let newUndoStack = project.undoStack;
 
       if (!skipHistory) {
-        const historyState: HistoryState = {
-          width: project.width,
-          height: project.height,
-          layers: JSON.parse(JSON.stringify(project.layers)),
-          activeLayerId: project.activeLayerId,
-          selection: JSON.parse(JSON.stringify(project.selection)),
-        };
+        const historyState = createHistoryState(project);
         newUndoStack = [...project.undoStack, { description: "Remove Layer", state: historyState }];
         if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
       }
@@ -286,13 +275,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       if (!layer) return state;
 
       // Push to history
-      const historyState: HistoryState = {
-        width: project.width,
-        height: project.height,
-        layers: JSON.parse(JSON.stringify(project.layers)),
-        activeLayerId: project.activeLayerId,
-        selection: JSON.parse(JSON.stringify(project.selection)),
-      };
+      const historyState = createHistoryState(project);
       const newUndoStack = [
         ...project.undoStack,
         { description: "Duplicate Layer", state: historyState },
@@ -300,7 +283,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
       if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
 
       const newId = Math.random().toString(36).substr(2, 9);
-      const newLayer = { ...layer, id: newId, name: `${layer.name} copy` };
+      const newLayer = {
+        ...JSON.parse(JSON.stringify(layer)),
+        id: newId,
+        name: `${layer.name} copy`,
+      };
       const index = project.layers.findIndex((l) => l.id === layerId);
 
       const newLayers = [...project.layers];
@@ -328,13 +315,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       if (!project) return state;
 
       // Push to history
-      const historyState: HistoryState = {
-        width: project.width,
-        height: project.height,
-        layers: JSON.parse(JSON.stringify(project.layers)),
-        activeLayerId: project.activeLayerId,
-        selection: JSON.parse(JSON.stringify(project.selection)),
-      };
+      const historyState = createHistoryState(project);
       const newUndoStack = [
         ...project.undoStack,
         { description: "Move Layer", state: historyState },
@@ -512,13 +493,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       const project = state.projects.find((p) => p.id === projectId);
       if (!project) return state;
 
-      const historyState: HistoryState = {
-        width: project.width,
-        height: project.height,
-        layers: JSON.parse(JSON.stringify(project.layers)), // Deep copy to avoid reference issues
-        activeLayerId: project.activeLayerId,
-        selection: JSON.parse(JSON.stringify(project.selection)),
-      };
+      const historyState = createHistoryState(project);
 
       const newEntry: HistoryEntry = {
         description,
@@ -547,13 +522,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       const lastEntry = newUndoStack.pop()!;
 
       // Save current state to redo stack
-      const currentHistoryState: HistoryState = {
-        width: project.width,
-        height: project.height,
-        layers: JSON.parse(JSON.stringify(project.layers)),
-        activeLayerId: project.activeLayerId,
-        selection: JSON.parse(JSON.stringify(project.selection)),
-      };
+      const currentHistoryState = createHistoryState(project);
 
       const redoEntry: HistoryEntry = {
         description: lastEntry.description,
@@ -586,13 +555,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       const nextEntry = newRedoStack.pop()!;
 
       // Save current state to undo stack
-      const currentHistoryState: HistoryState = {
-        width: project.width,
-        height: project.height,
-        layers: JSON.parse(JSON.stringify(project.layers)),
-        activeLayerId: project.activeLayerId,
-        selection: JSON.parse(JSON.stringify(project.selection)),
-      };
+      const currentHistoryState = createHistoryState(project);
 
       const undoEntry: HistoryEntry = {
         description: nextEntry.description,
@@ -629,13 +592,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       const currentRedoStack = [...project.redoStack];
 
       // Capturamos o estado vivo atual UMA vez antes do loop
-      let currentHistoryState: HistoryState = {
-        width: project.width,
-        height: project.height,
-        layers: JSON.parse(JSON.stringify(project.layers)),
-        activeLayerId: project.activeLayerId,
-        selection: JSON.parse(JSON.stringify(project.selection)),
-      };
+      let currentHistoryState = createHistoryState(project);
 
       // O índice atual do usuário é sempre baseado no tamanho do undoStack
       const currentIndex = currentUndoStack.length - 1;

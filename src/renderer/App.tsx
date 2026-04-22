@@ -224,10 +224,10 @@ function App() {
             <CanvasViewport />
 
             <aside className="w-[250px] bg-[#222] border-l border-bg-tertiary flex flex-col">
-              <div className="flex-1 flex flex-col min-h-0 border-b border-bg-tertiary">
+              <div className="flex-1 flex flex-col min-h-0 border-b-2 border-bg-tertiary">
                 <LayerList />
               </div>
-              <div className="h-[200px] flex flex-col min-h-0">
+              <div className="flex-1 flex flex-col min-h-0">
                 <HistoryPanel projectId={activeTab} />
               </div>
             </aside>

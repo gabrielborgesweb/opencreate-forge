@@ -96,6 +96,7 @@ interface ProjectState {
   setActiveLayer: (projectId: string, layerId: string | null) => void;
   undoText: (projectId: string, layerId: string) => void;
   redoText: (projectId: string, layerId: string) => void;
+  jumpToHistory: (projectId: string, index: number) => void;
   // History actions
   pushHistory: (projectId: string, description: string) => void;
   undo: (projectId: string) => void;
@@ -117,17 +118,21 @@ export const useProjectStore = create<ProjectState>((set) => ({
   activeProjectId: null,
 
   addProject: (project) =>
-    set((state) => ({
-      projects: [
-        ...state.projects,
-        {
-          ...project,
-          undoStack: project.undoStack || [],
-          redoStack: project.redoStack || [],
-        },
-      ],
-      activeProjectId: project.id,
-    })),
+    set((state) => {
+      const initialState = createHistoryState(project);
+      const description = project.undoStack[0]?.description || "Initial State";
+      return {
+        projects: [
+          ...state.projects,
+          {
+            ...project,
+            undoStack: [{ description, state: initialState }],
+            redoStack: [],
+          },
+        ],
+        activeProjectId: project.id,
+      };
+    }),
 
   removeProject: (id) =>
     set((state) => {
@@ -167,7 +172,10 @@ export const useProjectStore = create<ProjectState>((set) => ({
         activeLayerId: project.activeLayerId,
         selection: JSON.parse(JSON.stringify(project.selection)),
       };
-      const newUndoStack = [...project.undoStack, { description: "Add Layer", state: historyState }];
+      const newUndoStack = [
+        ...project.undoStack,
+        { description: "Add Layer", state: historyState },
+      ];
       if (newUndoStack.length > MAX_HISTORY) newUndoStack.shift();
 
       const id = partialLayer.id || Math.random().toString(36).substr(2, 9);
@@ -378,9 +386,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
           p.id === projectId
             ? {
                 ...p,
-                layers: p.layers.map((l) =>
-                  l.id === layerId ? { ...l, visible: !l.visible } : l,
-                ),
+                layers: p.layers.map((l) => (l.id === layerId ? { ...l, visible: !l.visible } : l)),
                 undoStack: newUndoStack,
                 redoStack: [],
                 isDirty: true,
@@ -426,12 +432,17 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
         const undoStack = [...(layer.textUndoStack || [])];
         const lastEntry = undoStack.pop()!;
-        const redoStack = [...(layer.textRedoStack || []), { text: layer.text || "", textSpans: layer.textSpans }];
+        const redoStack = [
+          ...(layer.textRedoStack || []),
+          { text: layer.text || "", textSpans: layer.textSpans },
+        ];
 
         return {
           ...p,
           layers: p.layers.map((l) =>
-            l.id === layerId ? { ...l, ...lastEntry, textUndoStack: undoStack, textRedoStack: redoStack } : l,
+            l.id === layerId
+              ? { ...l, ...lastEntry, textUndoStack: undoStack, textRedoStack: redoStack }
+              : l,
           ),
           isDirty: true,
         };
@@ -447,12 +458,17 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
         const redoStack = [...(layer.textRedoStack || [])];
         const nextEntry = redoStack.pop()!;
-        const undoStack = [...(layer.textUndoStack || []), { text: layer.text || "", textSpans: layer.textSpans }];
+        const undoStack = [
+          ...(layer.textUndoStack || []),
+          { text: layer.text || "", textSpans: layer.textSpans },
+        ];
 
         return {
           ...p,
           layers: p.layers.map((l) =>
-            l.id === layerId ? { ...l, ...nextEntry, textUndoStack: undoStack, textRedoStack: redoStack } : l,
+            l.id === layerId
+              ? { ...l, ...nextEntry, textUndoStack: undoStack, textRedoStack: redoStack }
+              : l,
           ),
           isDirty: true,
         };
@@ -499,7 +515,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
   undo: (projectId) =>
     set((state) => {
       const project = state.projects.find((p) => p.id === projectId);
-      if (!project || project.undoStack.length === 0) return state;
+      // Impede undo se tiver apenas o estado inicial
+      if (!project || project.undoStack.length <= 1) return state;
 
       const newUndoStack = [...project.undoStack];
       const lastEntry = newUndoStack.pop()!;
@@ -567,6 +584,71 @@ export const useProjectStore = create<ProjectState>((set) => ({
                 ...nextEntry.state,
                 undoStack: newUndoStack,
                 redoStack: newRedoStack,
+                isDirty: true,
+              }
+            : p,
+        ),
+      };
+    }),
+
+  jumpToHistory: (projectId, index) =>
+    set((state) => {
+      const project = state.projects.find((p) => p.id === projectId);
+      if (!project) return state;
+
+      const historyLength = project.undoStack.length + project.redoStack.length;
+      if (index < 0 || index >= historyLength) return state;
+
+      // Usamos arrays mutáveis internamente para o loop
+      const currentUndoStack = [...project.undoStack];
+      const currentRedoStack = [...project.redoStack];
+
+      // Capturamos o estado vivo atual UMA vez antes do loop
+      let currentHistoryState: HistoryState = {
+        width: project.width,
+        height: project.height,
+        layers: JSON.parse(JSON.stringify(project.layers)),
+        activeLayerId: project.activeLayerId,
+        selection: JSON.parse(JSON.stringify(project.selection)),
+      };
+
+      // O índice atual do usuário é sempre baseado no tamanho do undoStack
+      const currentIndex = currentUndoStack.length - 1;
+
+      if (index === currentIndex) return state;
+
+      if (index < currentIndex) {
+        // Voltando no tempo (Simula chamadas de Undo)
+        const steps = currentIndex - index;
+        for (let i = 0; i < steps; i++) {
+          const lastEntry = currentUndoStack.pop()!;
+          currentRedoStack.push({
+            description: lastEntry.description,
+            state: currentHistoryState,
+          });
+          currentHistoryState = lastEntry.state;
+        }
+      } else {
+        // Avançando no tempo (Simula chamadas de Redo)
+        const steps = index - currentIndex;
+        for (let i = 0; i < steps; i++) {
+          const nextEntry = currentRedoStack.pop()!;
+          currentUndoStack.push({
+            description: nextEntry.description,
+            state: currentHistoryState,
+          });
+          currentHistoryState = nextEntry.state;
+        }
+      }
+
+      return {
+        projects: state.projects.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                ...currentHistoryState,
+                undoStack: currentUndoStack,
+                redoStack: currentRedoStack,
                 isDirty: true,
               }
             : p,

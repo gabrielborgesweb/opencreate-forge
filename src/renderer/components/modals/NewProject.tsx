@@ -99,7 +99,7 @@ const NewProject: React.FC<NewProjectProps> = ({ isOpen, onClose }) => {
       panX: 0,
       panY: 0,
       isDirty: false,
-      undoStack: [],
+      undoStack: [{ description: "New Project", state: {} as any }],
       redoStack: [],
     };
     addProject(newProject);

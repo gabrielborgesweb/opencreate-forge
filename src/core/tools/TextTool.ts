@@ -550,6 +550,13 @@ export class TextTool extends BaseTool {
     } else if (e.key === "Escape") {
       this.cancel(context);
       return consume();
+    } else if (e.key === "z" && (e.ctrlKey || e.metaKey)) {
+      if (e.shiftKey) {
+        useProjectStore.getState().redoText(context.project.id, this.editingLayerId);
+      } else {
+        useProjectStore.getState().undoText(context.project.id, this.editingLayerId);
+      }
+      return consume();
     } else if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
       this.selectionStart = 0;
       this.caretIndex = text.length;

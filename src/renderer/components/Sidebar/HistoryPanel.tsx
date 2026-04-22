@@ -10,6 +10,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ projectId }) => {
   const project = useProjectStore((state) => state.projects.find((p) => p.id === projectId));
   const undo = useProjectStore((state) => state.undo);
   const redo = useProjectStore((state) => state.redo);
+  const jumpToHistory = useProjectStore((state) => state.jumpToHistory);
 
   if (!project) return null;
 
@@ -25,12 +26,13 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ projectId }) => {
           return (
             <div
               key={i}
-              className={`text-[0.85rem] py-1.5 px-4 cursor-default transition-colors border-accent ${
+              onClick={() => jumpToHistory(projectId, i)}
+              className={`text-[0.85rem] py-1.5 px-4 cursor-pointer transition-colors border-l ${
                 isActive
-                  ? "bg-bg-tertiary border-l text-text"
+                  ? "bg-bg-tertiary border-accent text-text"
                   : isRedo
-                    ? "text-[#666] hover:bg-white/5"
-                    : "text-text hover:bg-white/5"
+                    ? "text-[#666] hover:bg-white/5 border-transparent"
+                    : "text-text hover:bg-white/5 border-transparent"
               }`}
             >
               {entry.description}
@@ -42,17 +44,17 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ projectId }) => {
         <div className="flex gap-1">
           <button
             onClick={() => undo(projectId)}
-            disabled={project.undoStack.length === 0}
+            disabled={project.undoStack.length <= 1}
             className="p-1.5 hover:bg-white/10 rounded transition-colors text-[#ccc] hover:text-white disabled:opacity-30"
           >
-            <RotateCcw size={14} />
+            <RotateCcw size={16} />
           </button>
           <button
             onClick={() => redo(projectId)}
             disabled={project.redoStack.length === 0}
             className="p-1.5 hover:bg-white/10 rounded transition-colors text-[#ccc] hover:text-white disabled:opacity-30"
           >
-            <RotateCw size={14} />
+            <RotateCw size={16} />
           </button>
         </div>
       </div>

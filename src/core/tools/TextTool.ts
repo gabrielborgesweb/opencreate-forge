@@ -1,9 +1,11 @@
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
-import { Layer, useProjectStore } from "@/renderer/store/projectStore";
+import { Layer, useProjectStore, HistoryState } from "@/renderer/store/projectStore";
 import { TextLayer } from "../layers/TextLayer";
 
 export class TextTool extends BaseTool {
   id: ToolId = "text";
+
+  private previousState: HistoryState | null = null;
 
   private isDragging = false;
   private isMoving = false;
@@ -402,12 +404,24 @@ export class TextTool extends BaseTool {
     this.originalText = layer.text || "";
     context.updateProject({ activeLayerId: layer.id });
 
+    if (!this.previousState) {
+      this.previousState = {
+        width: context.project.width,
+        height: context.project.height,
+        layers: JSON.parse(JSON.stringify(context.project.layers)),
+        activeLayerId: context.project.activeLayerId,
+        selection: JSON.parse(JSON.stringify(context.project.selection)),
+      };
+    }
+
     // Save initial state to history for this layer
     const newUndoStack = [
       ...(layer.textUndoStack || []),
-      { text: layer.text || "", textSpans: layer.textSpans }
+      { text: layer.text || "", textSpans: layer.textSpans },
     ];
-    useProjectStore.getState().updateLayer(context.project.id, layer.id, { textUndoStack: newUndoStack });
+    useProjectStore
+      .getState()
+      .updateLayer(context.project.id, layer.id, { textUndoStack: newUndoStack });
 
     if (hitX !== undefined && hitY !== undefined) {
       this.caretIndex = TextLayer.getCaretIndexAt(context.ctx, layer, hitX, hitY);
@@ -423,6 +437,14 @@ export class TextTool extends BaseTool {
   private createNewTextLayer(context: ToolContext, type: "point" | "area") {
     const settings = context.settings.text;
     const id = Math.random().toString(36).substring(2, 11);
+
+    this.previousState = {
+      width: context.project.width,
+      height: context.project.height,
+      layers: JSON.parse(JSON.stringify(context.project.layers)),
+      activeLayerId: context.project.activeLayerId,
+      selection: JSON.parse(JSON.stringify(context.project.selection)),
+    };
 
     let x = this.startPos.x;
     let y = this.startPos.y;
@@ -464,7 +486,7 @@ export class TextTool extends BaseTool {
       textRendering: settings.textRendering || "bilinear",
     };
 
-    useProjectStore.getState().addLayer(context.project.id, newLayer);
+    useProjectStore.getState().addLayer(context.project.id, newLayer, true);
 
     this.editingLayerId = id;
     this.isEditing = true;
@@ -646,7 +668,7 @@ export class TextTool extends BaseTool {
     // Push previous text to undo stack before updating
     const newUndoStack = [
       ...(layer.textUndoStack || []),
-      { text: layer.text || "", textSpans: layer.textSpans }
+      { text: layer.text || "", textSpans: layer.textSpans },
     ];
 
     const baseUpdates: Partial<Layer> = { text, textUndoStack: newUndoStack, textRedoStack: [] };
@@ -669,10 +691,24 @@ export class TextTool extends BaseTool {
   private commit(context: ToolContext) {
     if (!this.editingLayerId) return;
     const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
+
+    // Se o texto está vazio e não havia nada originalmente, removemos silenciosamente
     if (layer && !layer.text && this.originalText === "") {
-      useProjectStore.getState().removeLayer(context.project.id, this.editingLayerId);
+      useProjectStore.getState().removeLayer(context.project.id, this.editingLayerId, true);
+    } else if (this.previousState && layer) {
+      const prevLayer = this.previousState.layers.find((l: Layer) => l.id === this.editingLayerId);
+
+      // Empurra o histórico APENAS se houver alguma modificação de fato (texto, posição, cor, etc)
+      if (!prevLayer || JSON.stringify(layer) !== JSON.stringify(prevLayer)) {
+        useProjectStore.getState().addHistoryEntry(context.project.id, {
+          description: "Text Tool",
+          state: this.previousState,
+        });
+      }
     }
+
     this.isEditing = false;
+    this.previousState = null; // Limpa o estado após o commit
     this.editingLayerId = null;
     if (this.hiddenInput) {
       this.hiddenInput.value = "";
@@ -685,14 +721,20 @@ export class TextTool extends BaseTool {
   private cancel(context: ToolContext) {
     if (!this.editingLayerId) return;
     const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
+
+    // Se criou camada e cancelou sem digitar, remove silenciosamente.
     if (this.originalText === "" && (!layer || !layer.text)) {
-      useProjectStore.getState().removeLayer(context.project.id, this.editingLayerId);
-    } else {
-      useProjectStore
-        .getState()
-        .updateLayer(context.project.id, this.editingLayerId, { text: this.originalText });
+      useProjectStore.getState().removeLayer(context.project.id, this.editingLayerId, true);
+    } else if (this.previousState) {
+      // Se estava editando uma camada existente, restaura as propriedades exatas que ela tinha antes
+      const prevLayer = this.previousState.layers.find((l: Layer) => l.id === this.editingLayerId);
+      if (prevLayer) {
+        useProjectStore.getState().updateLayer(context.project.id, this.editingLayerId, prevLayer);
+      }
     }
+
     this.isEditing = false;
+    this.previousState = null; // Limpa o estado após o cancelamento
     this.editingLayerId = null;
     if (this.hiddenInput) {
       this.hiddenInput.value = "";

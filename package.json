@@ -8,9 +8,10 @@
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
     "preview": "vite preview",
-    "lint": "eslint .",
-    "tsc": "tsc --noEmit",
+    "lint": "eslint . --color",
+    "tsc": "tsc --noEmit --pretty",
     "check": "npm run tsc && npm run lint",
+    "check:cp": "node scripts/check.js",
     "prettier": "prettier --write . --ignore-path .prettierignore"
   },
   "dependencies": {

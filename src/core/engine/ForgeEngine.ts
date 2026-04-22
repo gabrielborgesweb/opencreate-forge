@@ -170,7 +170,7 @@ export class ForgeEngine {
     } else if (isCtrl && e.key.toLowerCase() === "x") {
       this.cutToClipboard();
     }
-  }
+  };
 
   public async cutToClipboard() {
     if (!this.project || !this.project.activeLayerId) return;

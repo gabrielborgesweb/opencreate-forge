@@ -45,7 +45,7 @@ const HomeScreen: React.FC = () => {
         undoStack: [{ description: "New Project", state: {} as any }],
         redoStack: [],
       };
-      
+
       addProject(newProject);
       setActiveTab(id);
     },

@@ -8,15 +8,17 @@ TODO: OpenCreate Forge
   - [-] Camada de Texto
 - [x] Ferramenta Texto (depois de Tipos de Camada)
   - [ ] Suporte a RichText
-- [ ] Régua
-- [ ] Guias (depois de Régua)
 - [ ] Salvamento local
   - [ ] Ferramenta atual
   - [ ] Foreground atual
   - [ ] Background atual
 - [ ] Salvar Projeto
-- [ ] Histórico (com descrição da mudança)
-- [ ] Poder expandir o sidebar de camada
+- [ ] Guias (depois de Régua)
+- [ ] Régua
+- [ ] Poder expandir o sidebar da direita
+- [x] Histórico (com descrição da mudança)
+  - [x] Histórico interno para cada camada de texto
+  - [x] UI em cima da aba Layers
 - [x] Melhor UI/UX do NewProjectModal
   - [x] Mais opções de templates
 - [x] Atalhos de Ctrl+N e Ctrl+W para gerenciar projetos

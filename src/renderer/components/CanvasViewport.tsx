@@ -12,6 +12,8 @@ const CanvasViewport: React.FC = () => {
   );
 
   const showToast = useUIStore((state) => state.showToast);
+  const sidebarWidth = useUIStore((state) => state.sidebarWidth);
+  const isSidebarExpanded = useUIStore((state) => state.isSidebarExpanded);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   // 1. Inicializa o Engine apenas uma vez
@@ -69,23 +71,27 @@ const CanvasViewport: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id]); // Apenas quando mudar o projeto, não quando mudar o zoom
 
-  // 4. Handle window resize (SEM fitToScreen forçado)
+  // 4. Handle resize (via ResizeObserver for better precision during transitions)
   useEffect(() => {
-    const handleResize = () => {
+    if (!canvasRef.current) return;
+    
+    const parent = canvasRef.current.parentElement;
+    if (!parent) return;
+
+    const resizeObserver = new ResizeObserver(() => {
       if (canvasRef.current && engineRef.current) {
-        const parent = canvasRef.current.parentElement;
-        if (parent) {
-          canvasRef.current.width = parent.clientWidth;
-          canvasRef.current.height = parent.clientHeight;
-        }
+        canvasRef.current.width = parent.clientWidth;
+        canvasRef.current.height = parent.clientHeight;
+        // Optionally, if the engine needs a manual trigger:
+        // engineRef.current.render();
       }
+    });
+
+    resizeObserver.observe(parent);
+
+    return () => {
+      resizeObserver.disconnect();
     };
-
-    window.addEventListener("resize", handleResize);
-    // Garantir que o primeiro resize ocorra antes de qualquer lógica de posicionamento
-    handleResize();
-
-    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const handleDragOver = (e: React.DragEvent) => {

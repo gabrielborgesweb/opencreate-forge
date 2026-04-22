@@ -2,8 +2,7 @@ import React from "react";
 import { useUIStore } from "@store/uiStore";
 import { useProjectStore } from "@store/projectStore";
 import CanvasViewport from "./components/CanvasViewport";
-import LayerList from "./components/Sidebar/LayerList";
-import HistoryPanel from "./components/Sidebar/HistoryPanel";
+import RightSidebar from "./components/Sidebar/RightSidebar";
 import Toolbar from "./components/Toolbar";
 import ToolOptions from "./components/ToolOptions";
 import ProjectTabs from "./components/ProjectTabs";
@@ -223,14 +222,7 @@ function App() {
 
             <CanvasViewport />
 
-            <aside className="w-[250px] bg-[#222] border-l border-bg-tertiary flex flex-col">
-              <div className="flex-1 flex flex-col min-h-0 border-b-2 border-bg-tertiary">
-                <LayerList />
-              </div>
-              <div className="flex-1 flex flex-col min-h-0">
-                <HistoryPanel projectId={activeTab} />
-              </div>
-            </aside>
+            <RightSidebar />
           </>
         )}
       </main>

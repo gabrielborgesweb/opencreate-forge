@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useProjectStore } from "@store/projectStore";
 import { RotateCcw, RotateCw } from "lucide-react";
 
@@ -11,6 +11,20 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ projectId }) => {
   const undo = useProjectStore((state) => state.undo);
   const redo = useProjectStore((state) => state.redo);
   const jumpToHistory = useProjectStore((state) => state.jumpToHistory);
+
+  // Scroll to active history entry
+  useEffect(() => {
+    if (!project) return;
+
+    const activeEntry = document.querySelector(
+      `.history-entry-${project.undoStack.length - 1}`,
+    ) as HTMLElement;
+    if (activeEntry) {
+      // Scroll smoothly to the active entry, centering it in the view
+      activeEntry.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.undoStack.length, project?.redoStack.length]);
 
   if (!project) return null;
 
@@ -27,7 +41,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ projectId }) => {
             <div
               key={i}
               onClick={() => jumpToHistory(projectId, i)}
-              className={`text-[0.85rem] py-1.5 px-4 cursor-pointer transition-colors border-l ${
+              className={`text-[0.85rem] py-1.5 px-4 cursor-pointer transition-colors border-l history-entry-${i} ${
                 isActive
                   ? "bg-bg-tertiary border-accent text-text"
                   : isRedo

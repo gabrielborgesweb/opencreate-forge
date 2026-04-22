@@ -9,16 +9,25 @@ interface UIState {
     visible: boolean;
     duration: number;
   } | null;
+  activeSidebarTab: "layers" | "history";
+  sidebarWidth: number;
+  isSidebarExpanded: boolean;
   setActiveTab: (tab: "home" | string) => void;
   removeFromHistory: (tabId: string) => void;
   showToast: (message: string, type?: "info" | "warning" | "error", duration?: number) => void;
   hideToast: () => void;
+  setActiveSidebarTab: (tab: "layers" | "history") => void;
+  setSidebarWidth: (width: number) => void;
+  setIsSidebarExpanded: (expanded: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
   activeTab: "home",
   tabHistory: ["home"],
   toast: null,
+  activeSidebarTab: "layers",
+  sidebarWidth: 280,
+  isSidebarExpanded: true,
   setActiveTab: (tab) =>
     set((state) => {
       const newHistory = state.tabHistory.filter((id) => id !== tab);
@@ -41,4 +50,7 @@ export const useUIStore = create<UIState>((set, get) => ({
       }, 300); // Wait for fade-out animation
     }
   },
+  setActiveSidebarTab: (tab) => set({ activeSidebarTab: tab }),
+  setSidebarWidth: (width) => set({ sidebarWidth: Math.max(200, Math.min(width, 600)) }),
+  setIsSidebarExpanded: (expanded) => set({ isSidebarExpanded: expanded }),
 }));

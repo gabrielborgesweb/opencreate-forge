@@ -429,6 +429,11 @@ export class ForgeEngine {
           useProjectStore.getState().pushHistory(this.project.id, description);
         }
       },
+      addHistoryEntry: (entry: any) => {
+        if (this.project) {
+          useProjectStore.getState().addHistoryEntry(this.project.id, entry);
+        }
+      },
       invalidateCache: (layerId: string) => this.invalidateLayerCache(layerId),
       screenToProject: (x: number, y: number) => this.screenToProject(x, y),
       getSelectionCanvas: () => ({

@@ -1,4 +1,5 @@
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
+import { createHistoryState, HistoryState } from "@/renderer/store/projectStore";
 
 export class BrushTool extends BaseTool {
   id: ToolId = "brush";
@@ -24,6 +25,8 @@ export class BrushTool extends BaseTool {
   private minY = Infinity;
   private maxX = -Infinity;
   private maxY = -Infinity;
+
+  private historySnapshot: HistoryState | null = null;
 
   private hexToRgba(hex: string, alpha: number) {
     if (!hex.startsWith("#")) return `rgba(0,0,0,${alpha})`;
@@ -87,10 +90,10 @@ export class BrushTool extends BaseTool {
     const layer = context.project.layers.find((l) => l.id === activeLayerId);
     if (!layer || layer.locked || !layer.visible) return;
 
+    this.historySnapshot = createHistoryState(context.project);
+
     this.isDrawing = true;
     this.layerId = activeLayerId;
-
-    context.pushHistory("Brush");
 
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
     this.mouseX = x;
@@ -225,6 +228,12 @@ export class BrushTool extends BaseTool {
           return l;
         });
 
+        if (this.historySnapshot) {
+          context.addHistoryEntry({
+            description: "Brush Tool",
+            state: this.historySnapshot,
+          });
+        }
         context.updateProject({ layers, isDirty: true });
       }
     }
@@ -232,6 +241,7 @@ export class BrushTool extends BaseTool {
     this.offscreenCanvas = null;
     this.offscreenCtx = null;
     this.brushCanvas = null;
+    this.historySnapshot = null;
   }
 
   private getOptimizedBoundingBox(

@@ -1,4 +1,4 @@
-import { Project, Layer } from "@/renderer/store/projectStore";
+import { Project, Layer, HistoryEntry } from "@/renderer/store/projectStore";
 import { ToolSettings, ToolId } from "@/renderer/store/toolStore";
 
 export type { ToolId };
@@ -12,6 +12,7 @@ export interface ToolContext {
   ctx: CanvasRenderingContext2D;
   updateProject: (updates: Partial<Project>) => void;
   pushHistory: (description: string) => void;
+  addHistoryEntry: (entry: HistoryEntry) => void;
   invalidateCache: (layerId: string) => void;
   setLayerCache: (layerId: string, canvas: HTMLCanvasElement) => void;
   getLayerCanvas: (layerId: string) => { canvas: HTMLCanvasElement; ready: boolean } | null;

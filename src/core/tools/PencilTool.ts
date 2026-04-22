@@ -1,4 +1,5 @@
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
+import { createHistoryState, HistoryState } from "@/renderer/store/projectStore";
 
 export class PencilTool extends BaseTool {
   id: ToolId = "pencil";
@@ -23,6 +24,8 @@ export class PencilTool extends BaseTool {
   private maxX = -Infinity;
   private maxY = -Infinity;
 
+  private historySnapshot: HistoryState | null = null;
+
   private isLoadingBaseImage = false;
 
   onMouseDown(e: MouseEvent, context: ToolContext): void {
@@ -34,10 +37,10 @@ export class PencilTool extends BaseTool {
     const layer = context.project.layers.find((l) => l.id === activeLayerId);
     if (!layer || layer.locked || !layer.visible) return;
 
+    this.historySnapshot = createHistoryState(context.project);
+
     this.isDrawing = true;
     this.layerId = activeLayerId;
-
-    context.pushHistory("Pencil");
 
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
     // Snap to pixel grid
@@ -171,6 +174,12 @@ export class PencilTool extends BaseTool {
           return l;
         });
 
+        if (this.historySnapshot) {
+          context.addHistoryEntry({
+            description: "Pencil Tool",
+            state: this.historySnapshot,
+          });
+        }
         context.updateProject({ layers, isDirty: true });
       }
     }
@@ -179,6 +188,7 @@ export class PencilTool extends BaseTool {
     this.offscreenCtx = null;
     this.scratchCanvas = null;
     this.scratchCtx = null;
+    this.historySnapshot = null;
   }
 
   private getOptimizedBoundingBox(

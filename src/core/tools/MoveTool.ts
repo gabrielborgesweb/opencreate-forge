@@ -1,4 +1,5 @@
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
+import { createHistoryState, HistoryState } from "@/renderer/store/projectStore";
 
 export class MoveTool extends BaseTool {
   id: ToolId = "move";
@@ -10,6 +11,7 @@ export class MoveTool extends BaseTool {
   private initialLayerY = 0;
   private layerId: string | null = null;
   private isFloating = false;
+  private historySnapshot: HistoryState | null = null;
 
   async onMouseDown(e: MouseEvent, context: ToolContext): Promise<void> {
     if (e.button !== 0) return;
@@ -21,9 +23,10 @@ export class MoveTool extends BaseTool {
     const layer = project.layers.find((l) => l.id === activeLayerId);
     if (!layer || layer.locked) return;
 
-    const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
+    // Capture snapshot BEFORE any changes
+    this.historySnapshot = createHistoryState(project);
 
-    context.pushHistory("Move");
+    const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
 
     // If we have a selection and no floating layer yet, we float it now
     if (project.selection.hasSelection && !project.selection.floatingLayer) {
@@ -96,8 +99,19 @@ export class MoveTool extends BaseTool {
   onMouseUp(e: MouseEvent, context: ToolContext): void {
     if (this.isDragging) {
       this.isDragging = false;
+
+      // Only push history if something actually changed
+      const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
+      if (this.historySnapshot && (x !== this.startX || y !== this.startY)) {
+        context.addHistoryEntry({
+          description: "Move Tool",
+          state: this.historySnapshot,
+        });
+      }
+
       context.updateProject({ isDirty: true });
     }
     this.layerId = null;
+    this.historySnapshot = null;
   }
 }

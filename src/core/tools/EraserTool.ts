@@ -1,4 +1,5 @@
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
+import { createHistoryState, HistoryState } from "@/renderer/store/projectStore";
 
 export class EraserTool extends BaseTool {
   id: ToolId = "eraser";
@@ -24,6 +25,8 @@ export class EraserTool extends BaseTool {
   private minY = Infinity;
   private maxX = -Infinity;
   private maxY = -Infinity;
+
+  private historySnapshot: HistoryState | null = null;
 
   private isLoadingBaseImage = false;
 
@@ -72,10 +75,10 @@ export class EraserTool extends BaseTool {
     const layer = context.project.layers.find((l) => l.id === activeLayerId);
     if (!layer || layer.locked || !layer.visible) return;
 
+    this.historySnapshot = createHistoryState(context.project);
+
     this.isDrawing = true;
     this.layerId = activeLayerId;
-
-    context.pushHistory("Eraser");
 
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
     const settings = context.settings.eraser;
@@ -214,6 +217,12 @@ export class EraserTool extends BaseTool {
           return l;
         });
 
+        if (this.historySnapshot) {
+          context.addHistoryEntry({
+            description: "Eraser Tool",
+            state: this.historySnapshot,
+          });
+        }
         context.updateProject({ layers, isDirty: true });
       } else {
         // Camada ficou totalmente vazia
@@ -228,6 +237,12 @@ export class EraserTool extends BaseTool {
           }
           return l;
         });
+        if (this.historySnapshot) {
+          context.addHistoryEntry({
+            description: "Eraser Tool",
+            state: this.historySnapshot,
+          });
+        }
         context.updateProject({ layers, isDirty: true });
       }
     }
@@ -237,6 +252,7 @@ export class EraserTool extends BaseTool {
     this.brushCanvas = null;
     this.scratchCanvas = null;
     this.scratchCtx = null;
+    this.historySnapshot = null;
   }
 
   private getOptimizedBoundingBox(

@@ -1,4 +1,5 @@
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
+import { createHistoryState, HistoryState } from "@/renderer/store/projectStore";
 
 export class SelectTool extends BaseTool {
   id: ToolId = "select";
@@ -13,8 +14,12 @@ export class SelectTool extends BaseTool {
   private selectionMoveStart = { x: 0, y: 0 };
   private selectionMoveStartBounds = { x: 0, y: 0, width: 0, height: 0 };
 
+  private historySnapshot: HistoryState | null = null;
+
   onMouseDown(e: MouseEvent, context: ToolContext): void {
     if (e.button !== 0) return;
+
+    this.historySnapshot = createHistoryState(context.project);
 
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
 
@@ -109,8 +114,15 @@ export class SelectTool extends BaseTool {
   onMouseUp(e: MouseEvent, context: ToolContext): void {
     if (this.isMovingSelection) {
       this.isMovingSelection = false;
+      if (this.historySnapshot) {
+        context.addHistoryEntry({
+          description: "Move Selection",
+          state: this.historySnapshot,
+        });
+      }
       context.setInteracting(false);
       context.updateSelectionEdges();
+      this.historySnapshot = null;
       return;
     }
 
@@ -140,11 +152,13 @@ export class SelectTool extends BaseTool {
         if (context.settings.select.mode === "replace") {
           this.clearSelection(context);
         }
+        this.historySnapshot = null;
         return;
       }
 
       this.updateSelectionWithRect(context, { x, y, width, height });
     }
+    this.historySnapshot = null;
   }
 
   private isPointInSelection(context: ToolContext, px: number, py: number): boolean {
@@ -170,7 +184,12 @@ export class SelectTool extends BaseTool {
 
   private async clearSelection(context: ToolContext) {
     if (context.project.selection.hasSelection) {
-      context.pushHistory("Deselect");
+      if (this.historySnapshot) {
+        context.addHistoryEntry({
+          description: "Deselect Tool",
+          state: this.historySnapshot,
+        });
+      }
     }
     await context.clearSelection();
   }
@@ -181,7 +200,12 @@ export class SelectTool extends BaseTool {
   ) {
     const mode = (this as any).effectiveMode || context.settings.select.mode;
 
-    context.pushHistory("Select");
+    if (this.historySnapshot) {
+      context.addHistoryEntry({
+        description: "Select Tool",
+        state: this.historySnapshot,
+      });
+    }
 
     // Commit if creating new selection in replace mode
     if (mode === "replace" && context.project.selection.floatingLayer) {

@@ -106,7 +106,7 @@ interface ProjectState {
 
 const MAX_HISTORY = 50;
 
-const createHistoryState = (project: Project): HistoryState => ({
+export const createHistoryState = (project: Project): HistoryState => ({
   width: project.width,
   height: project.height,
   layers: JSON.parse(JSON.stringify(project.layers)),

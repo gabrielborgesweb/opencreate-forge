@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -32,6 +32,80 @@ app.commandLine.appendSwitch("enable-gpu-rasterization"); // Melhora o render de
 app.commandLine.appendSwitch("enable-zero-copy"); // Melhora a velocidade de escrita de texturas (bom para Canvas)
 app.commandLine.appendSwitch("enable-features", "SharedArrayBuffer"); // Crucial para WASM multithread
 
+function createMenu() {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: "File",
+      submenu: [
+        {
+          label: "New Project",
+          accelerator: "CmdOrCtrl+N",
+          click: () => win?.webContents.send("menu:action", "new-project"),
+        },
+        { type: "separator" },
+        {
+          label: "Open...",
+          accelerator: "CmdOrCtrl+O",
+          click: () => win?.webContents.send("menu:action", "open-project"),
+        },
+        { type: "separator" },
+        {
+          label: "Save",
+          accelerator: "CmdOrCtrl+S",
+          click: () => win?.webContents.send("menu:action", "save-project"),
+        },
+        {
+          label: "Save As...",
+          accelerator: "CmdOrCtrl+Shift+S",
+          click: () => win?.webContents.send("menu:action", "save-project-as"),
+        },
+        { type: "separator" },
+        {
+          label: "Export as PNG...",
+          accelerator: "CmdOrCtrl+E",
+          click: () => win?.webContents.send("menu:action", "export-png"),
+        },
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    },
+    {
+      label: "Edit",
+      submenu: [
+        {
+          label: "Undo",
+          accelerator: "CmdOrCtrl+Z",
+          click: () => win?.webContents.send("menu:action", "undo"),
+        },
+        {
+          label: "Redo",
+          accelerator: "CmdOrCtrl+Y",
+          click: () => win?.webContents.send("menu:action", "redo"),
+        },
+        { type: "separator" },
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
+        { type: "separator" },
+        {
+          label: "Preferences",
+          click: () => win?.webContents.send("menu:action", "preferences"),
+        },
+      ],
+    },
+    { label: "Image", submenu: [{ label: "Canvas Size...", enabled: false }] },
+    { label: "Layer", submenu: [{ label: "New Layer", enabled: false }] },
+    { label: "Select", submenu: [{ label: "All", enabled: false }] },
+    { label: "Filter", submenu: [{ label: "Blur", enabled: false }] },
+    { label: "View", submenu: [{ role: "toggleDevTools" }, { role: "reload" }, { type: "separator" }, { role: "zoomIn" }, { role: "zoomOut" }, { role: "resetZoom" }] },
+    { label: "Window", submenu: [{ role: "minimize" }, { role: "zoom" }] },
+    { label: "Help", submenu: [{ label: "About OpenCreate Forge", enabled: false }] },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1400,
@@ -64,7 +138,7 @@ function createWindow() {
   }
 
   win.maximize();
-  win.setMenu(null);
+  createMenu();
 }
 
 app.on("window-all-closed", () => {
@@ -92,8 +166,8 @@ app.whenReady().then(() => {
 
   ipcMain.handle("dialog:saveFile", async (_event, { dataURL, defaultName }) => {
     const { canceled, filePath } = await dialog.showSaveDialog({
-      title: "Salvar imagem",
-      defaultPath: defaultName || "image.png",
+      title: "Exportar imagem",
+      defaultPath: defaultName || "export.png",
       filters: [
         { name: "PNG", extensions: ["png"] },
         { name: "JPEG", extensions: ["jpg", "jpeg"] },
@@ -113,6 +187,8 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.handle("app:getVersion", () => app.getVersion());
+
   ipcMain.handle("dialog:saveProjectAs", async (_event, { jsonString, defaultName }) => {
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: "Salvar Projeto Como...",
@@ -122,14 +198,18 @@ app.whenReady().then(() => {
     if (canceled || !filePath) return { success: false, filePath: null };
 
     try {
-      let projectData = JSON.parse(jsonString);
-      projectData = {
-        ...projectData,
-        originalName: projectData.name,
-        name: path.basename(filePath),
-      };
-      await fs.writeFile(filePath, JSON.stringify(projectData));
-      return { success: true, filePath };
+      const projectData = JSON.parse(jsonString);
+      const name = path.basename(filePath, ".ocfd");
+      
+      // Clean up internal-only fields before saving to disk
+      const dataToSave = { ...projectData };
+      delete dataToSave.filePath;
+      delete dataToSave.isDirty;
+      dataToSave.name = name;
+      dataToSave.updatedAt = new Date().toISOString();
+
+      await fs.writeFile(filePath, JSON.stringify(dataToSave, null, 2));
+      return { success: true, filePath, name };
     } catch (err: any) {
       return { success: false, error: err.message, filePath: null };
     }
@@ -138,7 +218,15 @@ app.whenReady().then(() => {
   ipcMain.handle("fs:saveProject", async (_event, { jsonString, filePath }) => {
     if (!filePath) return { success: false, error: "Nenhum caminho de arquivo fornecido." };
     try {
-      await fs.writeFile(filePath, jsonString);
+      const projectData = JSON.parse(jsonString);
+      
+      // Clean up internal-only fields before saving to disk
+      const dataToSave = { ...projectData };
+      delete dataToSave.filePath;
+      delete dataToSave.isDirty;
+      dataToSave.updatedAt = new Date().toISOString();
+
+      await fs.writeFile(filePath, JSON.stringify(dataToSave, null, 2));
       return { success: true, filePath };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -176,3 +264,4 @@ app.whenReady().then(() => {
 
   createWindow();
 });
+

@@ -214,7 +214,9 @@ export const TextOptions: React.FC = () => {
         );
 
         if (hasChange) {
-          useProjectStore.getState().updateLayer(activeProject.id, layer.id, updates);
+          useProjectStore
+            .getState()
+            .updateLayer(activeProject.id, layer.id, updates, !textSettings.isEditing);
         }
       }
     }

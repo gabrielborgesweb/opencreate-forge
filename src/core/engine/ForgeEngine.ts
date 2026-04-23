@@ -89,6 +89,29 @@ export class ForgeEngine {
     this.startRenderLoop();
   }
 
+  private unsubscribeToolStore: (() => void) | null = null;
+
+  private handleClearSelection = () => {
+    if (this.project) {
+      this.clearSelection();
+    }
+  };
+
+  private handleExportPNG = async () => {
+    if (this.project) {
+      const dataURL = await this.exportToPNG();
+      if ((window as any).electronAPI) {
+        const result = await (window as any).electronAPI.saveFile({
+          dataURL,
+          defaultName: `${this.project.name}.png`,
+        });
+        if (result.success) {
+          useUIStore.getState().showToast("Project exported as PNG", "info");
+        }
+      }
+    }
+  };
+
   private setupEventListeners() {
     this.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
     this.canvas.addEventListener("mousedown", this.handleMouseDown);
@@ -97,27 +120,23 @@ export class ForgeEngine {
     window.addEventListener("mouseup", this.handleMouseUp);
     window.addEventListener("keydown", this.handleKeyDown);
     window.addEventListener("keyup", this.handleKeyUp);
-    window.addEventListener("forge:clear-selection", () => {
-      if (this.project) {
-        this.clearSelection();
-      }
-    });
+    window.addEventListener("forge:clear-selection", this.handleClearSelection);
+    window.addEventListener("forge:export-png", this.handleExportPNG);
 
-    // --- ADICIONE ESTE BLOCO ---
-    useToolStore.subscribe((state) => {
+    useToolStore.subscribe((state, prevState) => {
       const newToolId = state.activeToolId;
-      if (newToolId !== this.currentToolId) {
+      if (newToolId !== prevState.activeToolId) {
         const context = this.getToolContext();
         if (context) {
-          if (this.currentToolId && this.tools[this.currentToolId]) {
-            this.tools[this.currentToolId].onDeactivate(context);
+          if (prevState.activeToolId && this.tools[prevState.activeToolId]) {
+            this.tools[prevState.activeToolId].onDeactivate(context);
           }
 
           this.currentToolId = newToolId;
           this.canvas.style.cursor = "default";
 
-          if (this.currentToolId && this.tools[this.currentToolId]) {
-            const activeTool = this.tools[this.currentToolId];
+          if (newToolId && this.tools[newToolId]) {
+            const activeTool = this.tools[newToolId];
             activeTool.onActivate(context);
 
             // Injeta a última posição do mouse para evitar a cintilação do preview
@@ -679,6 +698,12 @@ export class ForgeEngine {
     window.removeEventListener("mouseup", this.handleMouseUp);
     window.removeEventListener("keydown", this.handleKeyDown);
     window.removeEventListener("keyup", this.handleKeyUp);
+    window.removeEventListener("forge:clear-selection", this.handleClearSelection);
+    window.removeEventListener("forge:export-png", this.handleExportPNG);
+
+    // if (this.unsubscribeToolStore) {
+    //   this.unsubscribeToolStore();
+    // }
   }
 
   private getCheckerPattern(): CanvasPattern {
@@ -1302,5 +1327,47 @@ export class ForgeEngine {
     });
 
     this.project.selection.floatingLayer = null;
+  }
+
+  public async exportToPNG(): Promise<string> {
+    if (!this.project) return "";
+
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = this.project.width;
+    exportCanvas.height = this.project.height;
+    const exportCtx = exportCanvas.getContext("2d")!;
+
+    // Background white (optional, but requested format is PNG which supports transparency)
+    // If user wants transparency, we just leave it.
+
+    for (const layer of this.project.layers) {
+      if (layer.visible) {
+        exportCtx.save();
+        exportCtx.globalAlpha = layer.opacity / 100;
+        exportCtx.globalCompositeOperation = layer.blendMode;
+
+        switch (layer.type) {
+          case "raster":
+            await RasterLayer.render(
+              exportCtx,
+              layer,
+              this.layerCanvasCache,
+              this.layerReadyCache,
+              this.imageCache,
+              () => {},
+            );
+            break;
+          case "text":
+            TextLayer.render(exportCtx, layer, this.layerCanvasCache, this.layerReadyCache);
+            break;
+          case "group":
+            GroupLayer.render(exportCtx, layer);
+            break;
+        }
+        exportCtx.restore();
+      }
+    }
+
+    return exportCanvas.toDataURL("image/png");
   }
 }

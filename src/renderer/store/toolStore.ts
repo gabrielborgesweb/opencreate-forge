@@ -120,7 +120,8 @@ export const useToolStore = create<ToolState>((set) => ({
       };
     }),
 
-  setInteracting: (isInteracting) => set({ isInteracting }),
+  setInteracting: (isInteracting) =>
+    set((state) => (state.isInteracting === isInteracting ? state : { isInteracting })),
 
   updateToolSettings: (id, settings) =>
     set((state) => ({

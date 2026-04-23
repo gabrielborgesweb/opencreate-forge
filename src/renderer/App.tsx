@@ -10,9 +10,17 @@ import HomeScreen from "./components/HomeScreen";
 import NewProject from "./components/modals/NewProject";
 import { useToolStore } from "@store/toolStore";
 import Toast from "./components/ui/Toast";
+import { useMenuHandler } from "./hooks/useMenuHandler";
 
 function App() {
+  useMenuHandler();
   const activeTab = useUIStore((state) => state.activeTab);
+  const initializeStore = useProjectStore((state) => state.initialize);
+
+  React.useEffect(() => {
+    initializeStore();
+  }, [initializeStore]);
+
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = React.useState(false);
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
   const setActiveTool = useToolStore((state) => state.setActiveTool);

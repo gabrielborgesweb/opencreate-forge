@@ -67,7 +67,7 @@ const Toast: React.FC = () => {
           ? "bg-orange-600/95 text-white"
           : toast.type === "error"
             ? "bg-red-600/95 text-white"
-            : "bg-accent/95 text-white"
+            : "bg-blue-600/95 text-white"
       }`}
       style={{ pointerEvents: toast.visible ? "auto" : "none" }}
       onMouseEnter={() => setIsHovered(true)}

@@ -72,6 +72,11 @@ export interface Project {
   panX: number;
   panY: number;
   isDirty: boolean; // Para saber se houve mudanças não salvas
+  filePath?: string; // Caminho no sistema de arquivos se já foi salvo
+  // Metadata
+  version?: string;
+  createdAt?: string;
+  updatedAt?: string;
   // History
   undoStack: HistoryEntry[];
   redoStack: HistoryEntry[];
@@ -80,7 +85,9 @@ export interface Project {
 interface ProjectState {
   projects: Project[];
   activeProjectId: string | null;
+  appVersion: string;
 
+  initialize: () => Promise<void>;
   addProject: (project: Project) => void;
   removeProject: (id: string) => void;
   setActiveProject: (id: string | null) => void;
@@ -90,7 +97,7 @@ interface ProjectState {
   addHistoryEntry: (projectId: string, entry: HistoryEntry) => void;
   moveLayer: (projectId: string, fromIndex: number, toIndex: number) => void;
   duplicateLayer: (projectId: string, layerId: string) => void;
-  updateLayer: (projectId: string, layerId: string, updates: Partial<Layer>) => void;
+  updateLayer: (projectId: string, layerId: string, updates: Partial<Layer>, skipDirty?: boolean) => void;
   renameLayer: (projectId: string, layerId: string, name: string) => void;
   toggleLayerVisibility: (projectId: string, layerId: string) => void;
   toggleLayerLock: (projectId: string, layerId: string) => void;
@@ -114,21 +121,43 @@ export const createHistoryState = (project: Project): HistoryState => ({
   selection: JSON.parse(JSON.stringify(project.selection)),
 });
 
-export const useProjectStore = create<ProjectState>((set) => ({
+export const useProjectStore = create<ProjectState>((set, _get) => ({
   projects: [],
   activeProjectId: null,
+  appVersion: "0.0.0",
+
+  initialize: async () => {
+    if ((window as any).electronAPI) {
+      const version = await (window as any).electronAPI.getAppVersion();
+      set({ appVersion: version });
+    }
+  },
 
   addProject: (project) =>
     set((state) => {
+      const existingProject = state.projects.find(
+        (p) => p.id === project.id || (p.filePath && p.filePath === project.filePath),
+      );
+
+      if (existingProject) {
+        return { activeProjectId: existingProject.id };
+      }
+
       const initialState = createHistoryState(project);
-      const description = project.undoStack[0]?.description || "Initial State";
+      const description = project.undoStack?.[0]?.description || "Initial State";
+      const now = new Date().toISOString();
       return {
         projects: [
           ...state.projects,
           {
             ...project,
-            undoStack: [{ description, state: initialState }],
-            redoStack: [],
+            version: project.version || state.appVersion,
+            createdAt: project.createdAt || now,
+            updatedAt: project.updatedAt || now,
+            undoStack: project.undoStack?.length
+              ? project.undoStack
+              : [{ description, state: initialState }],
+            redoStack: project.redoStack || [],
           },
         ],
         activeProjectId: project.id,
@@ -335,17 +364,27 @@ export const useProjectStore = create<ProjectState>((set) => ({
       };
     }),
 
-  updateLayer: (projectId, layerId, updates) =>
+  updateLayer: (projectId, layerId, updates, skipDirty = false) =>
     set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              isDirty: true,
-              layers: p.layers.map((l) => (l.id === layerId ? { ...l, ...updates } : l)),
-            }
-          : p,
-      ),
+      projects: state.projects.map((p) => {
+        if (p.id !== projectId) return p;
+
+        const layer = p.layers.find((l) => l.id === layerId);
+        if (!layer) return p;
+
+        // Check if there's an actual change to avoid unnecessary dirtying
+        const hasActualChange = Object.entries(updates).some(([key, value]) => {
+          return (layer as any)[key] !== value;
+        });
+
+        if (!hasActualChange) return p;
+
+        return {
+          ...p,
+          isDirty: skipDirty ? p.isDirty : true,
+          layers: p.layers.map((l) => (l.id === layerId ? { ...l, ...updates } : l)),
+        };
+      }),
     })),
 
   renameLayer: (projectId, layerId, name) =>

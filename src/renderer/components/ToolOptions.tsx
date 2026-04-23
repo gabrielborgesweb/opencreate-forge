@@ -4,6 +4,7 @@ import { TOOLS } from "../constants/tools";
 import { Settings2 } from "lucide-react";
 
 import { BrushOptions } from "./tools/BrushOptions";
+import { MoveOptions } from "./tools/MoveOptions";
 import { PencilOptions } from "./tools/PencilOptions";
 import { EraserOptions } from "./tools/EraserOptions";
 import { SelectOptions } from "./tools/SelectOptions";
@@ -12,6 +13,7 @@ import { CropOptions } from "./tools/CropOptions";
 import { TextOptions } from "./tools/TextOptions";
 
 const TOOL_COMPONENTS: Partial<Record<ToolId, React.FC>> = {
+  move: MoveOptions,
   brush: BrushOptions,
   pencil: PencilOptions,
   eraser: EraserOptions,
@@ -36,11 +38,13 @@ const ToolOptions: React.FC = () => {
           {activeTool?.name || activeToolId}
         </span>
       </div>
-      {OptionsComponent ? (
-        <OptionsComponent />
-      ) : (
-        <span className="text-[0.75rem] text-[#666]">No options for this tool</span>
-      )}
+      <div className="flex-1 flex items-center h-full">
+        {OptionsComponent ? (
+          <OptionsComponent />
+        ) : (
+          <span className="text-[0.75rem] text-[#666]">No options for this tool</span>
+        )}
+      </div>
     </div>
   );
 };

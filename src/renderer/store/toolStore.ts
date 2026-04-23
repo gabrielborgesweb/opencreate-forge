@@ -15,6 +15,7 @@ export type SelectShape = "rectangle" | "ellipse" | "lasso" | "wand";
 export type CropMode = "Free" | "Original Ratio" | "Fixed Ratio";
 
 export interface ToolSettings {
+  move: { autoSelect: boolean };
   select: { mode: SelectMode; shape: SelectShape };
   brush: { size: number; color: string; hardness: number };
   pencil: { size: number; color: string; shape: "circle" | "square" };
@@ -76,6 +77,7 @@ export const useToolStore = create<ToolState>((set) => ({
   foregroundColor: "#000000",
   backgroundColor: "#ffffff",
   toolSettings: {
+    move: { autoSelect: true },
     select: { mode: "replace", shape: "rectangle" },
     brush: { size: 50, color: "#000000", hardness: 1.0 },
     pencil: { size: 1, color: "#000000", shape: "square" },

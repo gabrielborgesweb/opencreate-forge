@@ -17,6 +17,24 @@ export class MoveTool extends BaseTool {
     if (e.button !== 0) return;
 
     const { project } = context;
+    const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
+
+    // 1. Auto Select Logic (Enabled by setting OR by holding Alt key)
+    if (context.settings.move.autoSelect || e.altKey) {
+      // Find top-most layer at this point (reverse search)
+      const foundLayer = [...project.layers].reverse().find(l => 
+        l.visible && !l.locked &&
+        x >= l.x && x <= l.x + l.width &&
+        y >= l.y && y <= l.y + l.height
+      );
+
+      if (foundLayer && foundLayer.id !== project.activeLayerId) {
+        context.updateProject({ activeLayerId: foundLayer.id });
+        // Update local reference for the rest of the method
+        project.activeLayerId = foundLayer.id;
+      }
+    }
+
     const activeLayerId = project.activeLayerId;
     if (!activeLayerId) return;
 
@@ -25,8 +43,6 @@ export class MoveTool extends BaseTool {
 
     // Capture snapshot BEFORE any changes
     this.historySnapshot = createHistoryState(project);
-
-    const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
 
     // If we have a selection and no floating layer yet, we float it now
     if (project.selection.hasSelection && !project.selection.floatingLayer) {
@@ -43,7 +59,6 @@ export class MoveTool extends BaseTool {
     this.isDragging = true;
     this.layerId = this.isFloating ? "floating-selection" : activeLayerId;
 
-    // IMPORTANT: use context.project (which was updated by floatSelection)
     const targetLayer = this.isFloating ? context.project.selection.floatingLayer! : layer;
 
     this.startX = x;
@@ -56,8 +71,9 @@ export class MoveTool extends BaseTool {
     if (!this.isDragging || !this.layerId) return;
 
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
-    const dx = x - this.startX;
-    const dy = y - this.startY;
+    // Use Math.round to force movement to project pixels (no subpixels)
+    const dx = Math.round(x - this.startX);
+    const dy = Math.round(y - this.startY);
 
     if (this.isFloating) {
       const floatingLayer = context.project.selection.floatingLayer;
@@ -100,9 +116,11 @@ export class MoveTool extends BaseTool {
     if (this.isDragging) {
       this.isDragging = false;
 
-      // Only push history if something actually changed
       const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
-      if (this.historySnapshot && (x !== this.startX || y !== this.startY)) {
+      const dx = Math.round(x - this.startX);
+      const dy = Math.round(y - this.startY);
+
+      if (this.historySnapshot && (dx !== 0 || dy !== 0)) {
         context.addHistoryEntry({
           description: "Move Tool",
           state: this.historySnapshot,
@@ -113,5 +131,45 @@ export class MoveTool extends BaseTool {
     }
     this.layerId = null;
     this.historySnapshot = null;
+  }
+
+  onKeyDown(e: KeyboardEvent, context: ToolContext): boolean {
+    const isArrow = e.key.startsWith("Arrow");
+    if (!isArrow) return false;
+
+    const { project } = context;
+    const activeLayerId = project.activeLayerId;
+    if (!activeLayerId) return false;
+
+    const layer = project.layers.find((l) => l.id === activeLayerId);
+    if (!layer || layer.locked) return false;
+
+    e.preventDefault();
+
+    const multiplier = e.shiftKey ? 8 : 1;
+    let dx = 0;
+    let dy = 0;
+
+    if (e.key === "ArrowLeft") dx = -1 * multiplier;
+    if (e.key === "ArrowRight") dx = 1 * multiplier;
+    if (e.key === "ArrowUp") dy = -1 * multiplier;
+    if (e.key === "ArrowDown") dy = 1 * multiplier;
+
+    const history = createHistoryState(project);
+
+    const layers = project.layers.map((l) => {
+      if (l.id === activeLayerId) {
+        return { ...l, x: l.x + dx, y: l.y + dy };
+      }
+      return l;
+    });
+
+    context.addHistoryEntry({
+      description: "Move",
+      state: history,
+    });
+
+    context.updateProject({ layers, isDirty: true });
+    return true;
   }
 }

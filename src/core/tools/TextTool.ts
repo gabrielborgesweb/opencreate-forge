@@ -404,6 +404,19 @@ export class TextTool extends BaseTool {
     this.originalText = layer.text || "";
     context.updateProject({ activeLayerId: layer.id });
 
+    // Sync tool settings with layer properties
+    context.updateToolSettings("text", {
+      fontSize: layer.fontSize,
+      fontFamily: layer.fontFamily,
+      fontWeight: layer.fontWeight,
+      color: layer.color,
+      textAlign: layer.textAlign,
+      lineHeight: layer.lineHeight,
+      tracking: layer.tracking,
+      textOverflow: layer.textOverflow,
+      textRendering: layer.textRendering,
+    });
+
     if (!this.previousState) {
       this.previousState = {
         width: context.project.width,

@@ -52,7 +52,7 @@ export class ForgeEngine {
   private currentToolId: string | null = null;
   private onViewportChange: (zoom: number, x: number, y: number) => void;
 
-  private lastMouseEvent: MouseEvent | null = null;
+  // private lastMouseEvent: MouseEvent | null = null;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -130,41 +130,41 @@ export class ForgeEngine {
     window.addEventListener("forge:clear-selection", this.handleClearSelection);
     window.addEventListener("forge:export-png", this.handleExportPNG);
 
-    useToolStore.subscribe((state, prevState) => {
-      const newToolId = state.activeToolId;
-      if (newToolId !== prevState.activeToolId) {
-        const context = this.getToolContext();
-        if (context) {
-          if (prevState.activeToolId && this.tools[prevState.activeToolId]) {
-            this.tools[prevState.activeToolId].onDeactivate(context);
-          }
+    // useToolStore.subscribe((state, prevState) => {
+    //   const newToolId = state.activeToolId;
+    //   if (newToolId !== prevState.activeToolId) {
+    //     const context = this.getToolContext();
+    //     if (context) {
+    //       if (prevState.activeToolId && this.tools[prevState.activeToolId]) {
+    //         this.tools[prevState.activeToolId].onDeactivate(context);
+    //       }
 
-          this.currentToolId = newToolId;
-          this.canvas.style.cursor = "default";
+    //       this.currentToolId = newToolId;
+    //       this.canvas.style.cursor = "default";
 
-          if (newToolId && this.tools[newToolId]) {
-            const activeTool = this.tools[newToolId];
-            activeTool.onActivate(context);
+    //       if (newToolId && this.tools[newToolId]) {
+    //         const activeTool = this.tools[newToolId];
+    //         activeTool.onActivate(context);
 
-            // Injeta a última posição do mouse para evitar a cintilação do preview
-            if (this.lastMouseEvent) {
-              const rect = this.canvas.getBoundingClientRect();
-              const e = this.lastMouseEvent;
-              const mouseEvent =
-                e.target === this.canvas
-                  ? e
-                  : ({
-                      ...e,
-                      offsetX: e.clientX - rect.left,
-                      offsetY: e.clientY - rect.top,
-                    } as MouseEvent);
+    //         // Injeta a última posição do mouse para evitar a cintilação do preview
+    //         if (this.lastMouseEvent) {
+    //           const rect = this.canvas.getBoundingClientRect();
+    //           const e = this.lastMouseEvent;
+    //           const mouseEvent =
+    //             e.target === this.canvas
+    //               ? e
+    //               : ({
+    //                   ...e,
+    //                   offsetX: e.clientX - rect.left,
+    //                   offsetY: e.clientY - rect.top,
+    //                 } as MouseEvent);
 
-              activeTool.onMouseMove(mouseEvent, context);
-            }
-          }
-        }
-      }
-    });
+    //           activeTool.onMouseMove(mouseEvent, context);
+    //         }
+    //       }
+    //     }
+    //   }
+    // });
   }
 
   private handleKeyUp = (e: KeyboardEvent) => {
@@ -662,7 +662,7 @@ export class ForgeEngine {
   }
 
   private handleMouseMove(e: MouseEvent) {
-    this.lastMouseEvent = e; // <--- Adicione isso
+    // this.lastMouseEvent = e; // <--- Adicione isso
     if (!this.project) return;
 
     const rect = this.canvas.getBoundingClientRect();
@@ -1040,21 +1040,21 @@ export class ForgeEngine {
     if (!this.project) return;
 
     // Detectar mudança de ferramenta
-    // const activeToolId = useToolStore.getState().activeToolId;
-    // if (activeToolId !== this.currentToolId) {
-    //   const context = this.getToolContext();
-    //   if (context) {
-    //     if (this.currentToolId && this.tools[this.currentToolId]) {
-    //       this.tools[this.currentToolId].onDeactivate(context);
-    //     }
-    //     this.currentToolId = activeToolId;
-    //     if (this.currentToolId && this.tools[this.currentToolId]) {
-    //       this.tools[this.currentToolId].onActivate(context);
-    //     }
-    //     // Reset cursor default ao trocar
-    //     this.canvas.style.cursor = "default";
-    //   }
-    // }
+    const activeToolId = useToolStore.getState().activeToolId;
+    if (activeToolId !== this.currentToolId) {
+      const context = this.getToolContext();
+      if (context) {
+        if (this.currentToolId && this.tools[this.currentToolId]) {
+          this.tools[this.currentToolId].onDeactivate(context);
+        }
+        this.currentToolId = activeToolId;
+        if (this.currentToolId && this.tools[this.currentToolId]) {
+          this.tools[this.currentToolId].onActivate(context);
+        }
+        // Reset cursor default ao trocar
+        this.canvas.style.cursor = "default";
+      }
+    }
 
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.imageSmoothingEnabled = false;
@@ -1123,12 +1123,12 @@ export class ForgeEngine {
 
     const editingLayerId = tool?.getEditingLayerId();
 
-    // if (this.project.activeLayerId && activeToolId !== "transform" && activeToolId !== "crop") {
-    if (
-      this.project.activeLayerId &&
-      this.currentToolId !== "transform" &&
-      this.currentToolId !== "crop"
-    ) {
+    if (this.project.activeLayerId && activeToolId !== "transform" && activeToolId !== "crop") {
+      // if (
+      //   this.project.activeLayerId &&
+      //   this.currentToolId !== "transform" &&
+      //   this.currentToolId !== "crop"
+      // ) {
       const activeLayer = this.project.layers.find((l) => l.id === this.project?.activeLayerId);
       if (activeLayer && activeLayer.id !== editingLayerId) {
         this.ctx.save();

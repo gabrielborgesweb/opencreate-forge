@@ -3,19 +3,19 @@ TODO: OpenCreate Forge
 [x] Marcar como feito
 [-] Marcar como pendente
 
-- [-] Tipos de Camada
-  - [x] Camada de Imagem (raster)
-  - [-] Camada de Texto
-- [x] Ferramenta Texto (depois de Tipos de Camada)
-  - [ ] Suporte a RichText
+- [ ] Guias (depois de Régua)
 - [ ] Salvamento local
   - [ ] Ferramenta atual
   - [ ] Foreground atual
   - [ ] Background atual
-- [ ] Salvar Projeto
-- [ ] Guias (depois de Régua)
-- [ ] Régua
-- [ ] Poder expandir o sidebar da direita
+- [x] Ferramenta Texto (depois de Tipos de Camada)
+  - [ ] Suporte a RichText
+- [-] Tipos de Camada
+  - [x] Camada de Imagem (raster)
+  - [-] Camada de Texto
+- [x] Salvar Projeto
+- [x] Régua
+- [x] Poder expandir o sidebar da direita
 - [x] Histórico (com descrição da mudança)
   - [x] Histórico interno para cada camada de texto
   - [x] UI em cima da aba Layers

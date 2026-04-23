@@ -32,6 +32,8 @@ function App() {
   const isInteracting = useToolStore((state) => state.isInteracting);
   const setShowRulers = useUIStore((state) => state.setShowRulers);
   const showRulers = useUIStore((state) => state.showRulers);
+  const swapColors = useToolStore((state) => state.swapColors);
+  const resetColors = useToolStore((state) => state.resetColors);
 
   const originalModeRef = React.useRef<any>(null);
   const pendingRestoreRef = React.useRef<boolean>(false);
@@ -123,10 +125,6 @@ function App() {
           transformSettings.isDirty &&
           nextToolId !== "transform"
         ) {
-          // showToast(
-          //   "Apply or cancel transform before switching tools",
-          //   "warning",
-          // );
           return false;
         }
         return true;
@@ -135,9 +133,6 @@ function App() {
       if (isCmdOrCtrl && e.key.toLowerCase() === "t") {
         e.preventDefault();
         if (checkDirty("transform")) setActiveTool("transform");
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === "x") {
-        // Prevent default browser cut if needed, although we handle it in ForgeEngine
-        // e.preventDefault();
       } else if (e.key === "Enter") {
         if (activeToolId === "transform")
           window.dispatchEvent(new CustomEvent("forge:transform-apply"));
@@ -162,6 +157,10 @@ function App() {
           if (checkDirty("crop")) setActiveTool("crop");
         } else if (e.key.toLowerCase() === "t") {
           if (checkDirty("text")) setActiveTool("text");
+        } else if (e.key.toLowerCase() === "x") {
+          swapColors();
+        } else if (e.key.toLowerCase() === "d") {
+          resetColors();
         }
       }
     };
@@ -204,6 +203,8 @@ function App() {
     setShowRulers,
     activeProjectId,
     isInteracting,
+    swapColors,
+    resetColors,
   ]);
 
   React.useEffect(() => {

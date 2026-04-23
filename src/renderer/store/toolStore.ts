@@ -56,17 +56,25 @@ interface ToolState {
   previousToolId: ToolId;
   isInteracting: boolean;
   toolSettings: ToolSettings;
+  foregroundColor: string;
+  backgroundColor: string;
 
   // Actions
   setActiveTool: (id: ToolId) => void;
   setInteracting: (isInteracting: boolean) => void;
   updateToolSettings: (id: ToolId, settings: any) => void;
+  setForegroundColor: (color: string) => void;
+  setBackgroundColor: (color: string) => void;
+  swapColors: () => void;
+  resetColors: () => void;
 }
 
 export const useToolStore = create<ToolState>((set) => ({
   activeToolId: "move",
   previousToolId: "move",
   isInteracting: false,
+  foregroundColor: "#000000",
+  backgroundColor: "#ffffff",
   toolSettings: {
     select: { mode: "replace", shape: "rectangle" },
     brush: { size: 50, color: "#000000", hardness: 1.0 },
@@ -130,4 +138,17 @@ export const useToolStore = create<ToolState>((set) => ({
         [id]: { ...state.toolSettings[id as keyof typeof state.toolSettings], ...settings },
       },
     })),
+
+  setForegroundColor: (color) => set({ foregroundColor: color }),
+  setBackgroundColor: (color) => set({ backgroundColor: color }),
+  swapColors: () =>
+    set((state) => ({
+      foregroundColor: state.backgroundColor,
+      backgroundColor: state.foregroundColor,
+    })),
+  resetColors: () =>
+    set({
+      foregroundColor: "#000000",
+      backgroundColor: "#ffffff",
+    }),
 }));

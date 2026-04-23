@@ -115,6 +115,13 @@ export class ForgeEngine {
   private setupEventListeners() {
     this.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
     this.canvas.addEventListener("mousedown", this.handleMouseDown);
+    this.canvas.addEventListener("mouseleave", () => {
+      window.dispatchEvent(
+        new CustomEvent("forge:mouse-move", {
+          detail: { x: null, y: null },
+        }),
+      );
+    });
     this.canvas.addEventListener("dblclick", this.handleDoubleClick);
     window.addEventListener("mousemove", this.handleMouseMove);
     window.addEventListener("mouseup", this.handleMouseUp);
@@ -651,6 +658,16 @@ export class ForgeEngine {
   private handleMouseMove(e: MouseEvent) {
     this.lastMouseEvent = e; // <--- Adicione isso
     if (!this.project) return;
+
+    const rect = this.canvas.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+
+    window.dispatchEvent(
+      new CustomEvent("forge:mouse-move", {
+        detail: { x: offsetX, y: offsetY },
+      }),
+    );
 
     if (this.isPanning) {
       const newPanX = e.clientX - this.startX;

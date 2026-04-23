@@ -12,6 +12,7 @@ interface UIState {
   activeSidebarTab: "layers" | "history";
   sidebarWidth: number;
   isSidebarExpanded: boolean;
+  showRulers: boolean;
   setActiveTab: (tab: "home" | string) => void;
   removeFromHistory: (tabId: string) => void;
   showToast: (message: string, type?: "info" | "warning" | "error", duration?: number) => void;
@@ -19,6 +20,7 @@ interface UIState {
   setActiveSidebarTab: (tab: "layers" | "history") => void;
   setSidebarWidth: (width: number) => void;
   setIsSidebarExpanded: (expanded: boolean) => void;
+  setShowRulers: (show: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
@@ -28,6 +30,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   activeSidebarTab: "layers",
   sidebarWidth: 280,
   isSidebarExpanded: true,
+  showRulers: true,
   setActiveTab: (tab) =>
     set((state) => {
       const newHistory = state.tabHistory.filter((id) => id !== tab);
@@ -53,4 +56,5 @@ export const useUIStore = create<UIState>((set, get) => ({
   setActiveSidebarTab: (tab) => set({ activeSidebarTab: tab }),
   setSidebarWidth: (width) => set({ sidebarWidth: Math.max(200, Math.min(width, 600)) }),
   setIsSidebarExpanded: (expanded) => set({ isSidebarExpanded: expanded }),
+  setShowRulers: (show) => set({ showRulers: show }),
 }));

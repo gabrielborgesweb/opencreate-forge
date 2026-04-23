@@ -30,6 +30,8 @@ function App() {
   const transformSettings = useToolStore((state) => state.toolSettings.transform);
   const showToast = useUIStore((state) => state.showToast);
   const isInteracting = useToolStore((state) => state.isInteracting);
+  const setShowRulers = useUIStore((state) => state.setShowRulers);
+  const showRulers = useUIStore((state) => state.showRulers);
 
   const originalModeRef = React.useRef<any>(null);
   const pendingRestoreRef = React.useRef<boolean>(false);
@@ -71,6 +73,12 @@ function App() {
       if (isCmdOrCtrl && e.key.toLowerCase() === "n") {
         e.preventDefault();
         setIsNewProjectModalOpen(true);
+        return;
+      }
+
+      if (isCmdOrCtrl && e.key.toLowerCase() === "r") {
+        e.preventDefault();
+        setShowRulers(!showRulers);
         return;
       }
 
@@ -192,6 +200,8 @@ function App() {
     toolSettings.select.mode,
     toolSettings.text.isEditing,
     updateToolSettings,
+    showRulers,
+    setShowRulers,
     activeProjectId,
     isInteracting,
   ]);

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useProjectStore } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";
 import { ForgeEngine } from "@core/engine/ForgeEngine";
+import Ruler from "./Ruler";
 
 const CanvasViewport: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -12,7 +13,10 @@ const CanvasViewport: React.FC = () => {
   );
 
   const showToast = useUIStore((state) => state.showToast);
+  const showRulers = useUIStore((state) => state.showRulers);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  const RULER_SIZE = 25;
 
   // 1. Inicializa o Engine apenas uma vez
   useEffect(() => {
@@ -177,7 +181,28 @@ const CanvasViewport: React.FC = () => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <canvas ref={canvasRef} className="block w-full h-full" />
+      <div
+        className="w-full h-full grid"
+        style={{
+          gridTemplateColumns: showRulers ? `${RULER_SIZE}px 1fr` : "1fr",
+          gridTemplateRows: showRulers ? `${RULER_SIZE}px 1fr` : "1fr",
+        }}
+      >
+        {showRulers && (
+          <>
+            <div className="bg-[#222] border-r border-b border-[#333] z-10" />
+            <div className="bg-[#222] border-b border-[#333] z-10 overflow-hidden">
+              <Ruler orientation="horizontal" size={RULER_SIZE} />
+            </div>
+            <div className="bg-[#222] border-r border-[#333] z-10 overflow-hidden">
+              <Ruler orientation="vertical" size={RULER_SIZE} />
+            </div>
+          </>
+        )}
+        <div className="relative overflow-hidden">
+          <canvas ref={canvasRef} className="block w-full h-full" />
+        </div>
+      </div>
     </div>
   );
 };

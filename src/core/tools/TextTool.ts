@@ -675,16 +675,20 @@ export class TextTool extends BaseTool {
     let dimensionUpdates = {};
 
     if (layer.textType === "point") {
-      const metrics = TextLayer.calculateMetrics(context.ctx, { ...layer, ...baseUpdates });
+      const metrics = TextLayer.calculateMetrics(context.ctx, layer, baseUpdates);
       dimensionUpdates = {
-        width: Math.round(metrics.width),
-        height: Math.round(metrics.height),
-        x: Math.round(metrics.x ?? layer.x),
+        width: metrics.width,
+        height: metrics.height,
+        x: metrics.x ?? layer.x,
       };
     }
 
     const updates = { ...baseUpdates, ...dimensionUpdates };
-    useProjectStore.getState().updateLayer(context.project.id, this.editingLayerId, updates);
+    useProjectStore.getState().updateLayer(context.project.id, this.editingLayerId, {
+      ...updates,
+      width: (updates as any).width ?? layer.width,
+      height: (updates as any).height ?? layer.height,
+    });
     context.invalidateCache(this.editingLayerId);
   }
 
@@ -698,8 +702,32 @@ export class TextTool extends BaseTool {
     } else if (this.previousState && layer) {
       const prevLayer = this.previousState.layers.find((l: Layer) => l.id === this.editingLayerId);
 
+      // Generate automatic name from content
+      let newName = layer.name;
+      if (layer.text) {
+        // Sanitize: remove newlines, trim, and truncate
+        const sanitized = layer.text.replace(/\r?\n|\r/g, " ").trim();
+        if (sanitized.length > 0) {
+          const truncated = sanitized.substring(0, 20);
+          newName = truncated.length < sanitized.length ? `${truncated}...` : truncated;
+        } else {
+          newName = "Empty Text";
+        }
+      }
+
+      // We only auto-rename if the layer was never renamed by the user 
+      // or if it still has the default "Text Layer" name.
+      const shouldRename = layer.name === "Text Layer" || layer.name === "Empty Text" || 
+                           (this.originalText !== "" && layer.name.startsWith(this.originalText.substring(0, 10)));
+
+      if (shouldRename && newName !== layer.name) {
+        useProjectStore.getState().updateLayer(context.project.id, layer.id, { name: newName }, true);
+      }
+
       // Empurra o histórico APENAS se houver alguma modificação de fato (texto, posição, cor, etc)
-      if (!prevLayer || JSON.stringify(layer) !== JSON.stringify(prevLayer)) {
+      // Note: We check against the project state AFTER potentially updating the name
+      const currentLayer = context.project.layers.find(l => l.id === this.editingLayerId);
+      if (!prevLayer || JSON.stringify(currentLayer) !== JSON.stringify(prevLayer)) {
         useProjectStore.getState().addHistoryEntry(context.project.id, {
           description: "Text Tool",
           state: this.previousState,

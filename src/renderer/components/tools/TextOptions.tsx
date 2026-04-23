@@ -193,16 +193,15 @@ export const TextOptions: React.FC = () => {
 
         if (layer.textType === "point") {
           const ctx = canvasRef.current.getContext("2d")!;
-          const metrics = TextLayer.calculateMetrics(ctx, {
-            ...layer,
+          const metrics = TextLayer.calculateMetrics(ctx, layer, {
             ...baseUpdates,
             ...dimensionUpdates,
           });
           dimensionUpdates = {
             ...dimensionUpdates,
-            width: Math.round(metrics.width),
-            height: Math.round(metrics.height),
-            x: Math.round(metrics.x ?? layer.x),
+            width: metrics.width,
+            height: metrics.height,
+            x: metrics.x ?? layer.x,
           };
         }
 

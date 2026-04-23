@@ -217,40 +217,52 @@ export class TextLayer {
   public static calculateMetrics(
     ctx: CanvasRenderingContext2D,
     layer: Partial<Layer>,
+    newProps?: Partial<Layer>,
   ): { width: number; height: number; x?: number } {
-    const text = layer.text || "";
-    const fontSize = layer.fontSize || 24;
-    const lineHeightMult = layer.lineHeight || 1.2;
-    const tracking = layer.tracking || 0;
-    const textAlign = layer.textAlign || "left";
+    const fontSize = newProps?.fontSize ?? layer.fontSize ?? 24;
+    const tracking = newProps?.tracking ?? layer.tracking ?? 0;
+    const textAlign = newProps?.textAlign ?? layer.textAlign ?? "left";
+    const text = newProps?.text ?? layer.text ?? "";
+    const lineHeightMult = newProps?.lineHeight ?? layer.lineHeight ?? 1.2;
     const lineHeight = fontSize * lineHeightMult;
 
     ctx.save();
-    // Using layoutText to handle word wrapping correctly for Area text
-    const lines = this.layoutText(ctx, layer as Layer, text, fontSize, tracking);
+    // Use a temporary merged layer for layout calculation
+    const mergedLayer = { ...layer, ...newProps } as Layer;
+    const lines = this.layoutText(ctx, mergedLayer, text, fontSize, tracking);
     let maxWidth = 0;
 
     lines.forEach((line, index) => {
       const lineStartPos = lines.slice(0, index).join("\n").length + (index > 0 ? 1 : 0);
-      const width = this.measureTextWithTracking(ctx, line, tracking, layer as Layer, lineStartPos);
+      const width = this.measureTextWithTracking(ctx, line, tracking, mergedLayer, lineStartPos);
       maxWidth = Math.max(maxWidth, width);
     });
 
-    const newWidth = Math.max(1, maxWidth);
-    // Use the total lines from layoutText to calculate total height
-    const newHeight = Math.max(1, lines.length * lineHeight);
+    const newWidth = Math.round(Math.max(1, maxWidth));
+    const newHeight = Math.round(Math.max(1, lines.length * lineHeight));
 
-    const result: any = { width: newWidth, height: newHeight };
+    const result: { width: number; height: number; x?: number } = {
+      width: newWidth,
+      height: newHeight,
+    };
 
     // For point text, we need to adjust X to maintain alignment anchor
-    if (layer.textType === "point" && layer.width !== undefined && layer.x !== undefined) {
+    if (
+      layer.textType === "point" &&
+      layer.x !== undefined &&
+      layer.width !== undefined &&
+      newProps !== undefined
+    ) {
+      // Find the anchor point (pivot) based on the PREVIOUS state
+      const oldAlign = layer.textAlign || "left";
       let anchorX = layer.x;
-      if (layer.textAlign === "center") anchorX = layer.x + layer.width / 2;
-      else if (layer.textAlign === "right") anchorX = layer.x + layer.width;
+      if (oldAlign === "center") anchorX = layer.x + layer.width / 2;
+      else if (oldAlign === "right") anchorX = layer.x + layer.width;
 
-      if (textAlign === "center") result.x = anchorX - newWidth / 2;
-      else if (textAlign === "right") result.x = anchorX - newWidth;
-      else result.x = anchorX;
+      // Calculate NEW x based on NEW width and NEW alignment to keep the anchor at the same place
+      if (textAlign === "center") result.x = Math.round(anchorX - newWidth / 2);
+      else if (textAlign === "right") result.x = Math.round(anchorX - newWidth);
+      else result.x = Math.round(anchorX);
     }
 
     ctx.restore();

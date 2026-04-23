@@ -73,7 +73,7 @@ const Toast: React.FC = () => {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="flex items-center gap-3 pr-2">
+      <div className="flex items-center gap-2 pr-2">
         {toast.type === "warning" && <TriangleAlert size={18} className="text-orange-200" />}
         {toast.type === "error" && <AlertCircle size={18} className="text-red-200" />}
         {toast.type === "info" && <Info size={18} className="text-blue-200" />}

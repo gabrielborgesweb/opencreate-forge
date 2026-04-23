@@ -8,7 +8,7 @@ export const PencilOptions: React.FC = () => {
   const updateToolSettings = useToolStore((state) => state.updateToolSettings);
 
   return (
-    <div className="flex items-center gap-6">
+    <div className="flex items-center gap-4">
       <ToolSettingInput
         label="Size"
         unit="px"

@@ -14,7 +14,7 @@ export const SelectOptions: React.FC = () => {
   const updateToolSettings = useToolStore((state) => state.updateToolSettings);
 
   return (
-    <div className="flex items-center gap-6">
+    <div className="flex items-center gap-4">
       <div className="flex items-center gap-2">
         <label className="text-[0.75rem] text-[#999] font-medium">Mode</label>
         <div className="flex items-center bg-black/20 rounded p-0.5">

@@ -12,8 +12,6 @@ const CanvasViewport: React.FC = () => {
   );
 
   const showToast = useUIStore((state) => state.showToast);
-  const sidebarWidth = useUIStore((state) => state.sidebarWidth);
-  const isSidebarExpanded = useUIStore((state) => state.isSidebarExpanded);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   // 1. Inicializa o Engine apenas uma vez
@@ -74,16 +72,23 @@ const CanvasViewport: React.FC = () => {
   // 4. Handle resize (via ResizeObserver for better precision during transitions)
   useEffect(() => {
     if (!canvasRef.current) return;
-    
+
     const parent = canvasRef.current.parentElement;
     if (!parent) return;
 
     const resizeObserver = new ResizeObserver(() => {
       if (canvasRef.current && engineRef.current) {
-        canvasRef.current.width = parent.clientWidth;
-        canvasRef.current.height = parent.clientHeight;
-        // Optionally, if the engine needs a manual trigger:
-        // engineRef.current.render();
+        const newWidth = parent.clientWidth;
+        const newHeight = parent.clientHeight;
+
+        // Só altera o tamanho (e consequentemente limpa o canvas) se realmente mudou
+        if (canvasRef.current.width !== newWidth || canvasRef.current.height !== newHeight) {
+          canvasRef.current.width = newWidth;
+          canvasRef.current.height = newHeight;
+
+          // FORÇA a renderização síncrona imediata para evitar a tela preta/branca
+          engineRef.current.render();
+        }
       }
     });
 

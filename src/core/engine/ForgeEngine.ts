@@ -52,6 +52,8 @@ export class ForgeEngine {
   private currentToolId: string | null = null;
   private onViewportChange: (zoom: number, x: number, y: number) => void;
 
+  private lastMouseEvent: MouseEvent | null = null;
+
   constructor(
     canvas: HTMLCanvasElement,
     onViewportChange: (zoom: number, x: number, y: number) => void,
@@ -98,6 +100,43 @@ export class ForgeEngine {
     window.addEventListener("forge:clear-selection", () => {
       if (this.project) {
         this.clearSelection();
+      }
+    });
+
+    // --- ADICIONE ESTE BLOCO ---
+    useToolStore.subscribe((state) => {
+      const newToolId = state.activeToolId;
+      if (newToolId !== this.currentToolId) {
+        const context = this.getToolContext();
+        if (context) {
+          if (this.currentToolId && this.tools[this.currentToolId]) {
+            this.tools[this.currentToolId].onDeactivate(context);
+          }
+
+          this.currentToolId = newToolId;
+          this.canvas.style.cursor = "default";
+
+          if (this.currentToolId && this.tools[this.currentToolId]) {
+            const activeTool = this.tools[this.currentToolId];
+            activeTool.onActivate(context);
+
+            // Injeta a última posição do mouse para evitar a cintilação do preview
+            if (this.lastMouseEvent) {
+              const rect = this.canvas.getBoundingClientRect();
+              const e = this.lastMouseEvent;
+              const mouseEvent =
+                e.target === this.canvas
+                  ? e
+                  : ({
+                      ...e,
+                      offsetX: e.clientX - rect.left,
+                      offsetY: e.clientY - rect.top,
+                    } as MouseEvent);
+
+              activeTool.onMouseMove(mouseEvent, context);
+            }
+          }
+        }
       }
     });
   }
@@ -591,6 +630,7 @@ export class ForgeEngine {
   }
 
   private handleMouseMove(e: MouseEvent) {
+    this.lastMouseEvent = e; // <--- Adicione isso
     if (!this.project) return;
 
     if (this.isPanning) {
@@ -952,21 +992,21 @@ export class ForgeEngine {
     if (!this.project) return;
 
     // Detectar mudança de ferramenta
-    const activeToolId = useToolStore.getState().activeToolId;
-    if (activeToolId !== this.currentToolId) {
-      const context = this.getToolContext();
-      if (context) {
-        if (this.currentToolId && this.tools[this.currentToolId]) {
-          this.tools[this.currentToolId].onDeactivate(context);
-        }
-        this.currentToolId = activeToolId;
-        if (this.currentToolId && this.tools[this.currentToolId]) {
-          this.tools[this.currentToolId].onActivate(context);
-        }
-        // Reset cursor default ao trocar
-        this.canvas.style.cursor = "default";
-      }
-    }
+    // const activeToolId = useToolStore.getState().activeToolId;
+    // if (activeToolId !== this.currentToolId) {
+    //   const context = this.getToolContext();
+    //   if (context) {
+    //     if (this.currentToolId && this.tools[this.currentToolId]) {
+    //       this.tools[this.currentToolId].onDeactivate(context);
+    //     }
+    //     this.currentToolId = activeToolId;
+    //     if (this.currentToolId && this.tools[this.currentToolId]) {
+    //       this.tools[this.currentToolId].onActivate(context);
+    //     }
+    //     // Reset cursor default ao trocar
+    //     this.canvas.style.cursor = "default";
+    //   }
+    // }
 
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.imageSmoothingEnabled = false;
@@ -1035,7 +1075,12 @@ export class ForgeEngine {
 
     const editingLayerId = tool?.getEditingLayerId();
 
-    if (this.project.activeLayerId && activeToolId !== "transform" && activeToolId !== "crop") {
+    // if (this.project.activeLayerId && activeToolId !== "transform" && activeToolId !== "crop") {
+    if (
+      this.project.activeLayerId &&
+      this.currentToolId !== "transform" &&
+      this.currentToolId !== "crop"
+    ) {
       const activeLayer = this.project.layers.find((l) => l.id === this.project?.activeLayerId);
       if (activeLayer && activeLayer.id !== editingLayerId) {
         this.ctx.save();

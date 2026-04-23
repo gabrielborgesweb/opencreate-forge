@@ -298,9 +298,10 @@ export class EraserTool extends BaseTool {
     this.offscreenCanvas = document.createElement("canvas");
     this.offscreenCanvas.width = width;
     this.offscreenCanvas.height = height;
-    this.offscreenCtx = this.offscreenCanvas.getContext("2d", {
-      willReadFrequently: true,
-    })!;
+    // this.offscreenCtx = this.offscreenCanvas.getContext("2d", {
+    //   willReadFrequently: true,
+    // })!;
+    this.offscreenCtx = this.offscreenCanvas.getContext("2d")!;
 
     const settings = context.settings.eraser;
     if (settings.mode === "pencil") {

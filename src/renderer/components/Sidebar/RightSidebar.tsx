@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useUIStore } from "@store/uiStore";
 import LayerList from "./LayerList";
 import HistoryPanel from "./HistoryPanel";
@@ -15,6 +15,9 @@ const RightSidebar: React.FC = () => {
 
   const [isResizing, setIsResizing] = useState(false);
 
+  // Adicione uma referência para controlar a animação
+  const rafRef = useRef<number | null>(null);
+
   const startResizing = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
@@ -22,13 +25,24 @@ const RightSidebar: React.FC = () => {
 
   const stopResizing = useCallback(() => {
     setIsResizing(false);
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
   }, []);
 
+  // Otimização: Throttling de alta performance com requestAnimationFrame
   const resize = useCallback(
     (e: MouseEvent) => {
       if (isResizing) {
-        const newWidth = window.innerWidth - e.clientX;
-        setSidebarWidth(newWidth);
+        if (rafRef.current) {
+          cancelAnimationFrame(rafRef.current);
+        }
+
+        rafRef.current = requestAnimationFrame(() => {
+          const newWidth = window.innerWidth - e.clientX;
+          setSidebarWidth(newWidth);
+        });
       }
     },
     [isResizing, setSidebarWidth],

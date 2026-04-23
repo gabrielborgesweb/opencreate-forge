@@ -728,18 +728,22 @@ export class TextTool extends BaseTool {
         }
       }
 
-      // We only auto-rename if the layer was never renamed by the user 
+      // We only auto-rename if the layer was never renamed by the user
       // or if it still has the default "Text Layer" name.
-      const shouldRename = layer.name === "Text Layer" || layer.name === "Empty Text" || 
-                           (this.originalText !== "" && layer.name.startsWith(this.originalText.substring(0, 10)));
+      const shouldRename =
+        layer.name === "Text Layer" ||
+        layer.name === "Empty Text" ||
+        (this.originalText !== "" && layer.name.startsWith(this.originalText.substring(0, 10)));
 
       if (shouldRename && newName !== layer.name) {
-        useProjectStore.getState().updateLayer(context.project.id, layer.id, { name: newName }, true);
+        useProjectStore
+          .getState()
+          .updateLayer(context.project.id, layer.id, { name: newName }, true);
       }
 
       // Empurra o histórico APENAS se houver alguma modificação de fato (texto, posição, cor, etc)
       // Note: We check against the project state AFTER potentially updating the name
-      const currentLayer = context.project.layers.find(l => l.id === this.editingLayerId);
+      const currentLayer = context.project.layers.find((l) => l.id === this.editingLayerId);
       if (!prevLayer || JSON.stringify(currentLayer) !== JSON.stringify(prevLayer)) {
         useProjectStore.getState().addHistoryEntry(context.project.id, {
           description: "Text Tool",

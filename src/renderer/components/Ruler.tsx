@@ -13,7 +13,7 @@ const Ruler: React.FC<RulerProps> = ({ orientation, size }) => {
 
   const [mousePos, setMousePos] = useState<number | null>(null);
 
-  // Use a ref to store the latest render parameters to avoid closing over stale state 
+  // Use a ref to store the latest render parameters to avoid closing over stale state
   // while allowing the ResizeObserver to trigger a render immediately.
   const paramsRef = useRef({ project, mousePos, orientation, size });
 
@@ -23,7 +23,6 @@ const Ruler: React.FC<RulerProps> = ({ orientation, size }) => {
   });
 
   const render = () => {
-
     const canvas = canvasRef.current;
     if (!canvas || !paramsRef.current.project) return;
 

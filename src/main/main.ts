@@ -97,7 +97,17 @@ function createMenu() {
     { label: "Layer", submenu: [{ label: "New Layer", enabled: false }] },
     { label: "Select", submenu: [{ label: "All", enabled: false }] },
     { label: "Filter", submenu: [{ label: "Blur", enabled: false }] },
-    { label: "View", submenu: [{ role: "toggleDevTools" }, { role: "reload" }, { type: "separator" }, { role: "zoomIn" }, { role: "zoomOut" }, { role: "resetZoom" }] },
+    {
+      label: "View",
+      submenu: [
+        { role: "toggleDevTools" },
+        { role: "reload" },
+        { type: "separator" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { role: "resetZoom" },
+      ],
+    },
     { label: "Window", submenu: [{ role: "minimize" }, { role: "zoom" }] },
     { label: "Help", submenu: [{ label: "About OpenCreate Forge", enabled: false }] },
   ];
@@ -200,7 +210,7 @@ app.whenReady().then(() => {
     try {
       const projectData = JSON.parse(jsonString);
       const name = path.basename(filePath, ".ocfd");
-      
+
       // Clean up internal-only fields before saving to disk
       const dataToSave = { ...projectData };
       delete dataToSave.filePath;
@@ -219,7 +229,7 @@ app.whenReady().then(() => {
     if (!filePath) return { success: false, error: "Nenhum caminho de arquivo fornecido." };
     try {
       const projectData = JSON.parse(jsonString);
-      
+
       // Clean up internal-only fields before saving to disk
       const dataToSave = { ...projectData };
       delete dataToSave.filePath;
@@ -264,4 +274,3 @@ app.whenReady().then(() => {
 
   createWindow();
 });
-

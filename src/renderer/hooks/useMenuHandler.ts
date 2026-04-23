@@ -47,7 +47,7 @@ export const useMenuHandler = () => {
               const appVersion = await (window as any).electronAPI.getAppVersion();
               const projectWithVersion = { ...activeProject, version: appVersion };
               const jsonString = JSON.stringify(projectWithVersion);
-              
+
               const result = await (window as any).electronAPI.saveProject({
                 jsonString,
                 filePath: activeProject.filePath,
@@ -70,7 +70,7 @@ export const useMenuHandler = () => {
             const appVersion = await (window as any).electronAPI.getAppVersion();
             const projectWithVersion = { ...activeProject, version: appVersion };
             const jsonString = JSON.stringify(projectWithVersion);
-            
+
             const result = await (window as any).electronAPI.saveProjectAs({
               jsonString,
               defaultName: `${activeProject.name}.ocfd`,

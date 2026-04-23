@@ -22,11 +22,17 @@ export class MoveTool extends BaseTool {
     // 1. Auto Select Logic (Enabled by setting OR by holding Alt key)
     if (context.settings.move.autoSelect || e.altKey) {
       // Find top-most layer at this point (reverse search)
-      const foundLayer = [...project.layers].reverse().find(l => 
-        l.visible && !l.locked &&
-        x >= l.x && x <= l.x + l.width &&
-        y >= l.y && y <= l.y + l.height
-      );
+      const foundLayer = [...project.layers]
+        .reverse()
+        .find(
+          (l) =>
+            l.visible &&
+            !l.locked &&
+            x >= l.x &&
+            x <= l.x + l.width &&
+            y >= l.y &&
+            y <= l.y + l.height,
+        );
 
       if (foundLayer && foundLayer.id !== project.activeLayerId) {
         context.updateProject({ activeLayerId: foundLayer.id });

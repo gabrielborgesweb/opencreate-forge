@@ -97,7 +97,12 @@ interface ProjectState {
   addHistoryEntry: (projectId: string, entry: HistoryEntry) => void;
   moveLayer: (projectId: string, fromIndex: number, toIndex: number) => void;
   duplicateLayer: (projectId: string, layerId: string) => void;
-  updateLayer: (projectId: string, layerId: string, updates: Partial<Layer>, skipDirty?: boolean) => void;
+  updateLayer: (
+    projectId: string,
+    layerId: string,
+    updates: Partial<Layer>,
+    skipDirty?: boolean,
+  ) => void;
   renameLayer: (projectId: string, layerId: string, name: string) => void;
   toggleLayerVisibility: (projectId: string, layerId: string) => void;
   toggleLayerLock: (projectId: string, layerId: string) => void;

@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, FolderOpen } from "lucide-react";
+// import { Plus, FolderOpen } from "lucide-react";
 import { useProjectStore, Project } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";
+import { ShortcutSpan } from "./ui/Global";
 
 const HomeScreen: React.FC = () => {
   const addProject = useProjectStore((state) => state.addProject);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  const handleNewProjectClick = () => {
-    window.dispatchEvent(new CustomEvent("forge:new-project"));
-  };
+  // const handleNewProjectClick = () => {
+  //   window.dispatchEvent(new CustomEvent("forge:new-project"));
+  // };
 
   const handleCreateFromImage = useCallback(
     (dataUrl: string, width: number, height: number, name: string) => {
@@ -125,6 +126,8 @@ const HomeScreen: React.FC = () => {
     }
   };
 
+  const isMacOS = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+
   return (
     <div
       className={`flex-1 flex flex-col items-center justify-center bg-bg-primary text-text gap-8 ${
@@ -137,14 +140,26 @@ const HomeScreen: React.FC = () => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="text-center">
-        <h2 className="text-[2rem] mb-2 font-bold text-text">
+      <div className="text-center gap-2 flex flex-col">
+        <h1 className="text-[2rem] mb-2 font-bold text-text">
           OpenCreate <span className="text-accent">Forge</span>
-        </h2>
-        <p className="text-[#888]">Modern Image Editor powered by React & Electron</p>
+        </h1>
+        <p className="mb-2">Image Editor powered by React & Electron</p>
+
+        <div className="flex flex-col gap-3">
+          <p className="flex items-center justify-center gap-1">
+            <ShortcutSpan shortcut={"Ctrl+N"} macos={isMacOS} />
+            <span className="ml-1">to create a new project</span>
+          </p>
+
+          <p className="flex items-center justify-center gap-1">
+            <ShortcutSpan shortcut={"Ctrl+O"} macos={isMacOS} />
+            <span className="ml-1">to open an existing project</span>
+          </p>
+        </div>
       </div>
 
-      <div className="flex gap-6">
+      {/* <div className="flex gap-6">
         <button
           onClick={handleNewProjectClick}
           className="flex flex-col items-center gap-4 p-8 bg-[#252525] border border-bg-tertiary rounded-lg cursor-pointer w-40 transition-all hover:border-accent hover:-translate-y-1"
@@ -157,7 +172,7 @@ const HomeScreen: React.FC = () => {
           <FolderOpen size={32} className="text-accent" />
           <span className="text-[0.9rem] font-medium">Open Project</span>
         </button>
-      </div>
+      </div> */}
     </div>
   );
 };

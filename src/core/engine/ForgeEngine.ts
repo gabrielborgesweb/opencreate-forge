@@ -501,6 +501,12 @@ export class ForgeEngine {
       },
       invalidateCache: (layerId: string) => this.invalidateLayerCache(layerId),
       screenToProject: (x: number, y: number) => this.screenToProject(x, y),
+      get foregroundColor() {
+        return useToolStore.getState().foregroundColor;
+      },
+      get backgroundColor() {
+        return useToolStore.getState().backgroundColor;
+      },
       getSelectionCanvas: () => ({
         canvas: this.selectionCanvas,
         ctx: this.selectionCtx,

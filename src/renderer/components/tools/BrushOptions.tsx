@@ -25,7 +25,7 @@ export const BrushOptions: React.FC = () => {
         value={toolSettings.brush.hardness}
         onChange={(val) => updateToolSettings("brush", { hardness: val })}
       />
-      <div className="flex items-center gap-2">
+      {/* <div className="flex items-center gap-2">
         <label className="text-[0.75rem] text-[#999] font-medium">Color</label>
         <input
           type="color"
@@ -33,7 +33,7 @@ export const BrushOptions: React.FC = () => {
           onChange={(e) => updateToolSettings("brush", { color: e.target.value })}
           className="border-none bg-none w-5 h-5 cursor-pointer rounded overflow-hidden"
         />
-      </div>
+      </div> */}
     </div>
   );
 };

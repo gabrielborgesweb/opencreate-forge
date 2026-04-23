@@ -102,7 +102,8 @@ export class BrushTool extends BaseTool {
     this.lastY = y;
 
     const settings = context.settings.brush;
-    this.initBrush(settings.size, settings.hardness, settings.color);
+    // this.initBrush(settings.size, settings.hardness, settings.color);
+    this.initBrush(settings.size, settings.hardness, context.foregroundColor);
     this.initOffscreen(layer, context);
 
     const pad = settings.size;

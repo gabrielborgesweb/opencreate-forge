@@ -18,6 +18,8 @@ export interface ToolContext {
   getLayerCanvas: (layerId: string) => { canvas: HTMLCanvasElement; ready: boolean } | null;
   ensureLayerCanvas: (layer: Layer) => Promise<HTMLCanvasElement>;
   screenToProject: (x: number, y: number) => { x: number; y: number };
+  foregroundColor: string;
+  backgroundColor: string;
   getSelectionCanvas: () => {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;

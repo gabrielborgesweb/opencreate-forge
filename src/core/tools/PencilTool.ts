@@ -358,7 +358,8 @@ export class PencilTool extends BaseTool {
       );
     } else {
       this.offscreenCtx.save();
-      this.offscreenCtx.fillStyle = settings.color;
+      // this.offscreenCtx.fillStyle = settings.color;
+      this.offscreenCtx.fillStyle = context.foregroundColor;
 
       // Bresenham's line algorithm
       let x0 = Math.floor(localLastX);

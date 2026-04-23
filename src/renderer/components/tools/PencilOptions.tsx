@@ -17,7 +17,7 @@ export const PencilOptions: React.FC = () => {
         value={toolSettings.pencil.size}
         onChange={(val) => updateToolSettings("pencil", { size: val })}
       />
-      <div className="flex items-center gap-2">
+      {/* <div className="flex items-center gap-2">
         <label className="text-[0.75rem] text-[#999] font-medium">Color</label>
         <input
           type="color"
@@ -25,7 +25,7 @@ export const PencilOptions: React.FC = () => {
           onChange={(e) => updateToolSettings("pencil", { color: e.target.value })}
           className="border-none bg-none w-5 h-5 cursor-pointer rounded overflow-hidden"
         />
-      </div>
+      </div> */}
       <div className="flex items-center gap-2">
         <label className="text-[0.75rem] text-[#999] font-medium">Shape</label>
         <div className="flex items-center bg-black/20 rounded p-0.5">

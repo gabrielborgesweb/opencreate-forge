@@ -49,6 +49,9 @@ export class ForgeEngine {
 
   private tools: Record<string, BaseTool>;
 
+  private projectBuffer: HTMLCanvasElement;
+  private projectCtx: CanvasRenderingContext2D;
+
   private currentToolId: string | null = null;
   private onViewportChange: (zoom: number, x: number, y: number) => void;
 
@@ -66,6 +69,9 @@ export class ForgeEngine {
     this.selectionCtx = this.selectionCanvas.getContext("2d", {
       willReadFrequently: true,
     })!;
+
+    this.projectBuffer = document.createElement("canvas");
+    this.projectCtx = this.projectBuffer.getContext("2d")!;
 
     this.tools = {
       move: new MoveTool(),
@@ -1059,58 +1065,49 @@ export class ForgeEngine {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.imageSmoothingEnabled = false;
 
-    this.ctx.save();
-    this.ctx.setTransform(
-      this.project.zoom,
-      0,
-      0,
-      this.project.zoom,
-      this.project.panX,
-      this.project.panY,
-    );
-    this.ctx.fillStyle = this.getCheckerPattern();
-    this.ctx.fillRect(0, 0, this.project.width, this.project.height);
-    this.ctx.restore();
-
-    this.ctx.save();
-    this.ctx.setTransform(
-      this.project.zoom,
-      0,
-      0,
-      this.project.zoom,
-      this.project.panX,
-      this.project.panY,
-    );
-
-    const tool = this.getActiveTool();
-
-    // 1. PASSO: Camadas que INTERSECTAM o projeto (Serão clipadas)
-    this.ctx.save();
-    this.ctx.beginPath();
-    this.ctx.rect(0, 0, this.project.width, this.project.height);
-    this.ctx.clip();
+    // --- STEP 1: COMPOSITE PROJECT IN 1:1 BUFFER ---
+    if (this.projectBuffer.width !== this.project.width || this.projectBuffer.height !== this.project.height) {
+      this.projectBuffer.width = this.project.width;
+      this.projectBuffer.height = this.project.height;
+    }
+    this.projectCtx.clearRect(0, 0, this.projectBuffer.width, this.projectBuffer.height);
+    this.projectCtx.imageSmoothingEnabled = false;
 
     for (const layer of this.project.layers) {
       if (layer.visible) {
         if (this.intersects(layer, this.project.width, this.project.height)) {
-          this.renderLayer(layer);
+          this.renderLayer(this.projectCtx, layer);
         }
       }
     }
 
     // Render floating layer if it exists
     if (this.project.selection.floatingLayer && this.project.selection.floatingLayer.visible) {
-      this.renderLayer(this.project.selection.floatingLayer);
+      this.renderLayer(this.projectCtx, this.project.selection.floatingLayer);
     }
 
-    this.ctx.restore(); // Fim do clip do projeto
+    // --- STEP 2: DRAW BUFFER TO VIEWPORT ---
+    this.ctx.save();
+    this.ctx.setTransform(
+      this.project.zoom,
+      0,
+      0,
+      this.project.zoom,
+      this.project.panX,
+      this.project.panY,
+    );
 
-    // 2. PASSO: Camadas que NÃO INTERSECTAM o projeto (Desenhar sem clip)
+    // Draw checkerboard background
+    this.ctx.fillStyle = this.getCheckerPattern();
+    this.ctx.fillRect(0, 0, this.project.width, this.project.height);
+
+    // Draw the composited project
+    this.ctx.drawImage(this.projectBuffer, 0, 0);
+
+    // Render layers that are outside the project (no clipping)
     for (const layer of this.project.layers) {
-      if (layer.visible) {
-        if (!this.intersects(layer, this.project.width, this.project.height)) {
-          this.renderLayer(layer);
-        }
+      if (layer.visible && !this.intersects(layer, this.project.width, this.project.height)) {
+        this.renderLayer(this.ctx, layer);
       }
     }
 
@@ -1118,27 +1115,24 @@ export class ForgeEngine {
       this.renderPixelGrid();
     }
 
+    // --- STEP 3: RENDER TOOLS AND UI ---
+    const tool = this.getActiveTool();
     const context = this.getToolContext();
     if (tool && context) tool.onRender(this.ctx, context);
 
     const editingLayerId = tool?.getEditingLayerId();
 
     if (this.project.activeLayerId && activeToolId !== "transform" && activeToolId !== "crop") {
-      // if (
-      //   this.project.activeLayerId &&
-      //   this.currentToolId !== "transform" &&
-      //   this.currentToolId !== "crop"
-      // ) {
       const activeLayer = this.project.layers.find((l) => l.id === this.project?.activeLayerId);
       if (activeLayer && activeLayer.id !== editingLayerId) {
         this.ctx.save();
 
         if (!activeLayer.visible) {
-          this.ctx.strokeStyle = "rgba(150, 150, 150, 0.7)"; // Gray for hidden
+          this.ctx.strokeStyle = "rgba(150, 150, 150, 0.7)";
         } else if (activeLayer.locked) {
-          this.ctx.strokeStyle = "rgba(255, 204, 0, 0.9)"; // Yellow for locked
+          this.ctx.strokeStyle = "rgba(255, 204, 0, 0.9)";
         } else {
-          this.ctx.strokeStyle = "rgba(0, 120, 255, 0.9)"; // Default blue
+          this.ctx.strokeStyle = "rgba(0, 120, 255, 0.9)";
         }
 
         this.ctx.lineWidth = 1 / this.project.zoom;
@@ -1162,17 +1156,17 @@ export class ForgeEngine {
     this.renderSelection();
   }
 
-  private renderLayer(layer: Layer) {
-    this.ctx.save();
-    this.ctx.globalAlpha = layer.opacity / 100;
-    this.ctx.globalCompositeOperation = layer.blendMode;
+  private renderLayer(ctx: CanvasRenderingContext2D, layer: Layer) {
+    ctx.save();
+    ctx.globalAlpha = layer.opacity / 100;
+    ctx.globalCompositeOperation = layer.blendMode;
 
     if (layer.rotation) {
       const centerX = layer.x + layer.width / 2;
       const centerY = layer.y + layer.height / 2;
-      this.ctx.translate(centerX, centerY);
-      this.ctx.rotate((layer.rotation * Math.PI) / 180);
-      this.ctx.translate(-centerX, -centerY);
+      ctx.translate(centerX, centerY);
+      ctx.rotate((layer.rotation * Math.PI) / 180);
+      ctx.translate(-centerX, -centerY);
     }
 
     const tool = this.getActiveTool();
@@ -1186,7 +1180,7 @@ export class ForgeEngine {
     switch (layer.type) {
       case "raster":
         RasterLayer.render(
-          this.ctx,
+          ctx,
           layer,
           this.layerCanvasCache,
           this.layerReadyCache,
@@ -1196,7 +1190,7 @@ export class ForgeEngine {
         break;
       case "text":
         TextLayer.render(
-          this.ctx,
+          ctx,
           layer,
           this.layerCanvasCache,
           this.layerReadyCache,
@@ -1204,10 +1198,10 @@ export class ForgeEngine {
         );
         break;
       case "group":
-        GroupLayer.render(this.ctx, layer);
+        GroupLayer.render(ctx, layer);
         break;
     }
-    this.ctx.restore();
+    ctx.restore();
   }
 
   private renderPixelGrid() {
@@ -1377,35 +1371,14 @@ export class ForgeEngine {
     exportCanvas.width = this.project.width;
     exportCanvas.height = this.project.height;
     const exportCtx = exportCanvas.getContext("2d")!;
+    exportCtx.imageSmoothingEnabled = false;
 
     // Background white (optional, but requested format is PNG which supports transparency)
     // If user wants transparency, we just leave it.
 
     for (const layer of this.project.layers) {
       if (layer.visible) {
-        exportCtx.save();
-        exportCtx.globalAlpha = layer.opacity / 100;
-        exportCtx.globalCompositeOperation = layer.blendMode;
-
-        switch (layer.type) {
-          case "raster":
-            await RasterLayer.render(
-              exportCtx,
-              layer,
-              this.layerCanvasCache,
-              this.layerReadyCache,
-              this.imageCache,
-              () => {},
-            );
-            break;
-          case "text":
-            TextLayer.render(exportCtx, layer, this.layerCanvasCache, this.layerReadyCache);
-            break;
-          case "group":
-            GroupLayer.render(exportCtx, layer);
-            break;
-        }
-        exportCtx.restore();
+        this.renderLayer(exportCtx, layer);
       }
     }
 

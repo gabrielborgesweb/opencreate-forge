@@ -15,12 +15,28 @@ export class TextLayer {
   ) {
     if (!layer.text && !editingState?.isFocused) return;
 
-    const matrix = ctx.getTransform();
-    const zoom = Math.hypot(matrix.a, matrix.b);
-
     // 1. Text Rendering (Always pixel-based, tied to project resolution)
     const textRendering = layer.textRendering || "bilinear";
     const textOverflow = layer.textOverflow !== false; // Default to true if undefined
+
+    // OPTIMIZATION: If text is rotated or being edited, we render vectors directly
+    // to the context to avoid "double anti-aliasing" blur caused by rotating a bitmap.
+    // Exception: 'nearest' rendering still needs the thresholding cache.
+    const isRotated = !!layer.rotation;
+    const isEditing = !!editingState?.isFocused;
+
+    if ((isRotated || isEditing) && textRendering !== "nearest") {
+      ctx.save();
+      if (!textOverflow) {
+        ctx.beginPath();
+        ctx.rect(layer.x, layer.y, layer.width, layer.height);
+        ctx.clip();
+      }
+      this.drawTextToContext(ctx, layer);
+      ctx.restore();
+      return;
+    }
+
     const spansKey = JSON.stringify(layer.textSpans || []);
     const propsKey = `${layer.text}|${spansKey}|${layer.fontSize}|${layer.fontFamily}|${layer.fontWeight}|${layer.color}|${layer.textAlign}|${layer.tracking}|${layer.lineHeight}|${layer.width}|${layer.height}|${textRendering}|${textOverflow}`;
 
@@ -79,95 +95,119 @@ export class TextLayer {
     }
 
     ctx.save();
+    if (textRendering === "nearest") {
+      ctx.imageSmoothingEnabled = false;
+    }
     // Draw the cached text, compensating for the horizontal offset
     ctx.drawImage(cachedCanvas, layer.x - offsetX, layer.y);
     ctx.restore();
+  }
 
-    // 2. UI Rendering (Caret, Selection, Pivot) - Rendered 'Normally' at zoom level
-    if (editingState?.isFocused) {
-      const text = layer.text || "";
-      const fontSize = layer.fontSize || 24;
-      const fontFamily = layer.fontFamily || "Arial";
-      const fontWeight = layer.fontWeight || "normal";
-      const textAlign = layer.textAlign || "left";
-      const lineHeightMult = layer.lineHeight || 1.2;
-      const tracking = layer.tracking || 0;
-      const lineHeight = fontSize * lineHeightMult;
+  public static renderUI(
+    ctx: CanvasRenderingContext2D,
+    layer: Layer,
+    editingState: {
+      caretIndex: number;
+      selectionStart?: number;
+      isFocused: boolean;
+      isCtrlPressed?: boolean;
+    },
+    zoom: number,
+  ) {
+    if (!editingState.isFocused) return;
 
-      ctx.save();
-      ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
-      ctx.textAlign = textAlign === "justify" ? "left" : textAlign;
-      ctx.textBaseline = "alphabetic";
+    const text = layer.text || "";
+    const fontSize = layer.fontSize || 24;
+    const fontFamily = layer.fontFamily || "Arial";
+    const fontWeight = layer.fontWeight || "normal";
+    const textAlign = layer.textAlign || "left";
+    const lineHeightMult = layer.lineHeight || 1.2;
+    const tracking = layer.tracking || 0;
+    const lineHeight = fontSize * lineHeightMult;
 
-      const lines = this.layoutText(ctx, layer, text, fontSize, tracking);
+    ctx.save();
 
-      // Keep first line fixed to pivot (baseline at layer.y + fontSize)
-      let currentY = layer.y + fontSize;
+    // Apply layer transformation for UI
+    if (layer.rotation) {
+      const midX = layer.x + layer.width / 2;
+      const midY = layer.y + layer.height / 2;
+      ctx.translate(midX, midY);
+      ctx.rotate((layer.rotation * Math.PI) / 180);
+      ctx.translate(-midX, -midY);
+    }
 
-      lines.forEach((line, lineIndex) => {
-        let currentX = layer.x;
-        if (textAlign === "center") {
-          currentX = layer.x + layer.width / 2;
-        } else if (textAlign === "right") {
-          currentX = layer.x + layer.width;
-        }
+    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+    ctx.textAlign = textAlign === "justify" ? "left" : textAlign;
+    ctx.textBaseline = "alphabetic";
 
-        // Render Underlines (Visual Aid)
-        this.renderUnderline(ctx, line, currentX, currentY, textAlign, tracking, layer);
+    const lines = this.layoutText(ctx, layer, text, fontSize, tracking);
 
-        // Render Caret if editing this line
-        if (
-          editingState.caretIndex !== undefined &&
-          editingState.selectionStart === editingState.caretIndex
-        ) {
-          this.renderCaret(
-            ctx,
-            line,
-            lineIndex,
-            lines,
-            editingState.caretIndex,
-            currentX,
-            currentY,
-            fontSize,
-            lineHeight,
-            textAlign,
-            tracking,
-            zoom,
-            layer,
-          );
-        }
+    // Keep first line fixed to pivot (baseline at layer.y + fontSize)
+    let currentY = layer.y + fontSize;
 
-        currentY += lineHeight;
-      });
+    lines.forEach((line, lineIndex) => {
+      let currentX = layer.x;
+      if (textAlign === "center") {
+        currentX = layer.x + layer.width / 2;
+      } else if (textAlign === "right") {
+        currentX = layer.x + layer.width;
+      }
 
-      // Handle selection rendering
+      // Render Underlines (Visual Aid)
+      this.renderUnderline(ctx, line, currentX, currentY, textAlign, tracking, zoom, layer);
+
+      // Render Caret if editing this line
       if (
-        editingState.selectionStart !== undefined &&
-        editingState.selectionStart !== editingState.caretIndex
+        editingState.caretIndex !== undefined &&
+        editingState.selectionStart === editingState.caretIndex
       ) {
-        this.renderSelection(
+        this.renderCaret(
           ctx,
+          line,
+          lineIndex,
           lines,
-          editingState.selectionStart,
           editingState.caretIndex,
-          layer.x,
-          layer.y,
-          layer.width,
+          currentX,
+          currentY,
           fontSize,
           lineHeight,
           textAlign,
           tracking,
+          zoom,
           layer,
         );
       }
 
-      // Render pivot point during editing
-      if (!editingState.isCtrlPressed) {
-        this.renderPivot(ctx, layer);
-      }
+      currentY += lineHeight;
+    });
 
-      ctx.restore();
+    // Handle selection rendering
+    if (
+      editingState.selectionStart !== undefined &&
+      editingState.selectionStart !== editingState.caretIndex
+    ) {
+      this.renderSelection(
+        ctx,
+        lines,
+        editingState.selectionStart,
+        editingState.caretIndex,
+        layer.x,
+        layer.y,
+        layer.width,
+        fontSize,
+        lineHeight,
+        textAlign,
+        tracking,
+        layer,
+      );
     }
+
+    // Render pivot point during editing
+    if (!editingState.isCtrlPressed) {
+      this.renderPivot(ctx, layer);
+    }
+
+    ctx.restore();
   }
 
   private static renderUnderline(
@@ -177,6 +217,7 @@ export class TextLayer {
     lineY: number,
     textAlign: string,
     tracking: number,
+    zoom: number,
     layer: Layer,
   ) {
     if (!lineText && layer.textType === "area") return;
@@ -195,7 +236,7 @@ export class TextLayer {
     ctx.save();
     ctx.globalCompositeOperation = "difference";
     ctx.strokeStyle = "white";
-    ctx.lineWidth = 1 / ctx.getTransform().a;
+    ctx.lineWidth = 1 / zoom;
     ctx.beginPath();
     ctx.moveTo(startX, lineY);
     ctx.lineTo(startX + lineWidth, lineY);

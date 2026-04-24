@@ -917,6 +917,9 @@ export class TextTool extends BaseTool {
 
       const scale = context.project.zoom;
 
+      // Render Text UI (Caret, Selection, Underline, Pivot)
+      TextLayer.renderUI(ctx, layer as any, this.getEditingState() as any, scale);
+
       if (this.isCtrlPressed) {
         // Render Transform-like handles
         const handles = this.getTransformHandles(layer, scale);

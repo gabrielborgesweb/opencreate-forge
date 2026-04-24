@@ -34,6 +34,7 @@ export interface Layer {
   textOverflow?: boolean;
   textRendering?: "nearest" | "bilinear";
   blendMode: GlobalCompositeOperation;
+  rotation?: number;
   // History for text
   textUndoStack?: { text: string; textSpans?: TextSpan[] }[];
   textRedoStack?: { text: string; textSpans?: TextSpan[] }[];

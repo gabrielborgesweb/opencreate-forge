@@ -19,12 +19,14 @@ export class TextTool extends BaseTool {
   private isEditing = false;
   private isSelecting = false;
   private isResizing = false;
+  private isRotating = false;
   private resizeHandle: string | null = null;
   private isCtrlPressed = false;
   private originalText: string = "";
   private hiddenInput: HTMLTextAreaElement | null = null;
   private isComposing = false;
   private lastContext: ToolContext | null = null;
+  private dragStartRotation: number = 0;
 
   private onApply = () => this.commit(this.lastContext!);
   private onCancel = () => this.cancel(this.lastContext!);
@@ -122,12 +124,12 @@ export class TextTool extends BaseTool {
     return this.isEditing ? this.editingLayerId : null;
   }
 
-  private getTransformHandles(layer: Layer) {
-    const { x, y, width, height } = layer;
+  private getTransformHandles(layer: Layer, zoom: number) {
+    const { x, y, width, height, rotation = 0 } = layer;
     const midX = x + width / 2;
     const midY = y + height / 2;
 
-    const handles = [
+    const rawHandles = [
       { name: "top-left", x, y, cursor: "nwse-resize" },
       { name: "top-middle", x: midX, y, cursor: "ns-resize" },
       { name: "top-right", x: x + width, y, cursor: "nesw-resize" },
@@ -136,24 +138,75 @@ export class TextTool extends BaseTool {
       { name: "bottom-left", x, y: y + height, cursor: "nesw-resize" },
       { name: "bottom-middle", x: midX, y: y + height, cursor: "ns-resize" },
       { name: "bottom-right", x: x + width, y: y + height, cursor: "nwse-resize" },
+      { name: "rotate", x: midX, y: y - 20 / zoom, cursor: "crosshair" },
     ];
 
-    return handles;
+    if (rotation === 0) return rawHandles;
+
+    const rad = (rotation * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    return rawHandles.map((h) => {
+      const dx = h.x - midX;
+      const dy = h.y - midY;
+      return {
+        ...h,
+        x: midX + (dx * cos - dy * sin),
+        y: midY + (dx * sin + dy * cos),
+        cursor: this.getRotatedCursor(h.name, rotation),
+      };
+    });
+  }
+
+  private getRotatedCursor(handleName: string, rotation: number): string {
+    if (handleName === "rotate") return "crosshair";
+    const directions = ["n", "ne", "e", "se", "s", "sw", "w", "nw"];
+    let baseDir = "";
+    if (handleName.includes("top")) baseDir += "n";
+    else if (handleName.includes("bottom")) baseDir += "s";
+    if (handleName.includes("left")) baseDir += "w";
+    else if (handleName.includes("right")) baseDir += "e";
+
+    if (baseDir === "wn") baseDir = "nw";
+    if (baseDir === "en") baseDir = "ne";
+    if (baseDir === "ws") baseDir = "sw";
+    if (baseDir === "es") baseDir = "se";
+
+    const index = directions.indexOf(baseDir);
+    if (index === -1) return "default";
+
+    const steps = Math.round(rotation / 45);
+    const newIndex = (index + steps + directions.length) % directions.length;
+    return `${directions[newIndex]}-resize`;
+  }
+
+  private worldToLocal(px: number, py: number, layer: Layer): { x: number; y: number } {
+    const rotation = layer.rotation || 0;
+    if (rotation === 0) return { x: px, y: py };
+
+    const midX = layer.x + layer.width / 2;
+    const midY = layer.y + layer.height / 2;
+
+    const dx = px - midX;
+    const dy = py - midY;
+
+    const rad = (-rotation * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    return {
+      x: midX + (dx * cos - dy * sin),
+      y: midY + (dx * sin + dy * cos),
+    };
   }
 
   private getHandleAtPoint(x: number, y: number, layer: Layer, zoom: number) {
-    const handles = this.getTransformHandles(layer);
+    const handles = this.getTransformHandles(layer, zoom);
     const handleSize = 8 / zoom;
     const threshold = handleSize * 1.5;
 
-    // Filter out bottom-left if it's at pivot position
-    // (Actually, the requirement says "esconder o pivô e o handle canto inferior esquerdo na mesma possição do pivô")
-    // Pivot is at (px, py) where py = y + fontSize.
-    // If it's a single line, bottom-left (y + height) might be near pivot.
-    // But we'll just implement the hide logic in render and click detection.
-
     for (const h of handles) {
-      // if (h.name === "bottom-left") continue; // Requirement: hide bottom-left
       const dist = Math.sqrt(Math.pow(x - h.x, 2) + Math.pow(y - h.y, 2));
       if (dist < threshold) return h;
     }
@@ -183,8 +236,13 @@ export class TextTool extends BaseTool {
       if (this.isCtrlPressed && editingLayer) {
         const handle = this.getHandleAtPoint(x, y, editingLayer, context.project.zoom);
         if (handle) {
-          this.isResizing = true;
-          this.resizeHandle = handle.name;
+          if (handle.name === "rotate") {
+            this.isRotating = true;
+            this.dragStartRotation = editingLayer.rotation || 0;
+          } else {
+            this.isResizing = true;
+            this.resizeHandle = handle.name;
+          }
           this.layerStartPos = { x: editingLayer.x, y: editingLayer.y };
           this.startPos = { x, y };
           context.setInteracting(true);
@@ -204,7 +262,8 @@ export class TextTool extends BaseTool {
 
       // If clicked inside the current editing layer
       if (hitLayer && hitLayer.id === this.editingLayerId) {
-        const index = TextLayer.getCaretIndexAt(context.ctx, hitLayer, x, y);
+        const localPos = this.worldToLocal(x, y, hitLayer);
+        const index = TextLayer.getCaretIndexAt(context.ctx, hitLayer, localPos.x, localPos.y);
         this.caretIndex = index;
         if (!e.shiftKey) {
           this.selectionStart = index;
@@ -240,8 +299,31 @@ export class TextTool extends BaseTool {
     if (this.isSelecting && this.editingLayerId) {
       const editingLayer = context.project.layers.find((l) => l.id === this.editingLayerId);
       if (editingLayer) {
-        this.caretIndex = TextLayer.getCaretIndexAt(context.ctx, editingLayer, x, y);
+        const localPos = this.worldToLocal(x, y, editingLayer);
+        this.caretIndex = TextLayer.getCaretIndexAt(context.ctx, editingLayer, localPos.x, localPos.y);
       }
+      return;
+    }
+
+    if (this.isRotating && this.editingLayerId) {
+      const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
+      if (!layer) return;
+
+      const midX = layer.x + layer.width / 2;
+      const midY = layer.y + layer.height / 2;
+
+      const startAngle = Math.atan2(this.startPos.y - midY, this.startPos.x - midX);
+      const currentAngle = Math.atan2(y - midY, x - midX);
+
+      let newRotation = this.dragStartRotation + ((currentAngle - startAngle) * 180) / Math.PI;
+
+      if (e.shiftKey) {
+        newRotation = Math.round(newRotation / 15) * 15;
+      }
+
+      useProjectStore.getState().updateLayer(context.project.id, this.editingLayerId, {
+        rotation: newRotation % 360,
+      });
       return;
     }
 
@@ -249,14 +331,19 @@ export class TextTool extends BaseTool {
       const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
       if (!layer) return;
 
-      const dx = x - this.startPos.x;
-      const dy = y - this.startPos.y;
+      const localPos = this.worldToLocal(x, y, layer);
+      const localStartPos = this.worldToLocal(this.startPos.x, this.startPos.y, layer);
+
+      const dx = localPos.x - localStartPos.x;
+      const dy = localPos.y - localStartPos.y;
 
       let newX = layer.x;
       let newY = layer.y;
       let newW = layer.width;
       let newH = layer.height;
 
+      // This is a simplified resizing that doesn't perfectly account for rotation yet
+      // but is better than nothing.
       if (this.resizeHandle.includes("right")) newW = Math.max(10, layer.width + dx);
       if (this.resizeHandle.includes("left")) {
         const delta = Math.min(layer.width - 10, dx);
@@ -327,6 +414,12 @@ export class TextTool extends BaseTool {
       return;
     }
 
+    if (this.isRotating) {
+      this.isRotating = false;
+      context.setInteracting(false);
+      return;
+    }
+
     if (this.isMoving) {
       this.isMoving = false;
       context.setInteracting(false);
@@ -361,7 +454,8 @@ export class TextTool extends BaseTool {
         this.startEditing(hitLayer, context, x, y);
       }
 
-      const index = TextLayer.getCaretIndexAt(context.ctx, hitLayer, x, y);
+      const localPos = this.worldToLocal(x, y, hitLayer);
+      const index = TextLayer.getCaretIndexAt(context.ctx, hitLayer, localPos.x, localPos.y);
       const text = hitLayer.text || "";
 
       // Find word boundaries
@@ -384,12 +478,13 @@ export class TextTool extends BaseTool {
     const layers = [...context.project.layers].reverse();
     for (const layer of layers) {
       if (layer.type === "text" && layer.visible && !layer.locked) {
+        const localPos = this.worldToLocal(x, y, layer);
         const padding = 10;
         if (
-          x >= layer.x - padding &&
-          x <= layer.x + layer.width + padding &&
-          y >= layer.y - padding &&
-          y <= layer.y + layer.height + padding
+          localPos.x >= layer.x - padding &&
+          localPos.x <= layer.x + layer.width + padding &&
+          localPos.y >= layer.y - padding &&
+          localPos.y <= layer.y + layer.height + padding
         ) {
           return layer;
         }
@@ -437,7 +532,8 @@ export class TextTool extends BaseTool {
       .updateLayer(context.project.id, layer.id, { textUndoStack: newUndoStack });
 
     if (hitX !== undefined && hitY !== undefined) {
-      this.caretIndex = TextLayer.getCaretIndexAt(context.ctx, layer, hitX, hitY);
+      const localPos = this.worldToLocal(hitX, hitY, layer);
+      this.caretIndex = TextLayer.getCaretIndexAt(context.ctx, layer, localPos.x, localPos.y);
     } else {
       this.caretIndex = layer.text?.length || 0;
     }
@@ -823,28 +919,51 @@ export class TextTool extends BaseTool {
 
       if (this.isCtrlPressed) {
         // Render Transform-like handles
-        const handles = this.getTransformHandles(layer);
+        const handles = this.getTransformHandles(layer, scale);
         ctx.save();
         ctx.strokeStyle = "#0078ff";
         ctx.lineWidth = 1 / scale;
 
-        // Draw connections
-        ctx.beginPath();
-        ctx.moveTo(layer.x, layer.y);
-        ctx.lineTo(layer.x + layer.width, layer.y);
-        ctx.lineTo(layer.x + layer.width, layer.y + layer.height);
-        ctx.lineTo(layer.x, layer.y + layer.height);
-        ctx.closePath();
-        ctx.stroke();
+        // Draw connections (rotated)
+        const cornerNames = ["top-left", "top-right", "bottom-right", "bottom-left"];
+        const corners = cornerNames
+          .map((name) => handles.find((h) => h.name === name))
+          .filter((h): h is any => !!h);
+
+        if (corners.length === 4) {
+          ctx.beginPath();
+          ctx.moveTo(corners[0].x, corners[0].y);
+          ctx.lineTo(corners[1].x, corners[1].y);
+          ctx.lineTo(corners[2].x, corners[2].y);
+          ctx.lineTo(corners[3].x, corners[3].y);
+          ctx.closePath();
+          ctx.stroke();
+        }
+
+        // Draw rotation line
+        const rotateHandle = handles.find((h) => h.name === "rotate");
+        const topMiddle = handles.find((h) => h.name === "top-middle");
+        if (rotateHandle && topMiddle) {
+          ctx.beginPath();
+          ctx.moveTo(topMiddle.x, topMiddle.y);
+          ctx.lineTo(rotateHandle.x, rotateHandle.y);
+          ctx.stroke();
+        }
 
         const handleSize = 8 / scale;
         handles.forEach((h) => {
-          // if (h.name === "bottom-left") return; // Hide bottom-left handle near pivot
           ctx.fillStyle = "white";
           ctx.strokeStyle = "#0078ff";
           ctx.lineWidth = 1 / scale;
-          ctx.fillRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
-          ctx.strokeRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+          if (h.name === "rotate") {
+            ctx.beginPath();
+            ctx.arc(h.x, h.y, handleSize / 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          } else {
+            ctx.fillRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+            ctx.strokeRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+          }
         });
         ctx.restore();
       } else if (layer.textType !== "point") {
@@ -853,7 +972,16 @@ export class TextTool extends BaseTool {
         ctx.strokeStyle = "#0078ff";
         ctx.lineWidth = 1 / scale;
         ctx.setLineDash([4 / scale, 2 / scale]);
-        ctx.strokeRect(layer.x, layer.y, layer.width, layer.height);
+
+        if (layer.rotation) {
+          const midX = layer.x + layer.width / 2;
+          const midY = layer.y + layer.height / 2;
+          ctx.translate(midX, midY);
+          ctx.rotate((layer.rotation * Math.PI) / 180);
+          ctx.strokeRect(-layer.width / 2, -layer.height / 2, layer.width, layer.height);
+        } else {
+          ctx.strokeRect(layer.x, layer.y, layer.width, layer.height);
+        }
         ctx.restore();
       }
     }

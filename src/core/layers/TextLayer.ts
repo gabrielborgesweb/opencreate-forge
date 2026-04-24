@@ -16,7 +16,7 @@ export class TextLayer {
     if (!layer.text && !editingState?.isFocused) return;
 
     const matrix = ctx.getTransform();
-    const zoom = matrix.a;
+    const zoom = Math.hypot(matrix.a, matrix.b);
 
     // 1. Text Rendering (Always pixel-based, tied to project resolution)
     const textRendering = layer.textRendering || "bilinear";
@@ -355,7 +355,7 @@ export class TextLayer {
   private static renderPivot(ctx: CanvasRenderingContext2D, layer: Layer) {
     const size = 8;
     const matrix = ctx.getTransform();
-    const zoom = matrix.a;
+    const zoom = Math.hypot(matrix.a, matrix.b);
     const s = size / zoom;
 
     ctx.save();

@@ -1143,7 +1143,17 @@ export class ForgeEngine {
 
         this.ctx.lineWidth = 1 / this.project.zoom;
         this.ctx.setLineDash([4 / this.project.zoom, 2 / this.project.zoom]);
-        this.ctx.strokeRect(activeLayer.x, activeLayer.y, activeLayer.width, activeLayer.height);
+        
+        if (activeLayer.rotation) {
+          const centerX = activeLayer.x + activeLayer.width / 2;
+          const centerY = activeLayer.y + activeLayer.height / 2;
+          this.ctx.translate(centerX, centerY);
+          this.ctx.rotate((activeLayer.rotation * Math.PI) / 180);
+          this.ctx.strokeRect(-activeLayer.width / 2, -activeLayer.height / 2, activeLayer.width, activeLayer.height);
+        } else {
+          this.ctx.strokeRect(activeLayer.x, activeLayer.y, activeLayer.width, activeLayer.height);
+        }
+        
         this.ctx.restore();
       }
     }
@@ -1156,6 +1166,14 @@ export class ForgeEngine {
     this.ctx.save();
     this.ctx.globalAlpha = layer.opacity / 100;
     this.ctx.globalCompositeOperation = layer.blendMode;
+
+    if (layer.rotation) {
+      const centerX = layer.x + layer.width / 2;
+      const centerY = layer.y + layer.height / 2;
+      this.ctx.translate(centerX, centerY);
+      this.ctx.rotate((layer.rotation * Math.PI) / 180);
+      this.ctx.translate(-centerX, -centerY);
+    }
 
     const tool = this.getActiveTool();
     const isEditing = tool?.getEditingLayerId() === layer.id;

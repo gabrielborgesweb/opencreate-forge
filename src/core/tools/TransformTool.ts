@@ -64,7 +64,7 @@ export class TransformTool extends BaseTool {
         height: layer.height,
         scaleX: 1,
         scaleY: 1,
-        rotation: 0,
+        rotation: layer.rotation || 0,
         anchor: { x: 0.5, y: 0.5 },
         isDirty: this.isFloating, // If we just floated, it's already a change from original
       };
@@ -600,6 +600,7 @@ export class TransformTool extends BaseTool {
           width: newWidth,
           height: newHeight,
           data: offCanvas.toDataURL(),
+          rotation: 0,
         };
         context.updateProject({
           selection: {
@@ -622,6 +623,7 @@ export class TransformTool extends BaseTool {
                   width: newWidth,
                   height: newHeight,
                   data: offCanvas.toDataURL(),
+                  rotation: 0,
                 }
               : l,
           ),

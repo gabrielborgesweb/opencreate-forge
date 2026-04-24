@@ -149,6 +149,7 @@ function createWindow() {
 
   win.maximize();
   createMenu();
+  // win.setAutoHideMenuBar(true);
 }
 
 app.on("window-all-closed", () => {

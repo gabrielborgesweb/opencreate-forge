@@ -488,16 +488,37 @@ export class CropTool extends BaseTool {
     const newW = Math.round(Math.abs(t.width * t.scaleX));
     const newH = Math.round(Math.abs(t.height * t.scaleY));
 
-    // New project origin in world space
-    const newOriginX = localLeft + t.x;
-    const newOriginY = localTop + t.y;
-
     const invRot = (-t.rotation * Math.PI) / 180;
     const cos = Math.cos(invRot);
     const sin = Math.sin(invRot);
 
     const newLayers: Layer[] = await Promise.all(
       context.project.layers.map(async (layer) => {
+        // Calculate new transform for the layer
+        const cx = layer.x + layer.width / 2;
+        const cy = layer.y + layer.height / 2;
+
+        // Transform center to new project space
+        const relX = cx - t.x;
+        const relY = cy - t.y;
+        const rotX = relX * cos - relY * sin;
+        const rotY = relX * sin + relY * cos;
+
+        const newCenterX = rotX - localLeft;
+        const newCenterY = rotY - localTop;
+        const newRotation = (layer.rotation || 0) - t.rotation;
+
+        // If it's not a raster layer or we don't want to delete pixels, just update transform
+        if (layer.type !== "raster" || !settings.deleteCropped) {
+          return {
+            ...layer,
+            rotation: newRotation,
+            x: newCenterX - layer.width / 2,
+            y: newCenterY - layer.height / 2,
+          };
+        }
+
+        // For raster layers with deleteCropped=true, we rasterize and clip
         // 1. Calculate bounding box of transformed layer in new project space
         const corners = [
           { x: layer.x, y: layer.y },
@@ -506,14 +527,29 @@ export class CropTool extends BaseTool {
           { x: layer.x, y: layer.y + layer.height },
         ];
 
-        const transCorners = corners.map((c) => {
+        let worldCorners = corners;
+        if (layer.rotation) {
+          const lrad = (layer.rotation * Math.PI) / 180;
+          const lcos = Math.cos(lrad);
+          const lsin = Math.sin(lrad);
+          worldCorners = corners.map((c) => {
+            const rx = c.x - cx;
+            const ry = c.y - cy;
+            return {
+              x: cx + (rx * lcos - ry * lsin),
+              y: cy + (rx * lsin + ry * lcos),
+            };
+          });
+        }
+
+        const transCorners = worldCorners.map((c) => {
           const relX = c.x - t.x;
           const relY = c.y - t.y;
           const rotX = relX * cos - relY * sin;
           const rotY = relX * sin + relY * cos;
           return {
-            x: rotX + t.x - newOriginX,
-            y: rotY + t.y - newOriginY,
+            x: rotX - localLeft,
+            y: rotY - localTop,
           };
         });
 
@@ -527,11 +563,8 @@ export class CropTool extends BaseTool {
         const finalMaxX = Math.ceil(maxX);
         const finalMaxY = Math.ceil(maxY);
 
-        const lw = finalMaxX - finalMinX;
-        const lh = finalMaxY - finalMinY;
-
-        if (lw <= 0 || lh <= 0)
-          return { ...layer, data: undefined, width: 1, height: 1, x: 0, y: 0 };
+        const lw = Math.max(1, finalMaxX - finalMinX);
+        const lh = Math.max(1, finalMaxY - finalMinY);
 
         // 2. Create new canvas and draw layer
         const canvas = document.createElement("canvas");
@@ -539,96 +572,64 @@ export class CropTool extends BaseTool {
         canvas.height = lh;
         const ctx = canvas.getContext("2d")!;
 
-        ctx.translate(-finalMinX, -finalMinY);
-        ctx.translate(t.x - newOriginX, t.y - newOriginY);
+        // Transform coordinate system to world space within the project-aligned canvas
+        ctx.translate(-finalMinX, -finalMinY); // To layer top-left in project space
+        ctx.translate(-localLeft, -localTop); // To crop center in project space
         ctx.rotate(invRot);
-        ctx.translate(-(t.x - newOriginX), -(t.y - newOriginY));
+        ctx.translate(-t.x, -t.y); // To world origin
 
-        // Draw original layer - Optimized to use cached canvas if possible
         if (layer.data) {
           const lCanvas = await context.ensureLayerCanvas(layer);
-          ctx.drawImage(lCanvas, layer.x - newOriginX, layer.y - newOriginY);
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(((layer.rotation || 0) * Math.PI) / 180);
+          ctx.drawImage(lCanvas, -layer.width / 2, -layer.height / 2);
+          ctx.restore();
         }
 
-        let finalCanvas = canvas;
-        let finalX = finalMinX;
-        let finalY = finalMinY;
+        // 3. Clip and Optimize
+        // We create a canvas the size of the NEW project to perform the crop clipping
+        const clipped = document.createElement("canvas");
+        clipped.width = newW;
+        clipped.height = newH;
+        const cctx = clipped.getContext("2d")!;
 
-        if (settings.deleteCropped) {
-          // Clip to project bounds (the new crop area)
-          const clipped = document.createElement("canvas");
-          clipped.width = lw;
-          clipped.height = lh;
-          const cctx = clipped.getContext("2d")!;
-          cctx.beginPath();
-          cctx.rect(-finalX, -finalY, newW, newH);
-          cctx.clip();
-          cctx.drawImage(canvas, 0, 0);
+        // Draw the transformed layer at its project coordinates
+        cctx.drawImage(canvas, finalMinX, finalMinY);
 
-          // Optimize bounding box of the clipped result
-          const bounds = this.getOptimizedBounds(clipped);
-          if (bounds) {
-            const opt = document.createElement("canvas");
-            opt.width = bounds.width;
-            opt.height = bounds.height;
-            opt
-              .getContext("2d")!
-              .drawImage(
-                clipped,
-                bounds.x,
-                bounds.y,
-                bounds.width,
-                bounds.height,
-                0,
-                0,
-                bounds.width,
-                bounds.height,
-              );
-            finalCanvas = opt;
-            finalX += bounds.x;
-            finalY += bounds.y;
-          } else {
-            // Layer is completely outside the crop area and we are deleting cropped pixels
-            return {
-              ...layer,
-              data: undefined,
-              width: 1,
-              height: 1,
-              x: 0,
-              y: 0,
-            };
-          }
+        let finalCanvas = clipped;
+        let finalX = 0;
+        let finalY = 0;
+
+        const bounds = this.getOptimizedBounds(clipped);
+        if (bounds) {
+          const opt = document.createElement("canvas");
+          opt.width = bounds.width;
+          opt.height = bounds.height;
+          opt
+            .getContext("2d")!
+            .drawImage(
+              clipped,
+              bounds.x,
+              bounds.y,
+              bounds.width,
+              bounds.height,
+              0,
+              0,
+              bounds.width,
+              bounds.height,
+            );
+          finalCanvas = opt;
+          finalX = bounds.x;
+          finalY = bounds.y;
         } else {
-          // NOT deleting pixels. We should still optimize the bounding box
-          // of the FULL transformed layer to avoid massive empty canvases,
-          // but we DON'T clip it to the project bounds.
-          const bounds = this.getOptimizedBounds(canvas);
-          if (bounds) {
-            const opt = document.createElement("canvas");
-            opt.width = bounds.width;
-            opt.height = bounds.height;
-            opt
-              .getContext("2d")!
-              .drawImage(
-                canvas,
-                bounds.x,
-                bounds.y,
-                bounds.width,
-                bounds.height,
-                0,
-                0,
-                bounds.width,
-                bounds.height,
-              );
-            finalCanvas = opt;
-            finalX += bounds.x;
-            finalY += bounds.y;
-          }
+          return { ...layer, data: undefined, width: 1, height: 1, x: 0, y: 0 };
         }
 
         context.invalidateCache(layer.id);
         return {
           ...layer,
+          rotation: 0, // Baked
           data: finalCanvas.toDataURL(),
           width: finalCanvas.width,
           height: finalCanvas.height,

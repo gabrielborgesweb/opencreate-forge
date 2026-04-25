@@ -31,6 +31,7 @@ export class ForgeEngine {
   private ZOOM_SMOOTHING = 0.15;
   private animationFrameId: number | null = null;
   private viewportAnimationId: number | null = null;
+  private targetViewport: { zoom: number; panX: number; panY: number } | null = null;
 
   private isPanning = false;
   private startX = 0;
@@ -118,6 +119,64 @@ export class ForgeEngine {
     }
   };
 
+  private handleZoomTo = (e: any) => {
+    const { zoom, panX, panY, step } = e.detail;
+    if (!this.project) return;
+
+    if (step !== undefined) {
+      const baseZoom = this.targetViewport ? this.targetViewport.zoom : this.project.zoom;
+      let nextZoom: number;
+
+      // Define increment based on magnitude (1-9% -> 0.1, 10-99% -> 1.0, etc)
+      // This keeps the perceived speed constant at high zoom levels
+      const magnitude = Math.pow(10, Math.floor(Math.log10(baseZoom)));
+      const factor = Math.max(0.1, magnitude * 0.1);
+
+      if (step > 0) {
+        // Zoom In: Snap to next multiple of factor
+        nextZoom = (Math.floor(baseZoom / factor + 0.001) + 1) * factor;
+        nextZoom = Math.min(nextZoom, 50);
+      } else {
+        // Zoom Out: Snap to previous multiple of factor
+        nextZoom = (Math.ceil(baseZoom / factor - 0.001) - 1) * factor;
+        nextZoom = Math.max(nextZoom, 0.01);
+      }
+
+      this.animateZoom(nextZoom);
+      return;
+    }
+
+    if (zoom !== undefined) {
+      if (zoom === -1) {
+        this.animateFitToScreen();
+      } else if (panX !== undefined && panY !== undefined) {
+        this.animateToViewport(zoom, panX, panY);
+      } else {
+        this.animateZoom(zoom);
+      }
+    }
+  };
+
+  public animateZoom(targetZoom: number) {
+    if (!this.project) return;
+
+    // Use current target as base for pan calculation if animating to keep it consistent
+    const baseZoom = this.targetViewport ? this.targetViewport.zoom : this.project.zoom;
+    const basePanX = this.targetViewport ? this.targetViewport.panX : this.project.panX;
+    const basePanY = this.targetViewport ? this.targetViewport.panY : this.project.panY;
+
+    // Zoom centralizado na viewport
+    const viewportWidth = this.canvas.width;
+    const viewportHeight = this.canvas.height;
+    const centerX = viewportWidth / 2;
+    const centerY = viewportHeight / 2;
+
+    const targetPanX = centerX - (centerX - basePanX) * (targetZoom / baseZoom);
+    const targetPanY = centerY - (centerY - basePanY) * (targetZoom / baseZoom);
+
+    this.animateToViewport(targetZoom, targetPanX, targetPanY);
+  }
+
   private setupEventListeners() {
     this.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
     this.canvas.addEventListener("mousedown", this.handleMouseDown);
@@ -135,6 +194,7 @@ export class ForgeEngine {
     window.addEventListener("keyup", this.handleKeyUp);
     window.addEventListener("forge:clear-selection", this.handleClearSelection);
     window.addEventListener("forge:export-png", this.handleExportPNG);
+    window.addEventListener("forge:zoom-to", this.handleZoomTo as any);
 
     // useToolStore.subscribe((state, prevState) => {
     //   const newToolId = state.activeToolId;
@@ -729,6 +789,7 @@ export class ForgeEngine {
     window.removeEventListener("keyup", this.handleKeyUp);
     window.removeEventListener("forge:clear-selection", this.handleClearSelection);
     window.removeEventListener("forge:export-png", this.handleExportPNG);
+    window.removeEventListener("forge:zoom-to", this.handleZoomTo as any);
 
     // if (this.unsubscribeToolStore) {
     //   this.unsubscribeToolStore();
@@ -993,6 +1054,8 @@ export class ForgeEngine {
   private animateToViewport(targetZoom: number, targetPanX: number, targetPanY: number) {
     if (!this.project) return;
 
+    this.targetViewport = { zoom: targetZoom, panX: targetPanX, panY: targetPanY };
+
     if (this.viewportAnimationId) {
       cancelAnimationFrame(this.viewportAnimationId);
     }
@@ -1000,7 +1063,14 @@ export class ForgeEngine {
     const startZoom = this.project.zoom;
     const startPanX = this.project.panX;
     const startPanY = this.project.panY;
-    const duration = 500; // ms
+
+    // To keep the center point stable during exponential zoom:
+    const viewportWidth = this.canvas.width;
+    const viewportHeight = this.canvas.height;
+    const centerX = viewportWidth / 2;
+    const centerY = viewportHeight / 2;
+
+    const duration = 400; // Snappier duration
     const startTime = performance.now();
 
     const animate = (now: number) => {
@@ -1008,15 +1078,17 @@ export class ForgeEngine {
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
 
-      // Ease-in-out cubic
-      const ease =
-        progress < 0.5
-          ? 4 * progress * progress * progress
-          : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+      // Ease-out cubic: starts fast, slows down at the end
+      const ease = 1 - Math.pow(1 - progress, 3);
 
-      const currentZoom = startZoom + (targetZoom - startZoom) * ease;
-      const currentPanX = startPanX + (targetPanX - startPanX) * ease;
-      const currentPanY = startPanY + (targetPanY - startPanY) * ease;
+      // EXPONENTIAL interpolation for Zoom
+      const currentZoom = Math.exp(
+        Math.log(startZoom) + (Math.log(targetZoom) - Math.log(startZoom)) * ease,
+      );
+
+      // INTERPOLATION for Pan (keeping the center fixed relative to current zoom)
+      const currentPanX = centerX - (centerX - startPanX) * (currentZoom / startZoom);
+      const currentPanY = centerY - (centerY - startPanY) * (currentZoom / startZoom);
 
       this.project.zoom = currentZoom;
       this.project.panX = currentPanX;
@@ -1027,6 +1099,7 @@ export class ForgeEngine {
         this.viewportAnimationId = requestAnimationFrame(animate);
       } else {
         this.viewportAnimationId = null;
+        this.targetViewport = null;
       }
     };
 

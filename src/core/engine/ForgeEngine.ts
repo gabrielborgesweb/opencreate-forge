@@ -119,6 +119,14 @@ export class ForgeEngine {
     }
   };
 
+  private handleSelectAll = () => {
+    this.selectAll();
+  };
+
+  private handleDuplicate = () => {
+    this.duplicateLayer();
+  };
+
   private handleZoomTo = (e: any) => {
     const { zoom, panX, panY, step } = e.detail;
     if (!this.project) return;
@@ -192,7 +200,9 @@ export class ForgeEngine {
     window.addEventListener("mouseup", this.handleMouseUp);
     window.addEventListener("keydown", this.handleKeyDown);
     window.addEventListener("keyup", this.handleKeyUp);
-    window.addEventListener("forge:clear-selection", this.handleClearSelection);
+    window.addEventListener("forge:select-clear", this.handleClearSelection);
+    window.addEventListener("forge:select-all", this.handleSelectAll);
+    window.addEventListener("forge:duplicate-layer", this.handleDuplicate);
     window.addEventListener("forge:export-png", this.handleExportPNG);
     window.addEventListener("forge:zoom-to", this.handleZoomTo as any);
 
@@ -269,30 +279,6 @@ export class ForgeEngine {
     }
 
     const isCtrl = e.ctrlKey || e.metaKey;
-
-    if (isCtrl && e.shiftKey && e.key.toLowerCase() === "z") {
-      if (this.project) {
-        e.preventDefault();
-        useProjectStore.getState().redo(this.project.id);
-      }
-      return;
-    }
-
-    if (isCtrl && e.key.toLowerCase() === "z") {
-      if (this.project) {
-        e.preventDefault();
-        useProjectStore.getState().undo(this.project.id);
-      }
-      return;
-    }
-
-    if (isCtrl && e.key.toLowerCase() === "y") {
-      if (this.project) {
-        e.preventDefault();
-        useProjectStore.getState().redo(this.project.id);
-      }
-      return;
-    }
 
     if (isCtrl && e.key.toLowerCase() === "c") {
       this.copyToClipboard();
@@ -787,7 +773,9 @@ export class ForgeEngine {
     window.removeEventListener("mouseup", this.handleMouseUp);
     window.removeEventListener("keydown", this.handleKeyDown);
     window.removeEventListener("keyup", this.handleKeyUp);
-    window.removeEventListener("forge:clear-selection", this.handleClearSelection);
+    window.removeEventListener("forge:select-clear", this.handleClearSelection);
+    window.removeEventListener("forge:select-all", this.handleSelectAll);
+    window.removeEventListener("forge:duplicate-layer", this.handleDuplicate);
     window.removeEventListener("forge:export-png", this.handleExportPNG);
     window.removeEventListener("forge:zoom-to", this.handleZoomTo as any);
 
@@ -1437,6 +1425,116 @@ export class ForgeEngine {
     });
 
     this.project.selection.floatingLayer = null;
+  }
+
+  public selectAll() {
+    if (!this.project) return;
+
+    useProjectStore.getState().pushHistory(this.project.id, "Select All");
+
+    const rect = {
+      x: 0,
+      y: 0,
+      width: this.project.width,
+      height: this.project.height,
+    };
+
+    this.selectionCanvas.width = rect.width;
+    this.selectionCanvas.height = rect.height;
+    this.selectionCtx.fillStyle = "white";
+    this.selectionCtx.fillRect(0, 0, rect.width, rect.height);
+
+    const mask = this.selectionCanvas.toDataURL();
+    this.lastSelectionMask = mask;
+
+    useProjectStore.getState().updateProject(this.project.id, {
+      selection: {
+        hasSelection: true,
+        bounds: rect,
+        mask,
+      },
+    });
+
+    this.updateSelectionEdges();
+  }
+
+  public async duplicateLayer() {
+    if (!this.project || !this.project.activeLayerId) return;
+
+    const activeLayer = this.project.layers.find((l) => l.id === this.project?.activeLayerId);
+    if (!activeLayer) return;
+
+    // Se NÃO houver seleção, duplica a camada inteira via Store
+    if (!this.project.selection.hasSelection || !this.project.selection.bounds) {
+      useProjectStore.getState().duplicateLayer(this.project.id, activeLayer.id);
+      return;
+    }
+
+    // Se HOUVER seleção, faz o "Layer via Copy" (Photoshop style)
+    if (activeLayer.type !== "raster" || !activeLayer.data) {
+      useUIStore.getState().showToast("Selection duplication only works on raster layers", "warning");
+      return;
+    }
+
+    const layerCanvas = this.layerCanvasCache.get(activeLayer.id);
+    if (!layerCanvas) return;
+
+    const { bounds } = this.project.selection;
+
+    // 1. Extrair pixels da seleção
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = bounds.width;
+    tempCanvas.height = bounds.height;
+    const tempCtx = tempCanvas.getContext("2d")!;
+
+    const layerOffsetX = activeLayer.x - bounds.x;
+    const layerOffsetY = activeLayer.y - bounds.y;
+
+    tempCtx.drawImage(layerCanvas, layerOffsetX, layerOffsetY);
+    tempCtx.globalCompositeOperation = "destination-in";
+    tempCtx.drawImage(this.selectionCanvas, 0, 0);
+
+    const optimizedBounds = getOptimizedBoundingBox(tempCanvas, {
+      x: 0,
+      y: 0,
+      width: tempCanvas.width,
+      height: tempCanvas.height,
+    });
+
+    if (!optimizedBounds) {
+      useUIStore.getState().showToast("The selection is empty on this layer", "warning");
+      return;
+    }
+
+    const finalCanvas = document.createElement("canvas");
+    finalCanvas.width = optimizedBounds.width;
+    finalCanvas.height = optimizedBounds.height;
+    const finalCtx = finalCanvas.getContext("2d")!;
+    finalCtx.drawImage(
+      tempCanvas,
+      optimizedBounds.x,
+      optimizedBounds.y,
+      optimizedBounds.width,
+      optimizedBounds.height,
+      0,
+      0,
+      optimizedBounds.width,
+      optimizedBounds.height,
+    );
+
+    // 2. Criar nova camada com os pixels extraídos
+    const finalX = bounds.x + optimizedBounds.x;
+    const finalY = bounds.y + optimizedBounds.y;
+
+    useProjectStore.getState().addLayer(this.project.id, {
+      name: `${activeLayer.name} copy`,
+      type: "raster",
+      data: finalCanvas.toDataURL(),
+      width: optimizedBounds.width,
+      height: optimizedBounds.height,
+      x: finalX,
+      y: finalY,
+    });
   }
 
   public async exportToPNG(): Promise<string> {

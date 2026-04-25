@@ -86,7 +86,7 @@ function createMenu() {
         },
         {
           label: "Redo",
-          accelerator: "CmdOrCtrl+Y",
+          accelerator: "CmdOrCtrl+Shift+Z",
           click: () => win?.webContents.send("menu:action", "redo"),
         },
         { type: "separator" },
@@ -95,23 +95,47 @@ function createMenu() {
         { role: "paste" },
         { type: "separator" },
         {
-          label: "Preferences",
+          label: "Preferences...",
+          accelerator: "CmdOrCtrl+,",
           click: () => win?.webContents.send("menu:action", "preferences"),
         },
       ],
     },
     { label: "Image", submenu: [{ label: "Canvas Size...", enabled: false }] },
-    { label: "Layer", submenu: [{ label: "New Layer", enabled: false }] },
+    {
+      label: "Layer",
+      submenu: [
+        {
+          label: "New Layer",
+          accelerator: "CmdOrCtrl+Shift+N",
+          click: () => win?.webContents.send("menu:action", "add-layer"),
+        },
+        {
+          label: "Duplicate Layer",
+          accelerator: "CmdOrCtrl+J",
+          click: () => win?.webContents.send("menu:action", "duplicate-layer"),
+        },
+        { type: "separator" },
+        {
+          label: "Delete Layer",
+          accelerator: "Backspace",
+          click: () => win?.webContents.send("menu:action", "remove-layer"),
+        },
+      ],
+    },
     {
       label: "Select",
       submenu: [
+        {
+          label: "All",
+          accelerator: "CmdOrCtrl+A",
+          click: () => win?.webContents.send("menu:action", "select-all"),
+        },
         {
           label: "Deselect",
           accelerator: "CmdOrCtrl+D",
           click: () => win?.webContents.send("menu:action", "deselect"),
         },
-        { type: "separator" },
-        { label: "All", enabled: false },
       ],
     },
     { label: "Filter", submenu: [{ label: "Blur", enabled: false }] },

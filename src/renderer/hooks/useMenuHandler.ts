@@ -9,6 +9,9 @@ export const useMenuHandler = () => {
   const updateProject = useProjectStore((state) => state.updateProject);
   const undo = useProjectStore((state) => state.undo);
   const redo = useProjectStore((state) => state.redo);
+  const addLayer = useProjectStore((state) => state.addLayer);
+  const duplicateLayer = useProjectStore((state) => state.duplicateLayer);
+  const removeLayer = useProjectStore((state) => state.removeLayer);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const showToast = useUIStore((state) => state.showToast);
   const showRulers = useUIStore((state) => state.showRulers);
@@ -104,6 +107,30 @@ export const useMenuHandler = () => {
           if (activeProjectId) redo(activeProjectId);
           break;
 
+        case "add-layer":
+          if (activeProjectId) {
+            addLayer(activeProjectId, { type: "raster" });
+          }
+          break;
+
+        case "duplicate-layer":
+          window.dispatchEvent(new CustomEvent("forge:duplicate-layer"));
+          break;
+
+        case "remove-layer":
+          if (activeProjectId && activeProject?.activeLayerId) {
+            // Safety: Don't delete layer if typing in an input or textarea
+            if (
+              document.activeElement?.tagName === "INPUT" ||
+              document.activeElement?.tagName === "TEXTAREA" ||
+              (document.activeElement as HTMLElement)?.isContentEditable
+            ) {
+              return;
+            }
+            removeLayer(activeProjectId, activeProject.activeLayerId);
+          }
+          break;
+
         case "close-project":
           window.dispatchEvent(new CustomEvent("forge:close-project"));
           break;
@@ -113,7 +140,11 @@ export const useMenuHandler = () => {
           break;
 
         case "deselect":
-          window.dispatchEvent(new CustomEvent("forge:clear-selection"));
+          window.dispatchEvent(new CustomEvent("forge:select-clear"));
+          break;
+
+        case "select-all":
+          window.dispatchEvent(new CustomEvent("forge:select-all"));
           break;
 
         case "zoom-in": {
@@ -151,10 +182,12 @@ export const useMenuHandler = () => {
     updateProject,
     undo,
     redo,
+    addLayer,
+    duplicateLayer,
+    removeLayer,
     setActiveTab,
     showToast,
     showRulers,
     setShowRulers,
   ]);
 };
-

@@ -1,5 +1,7 @@
 {
   "name": "opencreate-forge",
+  "author": "Gabriel Borges",
+  "description": "Image Editor powered by React & Electron",
   "productName": "OpenCreate Forge",
   "type": "module",
   "version": "0.1.0",
@@ -43,10 +45,35 @@
     "vite-plugin-electron-renderer": "^0.14.6"
   },
   "build": {
-    "appId": "com.opencreate.forge",
+    "appId": "app.opencreate.forge",
+    "productName": "OpenCreate Forge",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json",
+      "!**/*.map",
+      "!src",
+      "!node_modules/.cache"
+    ],
+    "extraMetadata": {
+      "main": "dist-electron/main.js"
+    },
     "mac": {
       "category": "public.app-category.graphics-design",
-      "icon": "shared/favicon/favicon-darwin-liquid.icns"
+      "icon": "shared/favicon/favicon-darwin-liquid.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
+    },
+    "dmg": {
+      "sign": false
     }
   }
 }

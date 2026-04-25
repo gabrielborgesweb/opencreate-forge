@@ -15,7 +15,7 @@ export default defineConfig({
         entry: path.join(__dirname, "src/main/main.ts"),
         vite: {
           build: {
-            outDir: "dist-electron",
+            outDir: path.join(__dirname, "dist-electron"),
           },
         },
       },
@@ -23,7 +23,7 @@ export default defineConfig({
         input: path.join(__dirname, "src/main/preload.ts"),
         vite: {
           build: {
-            outDir: "dist-electron",
+            outDir: path.join(__dirname, "dist-electron"),
           },
         },
       },

@@ -16,13 +16,20 @@ function App() {
   useMenuHandler();
   const activeTab = useUIStore((state) => state.activeTab);
   const initializeStore = useProjectStore((state) => state.initialize);
+  const projects = useProjectStore((state) => state.projects);
+  const activeProjectId = useProjectStore((state) => state.activeProjectId);
 
   React.useEffect(() => {
     initializeStore();
   }, [initializeStore]);
 
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = React.useState(false);
-  const activeProjectId = useProjectStore((state) => state.activeProjectId);
+
+  React.useEffect(() => {
+    if (!(window as any).electronAPI) return;
+    const hasProject = projects.length > 0 && activeProjectId !== null && activeTab !== "home";
+    (window as any).electronAPI.updateMenu({ hasProject });
+  }, [projects.length, activeProjectId, activeTab]);
   const setActiveTool = useToolStore((state) => state.setActiveTool);
   const activeToolId = useToolStore((state) => state.activeToolId);
   const toolSettings = useToolStore((state) => state.toolSettings);

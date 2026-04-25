@@ -21,7 +21,8 @@
       "@/*": ["./src/*"],
       "@core/*": ["./src/core/*"],
       "@ui/*": ["./src/renderer/*"],
-      "@store/*": ["./src/renderer/store/*"]
+      "@store/*": ["./src/renderer/store/*"],
+      "@utils/*": ["./src/renderer/utils/*"]
     },
     "ignoreDeprecations": "5.0"
   },

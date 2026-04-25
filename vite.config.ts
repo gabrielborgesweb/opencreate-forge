@@ -37,6 +37,7 @@ export default defineConfig({
       "@core": path.resolve(__dirname, "./src/core"),
       "@ui": path.resolve(__dirname, "./src/renderer"),
       "@store": path.resolve(__dirname, "./src/renderer/store"),
+      "@utils": path.resolve(__dirname, "./src/renderer/utils"),
     },
   },
   build: {

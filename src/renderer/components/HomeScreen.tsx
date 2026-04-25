@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 // import { Plus, FolderOpen } from "lucide-react";
-import { useProjectStore, Project } from "@store/projectStore";
+import { useProjectStore } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";
 import { ShortcutSpan } from "./ui/Global";
+import { createProjectFromImage, loadImage } from "@utils/projectUtils";
 
 const HomeScreen: React.FC = () => {
   const addProject = useProjectStore((state) => state.addProject);
@@ -15,40 +16,9 @@ const HomeScreen: React.FC = () => {
 
   const handleCreateFromImage = useCallback(
     (dataUrl: string, width: number, height: number, name: string) => {
-      const id = Math.random().toString(36).substr(2, 9);
-      const newProject: Project = {
-        id,
-        name,
-        width,
-        height,
-        layers: [
-          {
-            id: "layer-" + id,
-            name: "Layer 1",
-            type: "raster",
-            visible: true,
-            locked: false,
-            opacity: 100,
-            x: 0,
-            y: 0,
-            width,
-            height,
-            data: dataUrl,
-            blendMode: "source-over",
-          },
-        ],
-        activeLayerId: "layer-" + id,
-        selection: { hasSelection: false, bounds: null },
-        zoom: 1,
-        panX: 0,
-        panY: 0,
-        isDirty: false,
-        undoStack: [{ description: "New Project", state: {} as any }],
-        redoStack: [],
-      };
-
+      const newProject = createProjectFromImage(dataUrl, width, height, name);
       addProject(newProject);
-      setActiveTab(id);
+      setActiveTab(newProject.id);
     },
     [addProject, setActiveTab],
   );
@@ -64,13 +34,14 @@ const HomeScreen: React.FC = () => {
           if (!file) continue;
 
           const reader = new FileReader();
-          reader.onload = (event) => {
+          reader.onload = async (event) => {
             const dataUrl = event.target?.result as string;
-            const img = new Image();
-            img.onload = () => {
+            try {
+              const img = await loadImage(dataUrl);
               handleCreateFromImage(dataUrl, img.naturalWidth, img.naturalHeight, "Pasted Image");
-            };
-            img.src = dataUrl;
+            } catch (err) {
+              console.error("Failed to load pasted image", err);
+            }
           };
           reader.readAsDataURL(file);
           break;
@@ -107,18 +78,19 @@ const HomeScreen: React.FC = () => {
     for (const file of files) {
       if (file.type.startsWith("image/")) {
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
           const dataUrl = event.target?.result as string;
-          const img = new Image();
-          img.onload = () => {
+          try {
+            const img = await loadImage(dataUrl);
             handleCreateFromImage(
               dataUrl,
               img.naturalWidth,
               img.naturalHeight,
               file.name.replace(/\.[^/.]+$/, ""),
             );
-          };
-          img.src = dataUrl;
+          } catch (err) {
+            console.error("Failed to load dropped image", err);
+          }
         };
         reader.readAsDataURL(file);
         break; // Just create one project for the first image

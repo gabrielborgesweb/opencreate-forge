@@ -31,7 +31,7 @@ app.commandLine.appendSwitch("enable-gpu-rasterization"); // Melhora o render de
 app.commandLine.appendSwitch("enable-zero-copy"); // Melhora a velocidade de escrita de texturas (bom para Canvas)
 app.commandLine.appendSwitch("enable-features", "SharedArrayBuffer"); // Crucial para WASM multithread
 
-function createMenu() {
+function createMenu(hasProject = false) {
   const isDev = !!VITE_DEV_SERVER_URL;
 
   const template: Electron.MenuItemConstructorOptions[] = [
@@ -53,23 +53,27 @@ function createMenu() {
         {
           label: "Save",
           accelerator: "CmdOrCtrl+S",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "save-project"),
         },
         {
           label: "Save As...",
           accelerator: "CmdOrCtrl+Shift+S",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "save-project-as"),
         },
         { type: "separator" },
         {
           label: "Export as PNG...",
           accelerator: "CmdOrCtrl+E",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "export-png"),
         },
         { type: "separator" },
         {
           label: "Close Project",
           accelerator: "CmdOrCtrl+W",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "close-project"),
         },
         { type: "separator" },
@@ -82,11 +86,13 @@ function createMenu() {
         {
           label: "Undo",
           accelerator: "CmdOrCtrl+Z",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "undo"),
         },
         {
           label: "Redo",
           accelerator: "CmdOrCtrl+Shift+Z",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "redo"),
         },
         { type: "separator" },
@@ -108,17 +114,20 @@ function createMenu() {
         {
           label: "New Layer",
           accelerator: "CmdOrCtrl+Shift+N",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "add-layer"),
         },
         {
           label: "Duplicate Layer",
           accelerator: "CmdOrCtrl+J",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "duplicate-layer"),
         },
         { type: "separator" },
         {
           label: "Delete Layer",
           accelerator: "Backspace",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "remove-layer"),
         },
       ],
@@ -129,11 +138,13 @@ function createMenu() {
         {
           label: "All",
           accelerator: "CmdOrCtrl+A",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "select-all"),
         },
         {
           label: "Deselect",
           accelerator: "CmdOrCtrl+D",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "deselect"),
         },
       ],
@@ -151,28 +162,33 @@ function createMenu() {
         {
           label: "Rulers",
           accelerator: "CmdOrCtrl+R",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "toggle-rulers"),
         },
         { type: "separator" },
         {
           label: "Zoom In",
           accelerator: "CmdOrCtrl+Plus",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "zoom-in"),
         },
         {
           label: "Zoom Out",
           accelerator: "CmdOrCtrl+-",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "zoom-out"),
         },
         { type: "separator" },
         {
           label: "Actual Size",
           accelerator: "CmdOrCtrl+1",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "zoom-100"),
         },
         {
           label: "Fit to Screen",
           accelerator: "CmdOrCtrl+0",
+          enabled: hasProject,
           click: () => win?.webContents.send("menu:action", "zoom-fit"),
         },
       ],
@@ -250,6 +266,10 @@ app.whenReady().then(() => {
     });
     if (canceled) return null;
     return filePaths[0];
+  });
+
+  ipcMain.handle("app:updateMenu", (_event, { hasProject }) => {
+    createMenu(hasProject);
   });
 
   ipcMain.handle("dialog:saveFile", async (_event, { dataURL, defaultName }) => {
@@ -335,16 +355,41 @@ app.whenReady().then(() => {
 
   ipcMain.handle("dialog:openProject", async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
-      title: "Abrir Projeto",
+      title: "Abrir Projeto ou Imagem",
       properties: ["openFile"],
-      filters: [{ name: "OpenCreate Forge Document", extensions: ["ocfd"] }],
+      filters: [
+        {
+          name: "Todos os Arquivos Suportados",
+          extensions: ["ocfd", "png", "jpg", "jpeg", "bmp", "webp"],
+        },
+        { name: "OpenCreate Forge Document", extensions: ["ocfd"] },
+        { name: "Imagens", extensions: ["png", "jpg", "jpeg", "bmp", "webp"] },
+      ],
     });
     if (canceled || !filePaths[0]) return null;
 
     const filePath = filePaths[0];
+    const ext = path.extname(filePath).toLowerCase();
+
     try {
-      const content = await fs.readFile(filePath, "utf8");
-      return { success: true, filePath, content };
+      if (ext === ".ocfd") {
+        const content = await fs.readFile(filePath, "utf8");
+        return { success: true, filePath, type: "project", content };
+      } else {
+        // É uma imagem
+        const buffer = await fs.readFile(filePath);
+        const mimeType =
+          {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".bmp": "image/bmp",
+            ".webp": "image/webp",
+          }[ext] || "image/png";
+
+        const dataURL = `data:${mimeType};base64,${buffer.toString("base64")}`;
+        return { success: true, filePath, type: "image", dataURL };
+      }
     } catch (err: any) {
       return { success: false, error: err.message };
     }

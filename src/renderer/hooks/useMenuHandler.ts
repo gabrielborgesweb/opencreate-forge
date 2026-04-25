@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useProjectStore } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";
+import { createProjectFromImage, loadImage } from "@utils/projectUtils";
 
 export const useMenuHandler = () => {
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
@@ -32,13 +33,28 @@ export const useMenuHandler = () => {
           try {
             const result = await (window as any).electronAPI.openProject();
             if (result && result.success) {
-              const projectData = JSON.parse(result.content);
-              // Ensure it has the new fields and is not dirty
-              projectData.filePath = result.filePath;
-              projectData.isDirty = false;
-              addProject(projectData);
-              setActiveTab(projectData.id);
-              showToast("Project opened successfully", "info");
+              if (result.type === "project") {
+                const projectData = JSON.parse(result.content);
+                // Ensure it has the new fields and is not dirty
+                projectData.filePath = result.filePath;
+                projectData.isDirty = false;
+                addProject(projectData);
+                setActiveTab(projectData.id);
+                showToast("Project opened successfully", "info");
+              } else if (result.type === "image") {
+                const img = await loadImage(result.dataURL);
+                const name = result.filePath.split(/[\\/]/).pop().replace(/\.[^/.]+$/, "");
+                const newProject = createProjectFromImage(
+                  result.dataURL,
+                  img.naturalWidth,
+                  img.naturalHeight,
+                  name,
+                  result.filePath,
+                );
+                addProject(newProject);
+                setActiveTab(newProject.id);
+                showToast("Image opened successfully", "info");
+              }
             }
           } catch (err: any) {
             showToast(`Failed to open project: ${err.message}`, "error");

@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   confirmClose: (projectName: string) => ipcRenderer.invoke("dialog:confirmClose", projectName),
   openProject: () => ipcRenderer.invoke("dialog:openProject"),
   getAppVersion: () => ipcRenderer.invoke("app:getVersion"),
+  updateMenu: (data: { hasProject: boolean }) => ipcRenderer.invoke("app:updateMenu", data),
   onProjectDropped: (callback: any) => {
     window.addEventListener("project-dropped", (event: any) => callback(event.detail));
   },

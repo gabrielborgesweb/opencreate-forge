@@ -32,6 +32,8 @@ app.commandLine.appendSwitch("enable-zero-copy"); // Melhora a velocidade de esc
 app.commandLine.appendSwitch("enable-features", "SharedArrayBuffer"); // Crucial para WASM multithread
 
 function createMenu() {
+  const isDev = !!VITE_DEV_SERVER_URL;
+
   const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: "File",
@@ -65,6 +67,12 @@ function createMenu() {
           click: () => win?.webContents.send("menu:action", "export-png"),
         },
         { type: "separator" },
+        {
+          label: "Close Project",
+          accelerator: "CmdOrCtrl+W",
+          click: () => win?.webContents.send("menu:action", "close-project"),
+        },
+        { type: "separator" },
         { role: "quit" },
       ],
     },
@@ -94,17 +102,55 @@ function createMenu() {
     },
     { label: "Image", submenu: [{ label: "Canvas Size...", enabled: false }] },
     { label: "Layer", submenu: [{ label: "New Layer", enabled: false }] },
-    { label: "Select", submenu: [{ label: "All", enabled: false }] },
+    {
+      label: "Select",
+      submenu: [
+        {
+          label: "Deselect",
+          accelerator: "CmdOrCtrl+D",
+          click: () => win?.webContents.send("menu:action", "deselect"),
+        },
+        { type: "separator" },
+        { label: "All", enabled: false },
+      ],
+    },
     { label: "Filter", submenu: [{ label: "Blur", enabled: false }] },
     {
       label: "View",
       submenu: [
-        { role: "toggleDevTools" },
-        { role: "reload" },
+        ...(isDev
+          ? ([
+              { role: "toggleDevTools" },
+              { type: "separator" },
+            ] as Electron.MenuItemConstructorOptions[])
+          : []),
+        {
+          label: "Rulers",
+          accelerator: "CmdOrCtrl+R",
+          click: () => win?.webContents.send("menu:action", "toggle-rulers"),
+        },
         { type: "separator" },
-        { role: "zoomIn" },
-        { role: "zoomOut" },
-        { role: "resetZoom" },
+        {
+          label: "Zoom In",
+          accelerator: "CmdOrCtrl+Plus",
+          click: () => win?.webContents.send("menu:action", "zoom-in"),
+        },
+        {
+          label: "Zoom Out",
+          accelerator: "CmdOrCtrl+-",
+          click: () => win?.webContents.send("menu:action", "zoom-out"),
+        },
+        { type: "separator" },
+        {
+          label: "Actual Size",
+          accelerator: "CmdOrCtrl+1",
+          click: () => win?.webContents.send("menu:action", "zoom-100"),
+        },
+        {
+          label: "Fit to Screen",
+          accelerator: "CmdOrCtrl+0",
+          click: () => win?.webContents.send("menu:action", "zoom-fit"),
+        },
       ],
     },
     { label: "Window", submenu: [{ role: "minimize" }, { role: "zoom" }] },

@@ -74,31 +74,6 @@ function App() {
 
       const isCmdOrCtrl = e.ctrlKey || e.metaKey;
 
-      if (isCmdOrCtrl && e.key.toLowerCase() === "n") {
-        e.preventDefault();
-        setIsNewProjectModalOpen(true);
-        return;
-      }
-
-      if (isCmdOrCtrl && e.key.toLowerCase() === "r") {
-        e.preventDefault();
-        setShowRulers(!showRulers);
-        return;
-      }
-
-      if (isCmdOrCtrl && e.key.toLowerCase() === "w") {
-        e.preventDefault();
-        window.dispatchEvent(new CustomEvent("forge:close-project"));
-        return;
-      }
-
-      // 1. Atalhos Globais (Independente de foco em input se for Cmd/Ctrl)
-      if (isCmdOrCtrl && e.key.toLowerCase() === "d") {
-        e.preventDefault();
-        window.dispatchEvent(new CustomEvent("forge:clear-selection"));
-        return;
-      }
-
       // Ignore if typing in an input
       if (
         document.activeElement?.tagName === "INPUT" ||

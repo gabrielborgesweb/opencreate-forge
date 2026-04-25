@@ -11,6 +11,8 @@ export const useMenuHandler = () => {
   const redo = useProjectStore((state) => state.redo);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const showToast = useUIStore((state) => state.showToast);
+  const showRulers = useUIStore((state) => state.showRulers);
+  const setShowRulers = useUIStore((state) => state.setShowRulers);
 
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
@@ -101,6 +103,40 @@ export const useMenuHandler = () => {
         case "redo":
           if (activeProjectId) redo(activeProjectId);
           break;
+
+        case "close-project":
+          window.dispatchEvent(new CustomEvent("forge:close-project"));
+          break;
+
+        case "toggle-rulers":
+          setShowRulers(!showRulers);
+          break;
+
+        case "deselect":
+          window.dispatchEvent(new CustomEvent("forge:clear-selection"));
+          break;
+
+        case "zoom-in": {
+          window.dispatchEvent(new CustomEvent("forge:zoom-to", { detail: { step: 1 } }));
+          break;
+        }
+
+        case "zoom-out": {
+          window.dispatchEvent(new CustomEvent("forge:zoom-to", { detail: { step: -1 } }));
+          break;
+        }
+
+        case "zoom-100":
+          if (activeProject) {
+            window.dispatchEvent(new CustomEvent("forge:zoom-to", { detail: { zoom: 1 } }));
+          }
+          break;
+
+        case "zoom-fit":
+          window.dispatchEvent(
+            new CustomEvent("forge:zoom-to", { detail: { zoom: -1 /* Trigger fit */ } }),
+          );
+          break;
       }
     };
 
@@ -117,5 +153,8 @@ export const useMenuHandler = () => {
     redo,
     setActiveTab,
     showToast,
+    showRulers,
+    setShowRulers,
   ]);
 };
+

@@ -53,7 +53,7 @@ function App() {
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') e.preventDefault(); // Prevent app menu focus
+      if (e.key === "Alt") e.preventDefault(); // Prevent app menu focus
 
       // Handle SelectTool modifiers for visual feedback
       if (activeToolId === "select") {

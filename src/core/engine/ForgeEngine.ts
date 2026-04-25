@@ -1066,7 +1066,10 @@ export class ForgeEngine {
     this.ctx.imageSmoothingEnabled = false;
 
     // --- STEP 1: COMPOSITE PROJECT IN 1:1 BUFFER ---
-    if (this.projectBuffer.width !== this.project.width || this.projectBuffer.height !== this.project.height) {
+    if (
+      this.projectBuffer.width !== this.project.width ||
+      this.projectBuffer.height !== this.project.height
+    ) {
       this.projectBuffer.width = this.project.width;
       this.projectBuffer.height = this.project.height;
     }
@@ -1137,17 +1140,22 @@ export class ForgeEngine {
 
         this.ctx.lineWidth = 1 / this.project.zoom;
         this.ctx.setLineDash([4 / this.project.zoom, 2 / this.project.zoom]);
-        
+
         if (activeLayer.rotation) {
           const centerX = activeLayer.x + activeLayer.width / 2;
           const centerY = activeLayer.y + activeLayer.height / 2;
           this.ctx.translate(centerX, centerY);
           this.ctx.rotate((activeLayer.rotation * Math.PI) / 180);
-          this.ctx.strokeRect(-activeLayer.width / 2, -activeLayer.height / 2, activeLayer.width, activeLayer.height);
+          this.ctx.strokeRect(
+            -activeLayer.width / 2,
+            -activeLayer.height / 2,
+            activeLayer.width,
+            activeLayer.height,
+          );
         } else {
           this.ctx.strokeRect(activeLayer.x, activeLayer.y, activeLayer.width, activeLayer.height);
         }
-        
+
         this.ctx.restore();
       }
     }
@@ -1189,13 +1197,7 @@ export class ForgeEngine {
         );
         break;
       case "text":
-        TextLayer.render(
-          ctx,
-          layer,
-          this.layerCanvasCache,
-          this.layerReadyCache,
-          editingState,
-        );
+        TextLayer.render(ctx, layer, this.layerCanvasCache, this.layerReadyCache, editingState);
         break;
       case "group":
         GroupLayer.render(ctx, layer);

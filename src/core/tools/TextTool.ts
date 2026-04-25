@@ -300,7 +300,12 @@ export class TextTool extends BaseTool {
       const editingLayer = context.project.layers.find((l) => l.id === this.editingLayerId);
       if (editingLayer) {
         const localPos = this.worldToLocal(x, y, editingLayer);
-        this.caretIndex = TextLayer.getCaretIndexAt(context.ctx, editingLayer, localPos.x, localPos.y);
+        this.caretIndex = TextLayer.getCaretIndexAt(
+          context.ctx,
+          editingLayer,
+          localPos.x,
+          localPos.y,
+        );
       }
       return;
     }

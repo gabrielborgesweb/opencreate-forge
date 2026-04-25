@@ -73,10 +73,34 @@ const HomeScreen: React.FC = () => {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setIsDraggingOver(false);
 
     const files = Array.from(e.dataTransfer.files);
     for (const file of files) {
-      if (file.type.startsWith("image/")) {
+      const isProject = file.name.toLowerCase().endsWith(".ocfd");
+
+      if (isProject) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const content = event.target?.result as string;
+            const projectData = JSON.parse(content);
+
+            // In Electron, File objects have a 'path' property
+            projectData.filePath = (file as any).path;
+            projectData.isDirty = false;
+
+            addProject(projectData);
+            setActiveTab(projectData.id);
+            useUIStore.getState().showToast("Project opened successfully", "info");
+          } catch (err) {
+            console.error("Failed to parse project file", err);
+            useUIStore.getState().showToast("Failed to open project file", "error");
+          }
+        };
+        reader.readAsText(file);
+        break;
+      } else if (file.type.startsWith("image/")) {
         const reader = new FileReader();
         reader.onload = async (event) => {
           const dataUrl = event.target?.result as string;

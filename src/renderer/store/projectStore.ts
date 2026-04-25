@@ -127,6 +127,26 @@ export const createHistoryState = (project: Project): HistoryState => ({
   selection: JSON.parse(JSON.stringify(project.selection)),
 });
 
+/**
+ * Prepares a project for serialization (saving to disk).
+ * Includes history stacks but may limit them to avoid excessively large files.
+ */
+export const getSerializableProject = (project: Project): any => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { isDirty, filePath, undoStack, redoStack, ...rest } = project;
+
+  // We keep the history but limit it to avoid massive files due to Base64 data duplication.
+  // 20 steps is usually a good compromise for persisted history.
+  const persistedUndoStack = undoStack.slice(-20);
+
+  return {
+    ...rest,
+    undoStack: persistedUndoStack,
+    redoStack: [], // Redo stack is typically not persisted across sessions
+    updatedAt: new Date().toISOString(),
+  };
+};
+
 export const useProjectStore = create<ProjectState>((set, _get) => ({
   projects: [],
   activeProjectId: null,

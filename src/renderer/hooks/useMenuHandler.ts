@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useProjectStore } from "@store/projectStore";
+import { useProjectStore, getSerializableProject } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";
 import { createProjectFromImage, loadImage } from "@utils/projectUtils";
 
@@ -66,8 +66,8 @@ export const useMenuHandler = () => {
           if (activeProject.filePath) {
             try {
               const appVersion = await (window as any).electronAPI.getAppVersion();
-              const projectWithVersion = { ...activeProject, version: appVersion };
-              const jsonString = JSON.stringify(projectWithVersion);
+              const serializableProject = getSerializableProject(activeProject);
+              const jsonString = JSON.stringify({ ...serializableProject, version: appVersion });
 
               const result = await (window as any).electronAPI.saveProject({
                 jsonString,
@@ -76,9 +76,14 @@ export const useMenuHandler = () => {
               if (result.success) {
                 updateProject(activeProject.id, { isDirty: false, version: appVersion });
                 showToast("Project saved", "info");
+                window.dispatchEvent(new CustomEvent("forge:save-project-finished", { detail: { success: true } }));
+              } else {
+                window.dispatchEvent(new CustomEvent("forge:save-project-finished", { detail: { success: false } }));
               }
             } catch (err: any) {
+              console.error("Save error:", err);
               showToast(`Failed to save project: ${err.message}`, "error");
+              window.dispatchEvent(new CustomEvent("forge:save-project-finished", { detail: { success: false } }));
             }
           } else {
             handleAction("save-project-as");
@@ -89,8 +94,8 @@ export const useMenuHandler = () => {
           if (!activeProject) return;
           try {
             const appVersion = await (window as any).electronAPI.getAppVersion();
-            const projectWithVersion = { ...activeProject, version: appVersion };
-            const jsonString = JSON.stringify(projectWithVersion);
+            const serializableProject = getSerializableProject(activeProject);
+            const jsonString = JSON.stringify({ ...serializableProject, version: appVersion });
 
             const result = await (window as any).electronAPI.saveProjectAs({
               jsonString,
@@ -104,9 +109,14 @@ export const useMenuHandler = () => {
                 version: appVersion,
               });
               showToast("Project saved", "info");
+              window.dispatchEvent(new CustomEvent("forge:save-project-finished", { detail: { success: true } }));
+            } else {
+              window.dispatchEvent(new CustomEvent("forge:save-project-finished", { detail: { success: false } }));
             }
           } catch (err: any) {
+            console.error("Save As error:", err);
             showToast(`Failed to save project: ${err.message}`, "error");
+            window.dispatchEvent(new CustomEvent("forge:save-project-finished", { detail: { success: false } }));
           }
           break;
 
@@ -188,8 +198,12 @@ export const useMenuHandler = () => {
     };
 
     const cleanup = (window as any).electronAPI.onMenuAction(handleAction);
+    const handleSaveRequest = () => handleAction("save-project");
+    window.addEventListener("forge:save-project", handleSaveRequest);
+
     return () => {
       if (cleanup) cleanup();
+      window.removeEventListener("forge:save-project", handleSaveRequest);
     };
   }, [
     activeProjectId,

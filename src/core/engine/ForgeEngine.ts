@@ -1052,11 +1052,16 @@ export class ForgeEngine {
     const startPanX = this.project.panX;
     const startPanY = this.project.panY;
 
-    // To keep the center point stable during exponential zoom:
+    // We want to interpolate the "project point" that is at the center of the viewport
     const viewportWidth = this.canvas.width;
     const viewportHeight = this.canvas.height;
     const centerX = viewportWidth / 2;
     const centerY = viewportHeight / 2;
+
+    const startCenterProjX = (centerX - startPanX) / startZoom;
+    const startCenterProjY = (centerY - startPanY) / startZoom;
+    const targetCenterProjX = (centerX - targetPanX) / targetZoom;
+    const targetCenterProjY = (centerY - targetPanY) / targetZoom;
 
     const duration = 400; // Snappier duration
     const startTime = performance.now();
@@ -1074,9 +1079,13 @@ export class ForgeEngine {
         Math.log(startZoom) + (Math.log(targetZoom) - Math.log(startZoom)) * ease,
       );
 
-      // INTERPOLATION for Pan (keeping the center fixed relative to current zoom)
-      const currentPanX = centerX - (centerX - startPanX) * (currentZoom / startZoom);
-      const currentPanY = centerY - (centerY - startPanY) * (currentZoom / startZoom);
+      // Interpolate the project point at the center of the viewport
+      const currentCenterProjX = startCenterProjX + (targetCenterProjX - startCenterProjX) * ease;
+      const currentCenterProjY = startCenterProjY + (targetCenterProjY - startCenterProjY) * ease;
+
+      // Calculate new Pan based on the interpolated center point
+      const currentPanX = centerX - currentCenterProjX * currentZoom;
+      const currentPanY = centerY - currentCenterProjY * currentZoom;
 
       this.project.zoom = currentZoom;
       this.project.panX = currentPanX;

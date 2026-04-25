@@ -4,10 +4,13 @@ TODO: OpenCreate Forge
 [-] Marcar como pendente
 
 - [ ] Guias (depois de Régua)
-- [ ] Salvamento local
-  - [ ] Ferramenta atual
-  - [ ] Foreground atual
-  - [ ] Background atual
+- [ ] Carregar todas as fontes do sistema
+  - [ ] Integrar com Google Fonts
+- [x] Salvamento local
+  - [x] Ferramenta atual
+  - [x] Foreground atual
+  - [x] Background atual
+  - [x] ToolOptions atual
 - [x] Ferramenta Texto (depois de Tipos de Camada)
   - [ ] Suporte a RichText
 - [-] Tipos de Camada

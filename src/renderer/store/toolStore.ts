@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 export type ToolId =
   | "move"
@@ -70,87 +71,110 @@ interface ToolState {
   resetColors: () => void;
 }
 
-export const useToolStore = create<ToolState>((set) => ({
-  activeToolId: "move",
-  previousToolId: "move",
-  isInteracting: false,
-  foregroundColor: "#000000",
-  backgroundColor: "#ffffff",
-  toolSettings: {
-    move: { autoSelect: true },
-    select: { mode: "replace", shape: "rectangle" },
-    brush: { size: 50, color: "#000000", hardness: 1.0 },
-    pencil: { size: 1, color: "#000000", shape: "square" },
-    eraser: { size: 100, hardness: 1.0, mode: "brush", shape: "circle" },
-    text: {
-      fontFamily: "Arial",
-      fontSize: 24,
-      fontWeight: "normal",
-      color: "#000000",
-      textAlign: "left",
-      lineHeight: 1.2,
-      tracking: 0,
-      textOverflow: true,
-      textRendering: "bilinear",
-      isEditing: false,
-    },
-    crop: {
-      mode: "Free",
-      ratioW: 1,
-      ratioH: 1,
-      deleteCropped: true,
-      isDirty: false,
-    },
-    transform: {
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-      scaleX: 1,
-      scaleY: 1,
-      rotation: 0,
-      anchor: { x: 0.5, y: 0.5 },
-      isDirty: false,
-    },
-  },
-
-  setActiveTool: (id) =>
-    set((state) => {
-      if (id === state.activeToolId) return state;
-
-      // Don't save 'transform' or 'crop' as the previous tool
-      const newPreviousToolId =
-        state.activeToolId === "transform" || state.activeToolId === "crop"
-          ? state.previousToolId
-          : state.activeToolId;
-
-      return {
-        activeToolId: id,
-        previousToolId: newPreviousToolId,
-      };
-    }),
-
-  setInteracting: (isInteracting) =>
-    set((state) => (state.isInteracting === isInteracting ? state : { isInteracting })),
-
-  updateToolSettings: (id, settings) =>
-    set((state) => ({
-      toolSettings: {
-        ...state.toolSettings,
-        [id]: { ...state.toolSettings[id as keyof typeof state.toolSettings], ...settings },
-      },
-    })),
-
-  setForegroundColor: (color) => set({ foregroundColor: color }),
-  setBackgroundColor: (color) => set({ backgroundColor: color }),
-  swapColors: () =>
-    set((state) => ({
-      foregroundColor: state.backgroundColor,
-      backgroundColor: state.foregroundColor,
-    })),
-  resetColors: () =>
-    set({
+export const useToolStore = create<ToolState>()(
+  persist(
+    (set) => ({
+      activeToolId: "move",
+      previousToolId: "move",
+      isInteracting: false,
       foregroundColor: "#000000",
       backgroundColor: "#ffffff",
+      toolSettings: {
+        move: { autoSelect: true },
+        select: { mode: "replace", shape: "rectangle" },
+        brush: { size: 50, color: "#000000", hardness: 1.0 },
+        pencil: { size: 1, color: "#000000", shape: "square" },
+        eraser: { size: 100, hardness: 1.0, mode: "brush", shape: "circle" },
+        text: {
+          fontFamily: "Arial",
+          fontSize: 24,
+          fontWeight: "normal",
+          color: "#000000",
+          textAlign: "left",
+          lineHeight: 1.2,
+          tracking: 0,
+          textOverflow: true,
+          textRendering: "bilinear",
+          isEditing: false,
+        },
+        crop: {
+          mode: "Free",
+          ratioW: 1,
+          ratioH: 1,
+          deleteCropped: true,
+          isDirty: false,
+        },
+        transform: {
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+          scaleX: 1,
+          scaleY: 1,
+          rotation: 0,
+          anchor: { x: 0.5, y: 0.5 },
+          isDirty: false,
+        },
+      },
+
+      setActiveTool: (id) =>
+        set((state) => {
+          if (id === state.activeToolId) return state;
+
+          // Don't save 'transform' or 'crop' as the previous tool
+          const newPreviousToolId =
+            state.activeToolId === "transform" || state.activeToolId === "crop"
+              ? state.previousToolId
+              : state.activeToolId;
+
+          return {
+            activeToolId: id,
+            previousToolId: newPreviousToolId,
+          };
+        }),
+
+      setInteracting: (isInteracting) =>
+        set((state) => (state.isInteracting === isInteracting ? state : { isInteracting })),
+
+      updateToolSettings: (id, settings) =>
+        set((state) => ({
+          toolSettings: {
+            ...state.toolSettings,
+            [id]: { ...state.toolSettings[id as keyof typeof state.toolSettings], ...settings },
+          },
+        })),
+
+      setForegroundColor: (color) => set({ foregroundColor: color }),
+      setBackgroundColor: (color) => set({ backgroundColor: color }),
+      swapColors: () =>
+        set((state) => ({
+          foregroundColor: state.backgroundColor,
+          backgroundColor: state.foregroundColor,
+        })),
+      resetColors: () =>
+        set({
+          foregroundColor: "#000000",
+          backgroundColor: "#ffffff",
+        }),
     }),
-}));
+    {
+      name: "forge-tool-storage",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        activeToolId:
+          state.activeToolId === "transform" || state.activeToolId === "crop"
+            ? state.previousToolId
+            : state.activeToolId,
+        previousToolId: state.previousToolId,
+        foregroundColor: state.foregroundColor,
+        backgroundColor: state.backgroundColor,
+        toolSettings: {
+          ...state.toolSettings,
+          text: { ...state.toolSettings.text, isEditing: false },
+          crop: { ...state.toolSettings.crop, isDirty: false },
+          transform: { ...state.toolSettings.transform, isDirty: false },
+        },
+      }),
+    },
+  ),
+);

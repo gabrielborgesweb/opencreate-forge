@@ -14,16 +14,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // │ │ ├── main.js
 // │ │ └── preload.js
 // │
-process.env.APP_ROOT = path.join(__dirname, "..");
+const APP_ROOT = path.join(__dirname, "..");
+process.env.APP_ROOT = APP_ROOT;
 
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - https://github.com/vitejs/vite/discussions/5912
 export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
-export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
+export const MAIN_DIST = path.join(APP_ROOT, "dist-electron");
+export const RENDERER_DIST = path.join(APP_ROOT, "dist");
 
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
-  ? path.join(process.env.APP_ROOT, "public")
-  : RENDERER_DIST;
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(APP_ROOT, "public") : RENDERER_DIST;
 
 let win: BrowserWindow | null;
 
@@ -117,6 +116,13 @@ function createMenu() {
 }
 
 function createWindow() {
+  const iconPath =
+    process.platform === "win32"
+      ? path.join(APP_ROOT, "shared/favicon/favicon-windows.ico")
+      : process.platform === "darwin"
+        ? path.join(APP_ROOT, "shared/favicon/favicon-darwin.icns")
+        : path.join(APP_ROOT, "shared/favicon/favicon-linux.png");
+
   win = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -125,6 +131,7 @@ function createWindow() {
     backgroundColor: "#1a1a1a",
     center: true,
     darkTheme: true,
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, "preload.mjs"),
       contextIsolation: true,

@@ -5,12 +5,14 @@ import electron from "vite-plugin-electron/simple";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
+  root: path.join(__dirname, "src/renderer"),
+  publicDir: path.join(__dirname, "public"),
   plugins: [
     react(),
     tailwindcss(),
     electron({
       main: {
-        entry: "src/main/main.ts",
+        entry: path.join(__dirname, "src/main/main.ts"),
         vite: {
           build: {
             outDir: "dist-electron",
@@ -18,7 +20,7 @@ export default defineConfig({
         },
       },
       preload: {
-        input: "src/main/preload.ts",
+        input: path.join(__dirname, "src/main/preload.ts"),
         vite: {
           build: {
             outDir: "dist-electron",
@@ -38,6 +40,7 @@ export default defineConfig({
     },
   },
   build: {
+    outDir: path.resolve(__dirname, "dist"),
     emptyOutDir: true,
   },
 });

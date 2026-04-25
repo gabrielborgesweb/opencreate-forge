@@ -46,7 +46,7 @@
     "appId": "com.opencreate.forge",
     "mac": {
       "category": "public.app-category.graphics-design",
-      "icon": "favicon-darwin-liquid.icns"
+      "icon": "shared/favicon/favicon-darwin-liquid.icns"
     }
   }
 }

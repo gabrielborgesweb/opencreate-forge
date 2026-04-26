@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { BrushTool } from "@/core/tools/BrushTool";
 import { PencilTool } from "@/core/tools/PencilTool";
-import { EraserTool } from "@/core/tools/EraserTool";
 import { createMockToolContext } from "../../mocks";
 
 describe("Painting Tools", () => {

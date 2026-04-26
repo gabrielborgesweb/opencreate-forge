@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SelectTool } from "@/core/tools/SelectTool";
-import { TransformTool } from "@/core/tools/TransformTool";
 import { createMockToolContext } from "../../mocks";
 
 describe("Selection and Transform Tools", () => {

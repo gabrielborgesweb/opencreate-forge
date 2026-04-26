@@ -140,12 +140,11 @@ jobs:
           <td><a href="$BASE_URL/${INTERNAL_NAME}_${VERSION}_amd64.deb">Debian (DEB)</a></td>
           </tr>
           <tr>
-          <td><a href="$BASE_URL/$INTERNAL_NAME-$VERSION.x86_64.rpm">RedHat (RPM)</a></td>
+          <td><a href="$BASE_URL/$INTERNAL_NAME-$VERSION.x86_64.rpm">Fedora (RPM)</a></td>
           </tr>
           </tbody>
           </table>
 
-          > **Note:** If you are seeing 404 errors, please ensure the release is **Published** and not in Draft state.
           EOF
 
       - name: Create Release

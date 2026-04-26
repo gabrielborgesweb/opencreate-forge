@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from "vite";
 import path from "node:path";
 import react from "@vitejs/plugin-react";
@@ -27,8 +28,6 @@ export default defineConfig({
           },
         },
       },
-      // Removendo o objeto vazio 'renderer' para evitar o erro de detecção automática do plugin
-      // Se precisarmos de 'require' no renderer, usaremos o plugin separadamente.
     }),
   ],
   resolve: {
@@ -39,6 +38,13 @@ export default defineConfig({
       "@store": path.resolve(__dirname, "./src/renderer/store"),
       "@utils": path.resolve(__dirname, "./src/renderer/utils"),
     },
+  },
+  test: {
+    globals: true,
+    environment: "jsdom",
+    root: path.resolve(__dirname, "."),
+    setupFiles: [path.resolve(__dirname, "./src/renderer/test/setup.ts")],
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
   build: {
     outDir: path.resolve(__dirname, "dist"),

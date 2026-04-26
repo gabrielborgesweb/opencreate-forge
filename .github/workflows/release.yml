@@ -32,7 +32,7 @@ jobs:
         run: npm run check
 
       - name: Build
-        run: npm run build -- --publish never
+        run: npm run build -- --publish never -m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -80,20 +80,14 @@ jobs:
           REPO="${{ github.repository }}"
           BASE_URL="https://github.com/$REPO/releases/download/$TAG"
 
-          # electron-builder sanitization rules:
-          # Windows: Spaces to dots
-          # macOS: Spaces are kept (usually)
-          # Linux: Uses 'name' field from package.json (opencreate-forge)
+          # electron-builder naming conventions:
+          # Windows/AppImage: ProductName.Version.ext (spaces to dots)
+          # macOS: ProductName-Version-arch.ext (spaces to dots)
+          # Linux (deb/rpm): name_version_arch.ext or name-version.arch.ext
 
-          PRODUCT_NAME="OpenCreate Forge"
+          PRODUCT_NAME_DOTS="OpenCreate.Forge"
           INTERNAL_NAME="opencreate-forge"
 
-          WIN_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /./g')
-          MAC_NAME="$PRODUCT_NAME"
-          LINUX_NAME="$INTERNAL_NAME"
-
-          # URL encode for the table links (replacing space with %20 for macOS)
-          MAC_URL_NAME=$(echo "$MAC_NAME" | sed 's/ /%20/g')
           cat <<EOF > body.md
           ## Downloads
 
@@ -109,40 +103,41 @@ jobs:
           <tr>
           <td rowspan="2"><strong>Windows</strong></td>
           <td rowspan="2">x64</td>
-          <td><a href="$BASE_URL/$WIN_NAME.Setup.$VERSION.exe">Installer (EXE)</a></td>
+          <td><a href="$BASE_URL/$PRODUCT_NAME_DOTS.Setup.$VERSION.exe">Installer (EXE)</a></td>
           </tr>
           <tr>
-          <td><a href="$BASE_URL/$WIN_NAME.$VERSION.exe">Portable (EXE)</a></td>
+          <td><a href="$BASE_URL/$PRODUCT_NAME_DOTS.$VERSION.exe">Portable (EXE)</a></td>
           </tr>
           <tr>
           <td rowspan="4"><strong>macOS</strong></td>
           <td rowspan="2">Intel (x64)</td>
-          <td><a href="$BASE_URL/$MAC_URL_NAME-$VERSION.dmg">Universal/Intel (DMG)</a></td>
+          <td><a href="$BASE_URL/$PRODUCT_NAME_DOTS-$VERSION.dmg">Universal/Intel (DMG)</a></td>
           </tr>
           <tr>
-          <td><a href="$BASE_URL/$MAC_URL_NAME-$VERSION-mac.zip">Portable (ZIP/APP)</a></td>
+          <td><a href="$BASE_URL/$PRODUCT_NAME_DOTS-$VERSION-mac.zip">Portable (ZIP/APP)</a></td>
           </tr>
           <tr>
           <td rowspan="2">Apple Silicon (arm64)</td>
-          <td><a href="$BASE_URL/$MAC_URL_NAME-$VERSION-arm64.dmg">Download (DMG)</a></td>
+          <td><a href="$BASE_URL/$PRODUCT_NAME_DOTS-$VERSION-arm64.dmg">Download (DMG)</a></td>
           </tr>
           <tr>
-          <td><a href="$BASE_URL/$MAC_URL_NAME-$VERSION-arm64-mac.zip">Portable (ZIP/APP)</a></td>
+          <td><a href="$BASE_URL/$PRODUCT_NAME_DOTS-$VERSION-arm64-mac.zip">Portable (ZIP/APP)</a></td>
           </tr>
           <tr>
           <td rowspan="3"><strong>Linux</strong></td>
           <td rowspan="3">x64</td>
-          <td><a href="$BASE_URL/$LINUX_NAME-$VERSION.AppImage">AppImage</a></td>
+          <td><a href="$BASE_URL/$PRODUCT_NAME_DOTS-$VERSION.AppImage">AppImage</a></td>
           </tr>
           <tr>
-          <td><a href="$BASE_URL/${LINUX_NAME}_${VERSION}_amd64.deb">Debian (DEB)</a></td>
+          <td><a href="$BASE_URL/${INTERNAL_NAME}_${VERSION}_amd64.deb">Debian (DEB)</a></td>
           </tr>
           <tr>
-          <td><a href="$BASE_URL/$LINUX_NAME-$VERSION.x86_64.rpm">RedHat (RPM)</a></td>
+          <td><a href="$BASE_URL/$INTERNAL_NAME-$VERSION.x86_64.rpm">RedHat (RPM)</a></td>
           </tr>
           </tbody>
           </table>
 
+          > **Note:** If you are seeing 404 errors, please ensure the release is **Published** and not in Draft state.
           EOF
 
       - name: Create Release
@@ -150,7 +145,7 @@ jobs:
         with:
           body_path: body.md
           files: artifacts/*
-          draft: true
+          draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

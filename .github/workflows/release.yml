@@ -83,16 +83,17 @@ jobs:
           # electron-builder sanitization rules:
           # Windows: Spaces to dots
           # macOS: Spaces are kept (usually)
-          # Linux: Spaces to hyphens
+          # Linux: Uses 'name' field from package.json (opencreate-forge)
 
           PRODUCT_NAME="OpenCreate Forge"
+          INTERNAL_NAME="opencreate-forge"
+
           WIN_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /./g')
           MAC_NAME="$PRODUCT_NAME"
-          LINUX_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /-/g')
+          LINUX_NAME="$INTERNAL_NAME"
 
           # URL encode for the table links (replacing space with %20 for macOS)
           MAC_URL_NAME=$(echo "$MAC_NAME" | sed 's/ /%20/g')
-
           cat <<EOF > body.md
           ## Downloads
 

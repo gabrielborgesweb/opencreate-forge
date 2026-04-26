@@ -118,6 +118,8 @@ const HomeScreen: React.FC = () => {
         };
         reader.readAsDataURL(file);
         break; // Just create one project for the first image
+      } else {
+        useUIStore.getState().showToast(`File "<b>${file.name}</b>" is not supported.`, "error");
       }
     }
   };

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { X, LucideIcon } from "lucide-react";
 
 interface BaseModalProps {
@@ -9,6 +9,7 @@ interface BaseModalProps {
   width?: string;
   height?: string;
   children: React.ReactNode;
+  trapFocusSelector?: string;
 }
 
 const BaseModal: React.FC<BaseModalProps> = ({
@@ -19,9 +20,11 @@ const BaseModal: React.FC<BaseModalProps> = ({
   width = "900px",
   height = "600px",
   children,
+  trapFocusSelector,
 }) => {
   const [isRendered, setIsRendered] = useState(isOpen);
   const [isVisible, setIsVisible] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   // --- Sincronização de Estado durante o Render ---
 
@@ -55,12 +58,43 @@ const BaseModal: React.FC<BaseModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+      }
+
+      if (e.key === "Tab" && modalRef.current) {
+        const container = trapFocusSelector
+          ? modalRef.current.querySelector(trapFocusSelector) || modalRef.current
+          : modalRef.current;
+
+        const focusableElements = container.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0] as HTMLElement;
+        const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            lastElement.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            firstElement.focus();
+            e.preventDefault();
+          }
+        }
+      }
     };
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, trapFocusSelector]);
 
   if (!isRendered) return null;
 
@@ -73,6 +107,7 @@ const BaseModal: React.FC<BaseModalProps> = ({
       onTransitionEnd={handleTransitionEnd}
     >
       <div
+        ref={modalRef}
         style={{ width, height }}
         className={`bg-[#252525] rounded-lg border border-border overflow-hidden flex flex-col shadow-2xl transition-all duration-300 transform ${
           isVisible
@@ -87,7 +122,7 @@ const BaseModal: React.FC<BaseModalProps> = ({
           </h2>
           <button
             onClick={onClose}
-            className="bg-none border-none text-inherit flex p-1 rounded cursor-pointer hover:bg-white/10 transition-colors items-center justify-center"
+            className="bg-none border-none text-inherit flex p-1 rounded cursor-pointer hover:bg-white/10 focus-visible:ring-1 focus-visible:ring-accent outline-none transition-colors items-center justify-center"
           >
             <X size={16} />
           </button>

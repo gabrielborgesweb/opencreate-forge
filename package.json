@@ -72,6 +72,14 @@
       "gatekeeperAssess": false,
       "identity": null
     },
+    "win": {
+      "icon": "shared/favicon/favicon-windows.ico",
+      "target": "nsis"
+    },
+    "linux": {
+      "icon": "shared/favicon/favicon-linux.png",
+      "target": "AppImage"
+    },
     "dmg": {
       "sign": false
     }

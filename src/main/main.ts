@@ -193,7 +193,7 @@ function createMenu(hasProject = false) {
         },
       ],
     },
-    { label: "Window", submenu: [{ role: "minimize" }, { role: "zoom" }] },
+    { label: "Window", submenu: [{ role: "minimize" }] },
     { label: "Help", submenu: [{ label: "About OpenCreate Forge", enabled: false }] },
   ];
 
@@ -206,7 +206,7 @@ function createWindow() {
     process.platform === "win32"
       ? path.join(APP_ROOT, "shared/favicon/favicon-windows.ico")
       : process.platform === "darwin"
-        ? path.join(APP_ROOT, "shared/favicon/favicon-darwin.icns")
+        ? path.join(APP_ROOT, "shared/favicon/favicon-darwin-liquid.icns")
         : path.join(APP_ROOT, "shared/favicon/favicon-linux.png");
 
   win = new BrowserWindow({

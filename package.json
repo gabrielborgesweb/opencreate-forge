@@ -1,6 +1,6 @@
 {
   "name": "opencreate-forge",
-  "author": "Gabriel Borges <gabrielborgesweb@gmail.com>",
+  "author": "Gabriel Borges <contato@gabrielborges.dev.br>",
   "description": "Image Editor powered by React & Electron",
   "productName": "OpenCreate Forge",
   "type": "module",

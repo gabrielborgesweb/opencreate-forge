@@ -6,7 +6,7 @@ on:
       - "v*"
 
 jobs:
-  publish:
+  build:
     permissions:
       contents: write
     strategy:
@@ -31,12 +31,105 @@ jobs:
       - name: Run quality checks
         run: npm run check
 
-      - name: Build and Publish
-        # We use electron-builder via the build script.
-        # The --publish always flag tells electron-builder to upload to GitHub Releases.
-        run: npm run build -- --publish always
+      - name: Build
+        run: npm run build -- --publish never
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # For macOS signing (optional):
-          # CSC_LINK: ${{ secrets.CSC_LINK }}
-          # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.os }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+          if-no-files-found: error
+
+  create-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Get Version
+        id: get_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Prepare Release Body
+        id: release_body
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          TAG="${{ steps.get_version.outputs.tag_name }}"
+          REPO="${{ github.repository }}"
+          BASE_URL="https://github.com/$REPO/releases/download/$TAG"
+          
+          # Adjusting filenames based on electron-builder default naming convention:
+          # ${productName}-${version}-${arch}.${ext} (spaces are preserved or replaced depending on target)
+          # Based on dry run: "OpenCreate Forge-0.1.0-arm64.dmg"
+          
+          PRODUCT_NAME="OpenCreate Forge"
+          
+          cat <<EOF > body.md
+          ## Downloads
+          
+          <table>
+          <thead>
+          <tr>
+          <th>Platform</th>
+          <th>Architecture</th>
+          <th>Download</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr>
+          <td><strong>Windows</strong></td>
+          <td>x64</td>
+          <td><a href="$BASE_URL/$PRODUCT_NAME.Setup.$VERSION.exe">Installer (EXE)</a></td>
+          </tr>
+          <tr>
+          <td rowspan="2"><strong>macOS</strong></td>
+          <td>Intel (x64)</td>
+          <td><a href="$BASE_URL/$PRODUCT_NAME-$VERSION.dmg">Universal/Intel (DMG)</a></td>
+          </tr>
+          <tr>
+          <td>Apple Silicon (arm64)</td>
+          <td><a href="$BASE_URL/$PRODUCT_NAME-$VERSION-arm64.dmg">Download (DMG)</a></td>
+          </tr>
+          <tr>
+          <td><strong>Linux</strong></td>
+          <td>x64</td>
+          <td><a href="$BASE_URL/$PRODUCT_NAME-$VERSION.AppImage">AppImage</a></td>
+          </tr>
+          </tbody>
+          </table>
+          
+          ---
+          *For more details on changes in this release, please check the commit history.*
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: body.md
+          files: artifacts/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

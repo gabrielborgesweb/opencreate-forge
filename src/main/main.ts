@@ -251,7 +251,7 @@ function createWindow() {
       nodeIntegration: false,
       additionalArguments: [
         "--disable-pinch", // Own zoom handling
-        "--force-color-profile=srgb", // Cores mais consistentes entre plataformas
+        "--force-color-profile=srgb", // More consistent colors between platforms
       ],
     },
   });
@@ -319,7 +319,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle("dialog:saveFile", async (_event, { dataURL, defaultName }) => {
     const { canceled, filePath } = await dialog.showSaveDialog({
-      title: "Exportar imagem",
+      title: "Export image",
       defaultPath: defaultName || "export.png",
       filters: [
         { name: "PNG", extensions: ["png"] },

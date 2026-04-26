@@ -89,7 +89,7 @@ const ProjectTabs: React.FC = () => {
   }, [activeTab, handleCloseTab]);
 
   return (
-    <div className="flex bg-[#111] h-[35px] border-b border-bg-tertiary px-[5px] items-end overflow-x-auto gap-1">
+    <div className="flex bg-[#111] h-[35px] border-b border-bg-tertiary px-[5px] items-end overflow-y-hidden overflow-x-auto gap-1">
       <button
         onClick={() => handleTabClick("home")}
         tabIndex={-1}

@@ -32,7 +32,15 @@ jobs:
         run: npm run check
 
       - name: Build
-        run: npm run build -- --publish never -m
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" == "macos-latest" ]; then
+            npm run build -- --publish never --mac --x64 --arm64
+          elif [ "${{ matrix.os }}" == "windows-latest" ]; then
+            npm run build -- --publish never --win --x64
+          else
+            npm run build -- --publish never --linux --x64
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

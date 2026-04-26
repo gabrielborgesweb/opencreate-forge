@@ -1481,7 +1481,9 @@ export class ForgeEngine {
 
     // Se HOUVER seleção, faz o "Layer via Copy" (Photoshop style)
     if (activeLayer.type !== "raster" || !activeLayer.data) {
-      useUIStore.getState().showToast("Selection duplication only works on raster layers", "warning");
+      useUIStore
+        .getState()
+        .showToast("Selection duplication only works on raster layers", "warning");
       return;
     }
 

@@ -18,10 +18,10 @@ describe("MoveTool", () => {
     context.screenToProject = vi.fn(() => ({ x: 20, y: 25 }));
     tool.onMouseMove({ offsetX: 20, offsetY: 25 } as MouseEvent, context);
 
-    expect(context.updateProject).toHaveBeenCalledWith(expect.objectContaining({
-      layers: expect.arrayContaining([
-        expect.objectContaining({ x: 10, y: 15 })
-      ])
-    }));
+    expect(context.updateProject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        layers: expect.arrayContaining([expect.objectContaining({ x: 10, y: 15 })]),
+      }),
+    );
   });
 });

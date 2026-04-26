@@ -70,7 +70,7 @@ const BaseModal: React.FC<BaseModalProps> = ({
           : modalRef.current;
 
         const focusableElements = container.querySelectorAll(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
         );
 
         if (focusableElements.length === 0) return;

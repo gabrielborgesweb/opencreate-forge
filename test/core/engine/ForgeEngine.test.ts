@@ -13,7 +13,7 @@ describe("ForgeEngine", () => {
     Object.defineProperty(canvas, "parentElement", {
       value: { clientWidth: 1000, clientHeight: 800 },
       configurable: true,
-      writable: true
+      writable: true,
     });
     onViewportChange = vi.fn();
     vi.stubGlobal("requestAnimationFrame", vi.fn());

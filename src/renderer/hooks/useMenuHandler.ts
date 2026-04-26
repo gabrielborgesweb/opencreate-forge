@@ -43,7 +43,10 @@ export const useMenuHandler = () => {
                 showToast("Project opened successfully", "info");
               } else if (result.type === "image") {
                 const img = await loadImage(result.dataURL);
-                const name = result.filePath.split(/[\\/]/).pop().replace(/\.[^/.]+$/, "");
+                const name = result.filePath
+                  .split(/[\\/]/)
+                  .pop()
+                  .replace(/\.[^/.]+$/, "");
                 const newProject = createProjectFromImage(
                   result.dataURL,
                   img.naturalWidth,
@@ -76,14 +79,20 @@ export const useMenuHandler = () => {
               if (result.success) {
                 updateProject(activeProject.id, { isDirty: false, version: appVersion });
                 showToast("Project saved", "info");
-                window.dispatchEvent(new CustomEvent("forge:save-project-finished", { detail: { success: true } }));
+                window.dispatchEvent(
+                  new CustomEvent("forge:save-project-finished", { detail: { success: true } }),
+                );
               } else {
-                window.dispatchEvent(new CustomEvent("forge:save-project-finished", { detail: { success: false } }));
+                window.dispatchEvent(
+                  new CustomEvent("forge:save-project-finished", { detail: { success: false } }),
+                );
               }
             } catch (err: any) {
               console.error("Save error:", err);
               showToast(`Failed to save project: ${err.message}`, "error");
-              window.dispatchEvent(new CustomEvent("forge:save-project-finished", { detail: { success: false } }));
+              window.dispatchEvent(
+                new CustomEvent("forge:save-project-finished", { detail: { success: false } }),
+              );
             }
           } else {
             handleAction("save-project-as");
@@ -109,14 +118,20 @@ export const useMenuHandler = () => {
                 version: appVersion,
               });
               showToast("Project saved", "info");
-              window.dispatchEvent(new CustomEvent("forge:save-project-finished", { detail: { success: true } }));
+              window.dispatchEvent(
+                new CustomEvent("forge:save-project-finished", { detail: { success: true } }),
+              );
             } else {
-              window.dispatchEvent(new CustomEvent("forge:save-project-finished", { detail: { success: false } }));
+              window.dispatchEvent(
+                new CustomEvent("forge:save-project-finished", { detail: { success: false } }),
+              );
             }
           } catch (err: any) {
             console.error("Save As error:", err);
             showToast(`Failed to save project: ${err.message}`, "error");
-            window.dispatchEvent(new CustomEvent("forge:save-project-finished", { detail: { success: false } }));
+            window.dispatchEvent(
+              new CustomEvent("forge:save-project-finished", { detail: { success: false } }),
+            );
           }
           break;
 

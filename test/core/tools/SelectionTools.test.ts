@@ -17,12 +17,14 @@ describe("Selection and Transform Tools", () => {
       tool.onMouseMove({ offsetX: 150, offsetY: 150 } as MouseEvent, context);
       tool.onMouseUp({ offsetX: 150, offsetY: 150 } as MouseEvent, context);
 
-      expect(context.updateProject).toHaveBeenCalledWith(expect.objectContaining({
-        selection: expect.objectContaining({
-          hasSelection: true,
-          bounds: { x: 50, y: 50, width: 100, height: 100 }
-        })
-      }));
+      expect(context.updateProject).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selection: expect.objectContaining({
+            hasSelection: true,
+            bounds: { x: 50, y: 50, width: 100, height: 100 },
+          }),
+        }),
+      );
     });
   });
 });

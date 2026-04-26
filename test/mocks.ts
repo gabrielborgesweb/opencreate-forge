@@ -37,7 +37,7 @@ export const createMockToolContext = (overrides: Partial<ToolContext> = {}): Too
   const canvas = document.createElement("canvas");
   canvas.width = 800;
   canvas.height = 600;
-  
+
   return {
     project: createMockProject(),
     settings: {
@@ -48,7 +48,7 @@ export const createMockToolContext = (overrides: Partial<ToolContext> = {}): Too
       select: { mode: "replace", type: "rect" },
       text: { fontSize: 24, fontFamily: "Arial", color: "#000000" },
       transform: { maintainAspectRatio: true },
-      crop: {}
+      crop: {},
     } as any,
     activeToolId: "brush",
     previousToolId: "brush",
@@ -66,7 +66,7 @@ export const createMockToolContext = (overrides: Partial<ToolContext> = {}): Too
     backgroundColor: "#ffffff",
     getSelectionCanvas: vi.fn(() => ({
       canvas: document.createElement("canvas"),
-      ctx: document.createElement("canvas").getContext("2d")!
+      ctx: document.createElement("canvas").getContext("2d")!,
     })),
     updateSelectionEdges: vi.fn(),
     setLastSelectionMask: vi.fn(),

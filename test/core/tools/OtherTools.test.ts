@@ -8,7 +8,7 @@ describe("Other Tools", () => {
 
   beforeEach(() => {
     context = createMockToolContext();
-    context.project.layers = []; 
+    context.project.layers = [];
   });
 
   describe("TextTool", () => {

@@ -8,7 +8,7 @@ describe("imageUtils", () => {
       const idx = (50 * 100 + 50) * 4;
       mockData[idx + 3] = 255;
       const mockCtx = {
-        getImageData: vi.fn(() => ({ data: mockData }))
+        getImageData: vi.fn(() => ({ data: mockData })),
       } as any;
       const mockCanvas = { width: 100, height: 100, getContext: () => mockCtx } as any;
       const bounds = getOptimizedBoundingBox(mockCanvas, { x: 0, y: 0, width: 100, height: 100 });

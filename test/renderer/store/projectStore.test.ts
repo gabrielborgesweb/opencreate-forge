@@ -4,7 +4,7 @@ import { useProjectStore, Project } from "@/renderer/store/projectStore";
 describe("projectStore", () => {
   beforeEach(() => {
     const { projects } = useProjectStore.getState();
-    projects.forEach(p => useProjectStore.getState().removeProject(p.id));
+    projects.forEach((p) => useProjectStore.getState().removeProject(p.id));
   });
 
   it("should add a new project", () => {
@@ -22,7 +22,7 @@ describe("projectStore", () => {
       panY: 0,
       isDirty: false,
       undoStack: [],
-      redoStack: []
+      redoStack: [],
     };
     store.addProject(newProject);
     expect(useProjectStore.getState().projects).toHaveLength(1);

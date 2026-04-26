@@ -1,3 +1,6 @@
+/**
+ * Purpose: Preload script that exposes Electron APIs and IPC communication to the renderer process in a secure way.
+ */
 import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("electronAPI", {

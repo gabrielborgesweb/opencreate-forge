@@ -1,3 +1,6 @@
+/**
+ * Purpose: Tool for moving layers and selections, including auto-selection logic and support for floating selections.
+ */
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 import { createHistoryState, HistoryState } from "@/renderer/store/projectStore";
 

@@ -1,3 +1,6 @@
+/**
+ * Purpose: Sidebar component containing the primary tool selection buttons and color picker interface.
+ */
 import React from "react";
 import { useToolStore } from "@store/toolStore";
 import { useUIStore } from "@store/uiStore";

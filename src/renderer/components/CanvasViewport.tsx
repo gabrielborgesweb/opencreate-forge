@@ -1,3 +1,6 @@
+/**
+ * Purpose: Component that provides the main interactive canvas area, integrating the ForgeEngine and handling project-level events like file drops and zoom.
+ */
 import React, { useEffect, useRef, useState } from "react";
 import { useProjectStore } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";

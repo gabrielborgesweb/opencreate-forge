@@ -1,3 +1,6 @@
+/**
+ * Purpose: Custom hook that listens for and handles global menu actions and Electron IPC events, such as saving, opening projects, and undo/redo operations.
+ */
 import { useEffect } from "react";
 import { useProjectStore, getSerializableProject } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";

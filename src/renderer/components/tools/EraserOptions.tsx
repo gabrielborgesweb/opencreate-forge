@@ -1,3 +1,6 @@
+/**
+ * Purpose: Tool options component for the Eraser tool, supporting both brush and pencil modes with size, hardness, and shape settings.
+ */
 import React from "react";
 import { Brush, Pencil, Square, Circle } from "lucide-react";
 import { useToolStore } from "@/renderer/store/toolStore";

@@ -1,3 +1,6 @@
+/**
+ * Purpose: Smooth painting tool with adjustable size and hardness, utilizing radial gradients for soft edges and optimized rendering.
+ */
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 import { createHistoryState, HistoryState } from "@/renderer/store/projectStore";
 

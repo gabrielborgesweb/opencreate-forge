@@ -1,3 +1,6 @@
+/**
+ * Purpose: Tool options component for the Crop tool, featuring mode selection, ratio inputs, and action buttons for applying or canceling crops.
+ */
 import React from "react";
 import { Check, X, RotateCcw } from "lucide-react";
 import { useToolStore, CropMode } from "@/renderer/store/toolStore";

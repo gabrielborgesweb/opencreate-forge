@@ -1,3 +1,6 @@
+/**
+ * Purpose: Contextual header component that displays settings and options specific to the currently active tool.
+ */
 import React from "react";
 import { useToolStore, ToolId } from "@store/toolStore";
 import { TOOLS } from "../constants/tools";

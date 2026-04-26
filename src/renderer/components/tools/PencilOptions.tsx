@@ -1,3 +1,6 @@
+/**
+ * Purpose: Tool options component for the Pencil tool, providing controls for brush size and tip shape (square or circle).
+ */
 import React from "react";
 import { Square, Circle } from "lucide-react";
 import { useToolStore } from "@/renderer/store/toolStore";

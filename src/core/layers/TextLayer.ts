@@ -1,6 +1,22 @@
+/**
+ * Purpose: Specialized rendering engine for text layers, supporting rich text styling, layout (point/area), caret management, and pixel-aligned rendering.
+ */
 import { Layer } from "@/renderer/store/projectStore";
 
+/**
+ * Specialized rendering engine for text layers.
+ * Supports rich text styling, layout (point vs area), caret management, and pixel-aligned rendering.
+ */
 export class TextLayer {
+  /**
+   * Renders the text content of a layer to the destination context.
+   * Utilizes a canvas cache to improve performance of static text.
+   * @param ctx The destination rendering context.
+   * @param layer The text layer data.
+   * @param cache Map of cached canvases.
+   * @param readyCache Map of readiness flags.
+   * @param editingState Current editing state if the layer is active in the Text Tool.
+   */
   public static render(
     ctx: CanvasRenderingContext2D,
     layer: Layer,
@@ -103,6 +119,13 @@ export class TextLayer {
     ctx.restore();
   }
 
+  /**
+   * Renders the editing UI for a text layer, including carets, selection highlights, and underscores.
+   * @param ctx The destination rendering context.
+   * @param layer The text layer data.
+   * @param editingState Current editing state.
+   * @param zoom The current viewport zoom level.
+   */
   public static renderUI(
     ctx: CanvasRenderingContext2D,
     layer: Layer,
@@ -255,6 +278,13 @@ export class TextLayer {
     ctx.putImageData(imageData, 0, 0);
   }
 
+  /**
+   * Calculates the bounding box metrics for a text layer based on its content and styling.
+   * @param ctx Context used for measuring text.
+   * @param layer The base layer data.
+   * @param newProps Optional new properties to simulate the metrics with.
+   * @returns The calculated width and height, and optionally a new X position for point text alignment.
+   */
   public static calculateMetrics(
     ctx: CanvasRenderingContext2D,
     layer: Partial<Layer>,

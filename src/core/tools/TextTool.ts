@@ -1,3 +1,6 @@
+/**
+ * Purpose: Comprehensive tool for creating and editing text layers, featuring rich text input, caret management, selection, and transformations.
+ */
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 import { Layer, useProjectStore, HistoryState } from "@/renderer/store/projectStore";
 import { TextLayer } from "../layers/TextLayer";

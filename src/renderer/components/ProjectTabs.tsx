@@ -1,3 +1,6 @@
+/**
+ * Purpose: Tab-based navigation bar for switching between open projects and managing project closing with save confirmation.
+ */
 import React from "react";
 import { useProjectStore } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";

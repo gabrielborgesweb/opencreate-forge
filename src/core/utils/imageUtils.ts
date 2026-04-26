@@ -1,4 +1,7 @@
 /**
+ * Purpose: Utility functions for image manipulation and optimization, such as calculating bounding boxes for non-transparent pixels.
+ */
+/**
  * Encontra a caixa delimitadora (bounding box) de pixels não transparentes
  * DENTRO de uma área de busca específica para otimização.
  */

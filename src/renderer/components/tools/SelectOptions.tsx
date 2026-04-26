@@ -1,3 +1,6 @@
+/**
+ * Purpose: Tool options component for the Select tool, offering controls for selection modes (unite, subtract, etc.) and marquee shapes.
+ */
 import React from "react";
 import {
   MousePointer2,

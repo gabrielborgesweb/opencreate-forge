@@ -1,3 +1,6 @@
+/**
+ * Purpose: Configuration and definitions for all available tools, including icons, labels, and associated IDs.
+ */
 import {
   MousePointer2,
   SquareDashed,

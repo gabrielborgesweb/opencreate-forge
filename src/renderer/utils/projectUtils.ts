@@ -1,3 +1,6 @@
+/**
+ * Purpose: Utility functions for project-related operations, such as creating projects from images and loading image assets.
+ */
 import { Project } from "@store/projectStore";
 
 export const createProjectFromImage = (

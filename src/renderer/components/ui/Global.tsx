@@ -1,3 +1,6 @@
+/**
+ * Purpose: Shared UI utility components for displaying keyboard shortcuts and key spans throughout the application.
+ */
 import React from "react";
 
 export const KeySpan: React.FC<{ children: React.ReactNode }> = ({ children }) => (

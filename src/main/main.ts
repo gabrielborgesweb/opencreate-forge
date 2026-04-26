@@ -1,3 +1,6 @@
+/**
+ * Purpose: Electron main process script that handles window management, native menus, and IPC handlers for file operations and system dialogs.
+ */
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import path from "node:path";
 import fs from "node:fs/promises";

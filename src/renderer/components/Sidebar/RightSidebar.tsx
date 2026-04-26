@@ -1,3 +1,6 @@
+/**
+ * Purpose: Main container for the right-hand sidebar, featuring resizable panels and tabs for switching between layers and history.
+ */
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useUIStore } from "@store/uiStore";
 import LayerList from "./LayerList";

@@ -1,3 +1,6 @@
+/**
+ * Purpose: Modal dialog for creating new projects, featuring presets for social media, print, and screen sizes, along with custom dimension controls.
+ */
 import React, { useState, useEffect, useRef } from "react";
 import { useProjectStore, Project } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";

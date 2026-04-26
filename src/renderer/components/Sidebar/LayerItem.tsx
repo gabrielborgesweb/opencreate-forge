@@ -1,3 +1,6 @@
+/**
+ * Purpose: Individual layer entry component within the layer list, handling visibility, locking, renaming, and selection from thumbnails.
+ */
 import React, { useState, useRef, useEffect } from "react";
 import { useProjectStore, Layer } from "@store/projectStore";
 import { useUIStore } from "@store/uiStore";

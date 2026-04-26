@@ -1,3 +1,6 @@
+/**
+ * Purpose: Core engine class responsible for project rendering, viewport management (zoom/pan), tool orchestration, and selection handling.
+ */
 import { Layer, Project, useProjectStore } from "@/renderer/store/projectStore";
 import { BaseTool, ToolContext } from "../tools/BaseTool";
 import { MoveTool } from "../tools/MoveTool";
@@ -15,12 +18,23 @@ import { RasterLayer } from "../layers/RasterLayer";
 import { TextLayer } from "../layers/TextLayer";
 import { GroupLayer } from "../layers/GroupLayer";
 
+/**
+ * Represents the current state of the canvas viewport.
+ */
 export interface ViewportState {
+  /** The current zoom level (1.0 is 100%). */
   scale: number;
+  /** The X coordinate of the viewport origin in project space. */
   originX: number;
+  /** The Y coordinate of the viewport origin in project space. */
   originY: number;
 }
 
+/**
+ * Core engine class responsible for project rendering, viewport management (zoom/pan),
+ * tool orchestration, and selection handling. It manages the main rendering loop
+ * and coordinates interactions between the UI, tools, and the project state.
+ */
 export class ForgeEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -58,6 +72,11 @@ export class ForgeEngine {
 
   // private lastMouseEvent: MouseEvent | null = null;
 
+  /**
+   * Initializes the engine with a target canvas and viewport change callback.
+   * @param canvas The HTML canvas element to render into.
+   * @param onViewportChange Callback fired when zoom or pan changes.
+   */
   constructor(
     canvas: HTMLCanvasElement,
     onViewportChange: (zoom: number, x: number, y: number) => void,
@@ -98,12 +117,18 @@ export class ForgeEngine {
 
   private unsubscribeToolStore: (() => void) | null = null;
 
+  /**
+   * Clears the current project selection.
+   */
   private handleClearSelection = () => {
     if (this.project) {
       this.clearSelection();
     }
   };
 
+  /**
+   * Exports the current project to a PNG file using the Electron API.
+   */
   private handleExportPNG = async () => {
     if (this.project) {
       const dataURL = await this.exportToPNG();
@@ -119,14 +144,24 @@ export class ForgeEngine {
     }
   };
 
+  /**
+   * Selects the entire canvas area.
+   */
   private handleSelectAll = () => {
     this.selectAll();
   };
 
+  /**
+   * Duplicates the currently active layer.
+   */
   private handleDuplicate = () => {
     this.duplicateLayer();
   };
 
+  /**
+   * Handles zoom requests from external events.
+   * @param e Custom event containing zoom details.
+   */
   private handleZoomTo = (e: any) => {
     const { zoom, panX, panY, step } = e.detail;
     if (!this.project) return;
@@ -165,6 +200,10 @@ export class ForgeEngine {
     }
   };
 
+  /**
+   * Animates the viewport to a specific zoom level, centered on the current view.
+   * @param targetZoom The target zoom level.
+   */
   public animateZoom(targetZoom: number) {
     if (!this.project) return;
 
@@ -185,6 +224,9 @@ export class ForgeEngine {
     this.animateToViewport(targetZoom, targetPanX, targetPanY);
   }
 
+  /**
+   * Attaches event listeners for user interaction.
+   */
   private setupEventListeners() {
     this.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
     this.canvas.addEventListener("mousedown", this.handleMouseDown);
@@ -205,48 +247,18 @@ export class ForgeEngine {
     window.addEventListener("forge:duplicate-layer", this.handleDuplicate);
     window.addEventListener("forge:export-png", this.handleExportPNG);
     window.addEventListener("forge:zoom-to", this.handleZoomTo as any);
-
-    // useToolStore.subscribe((state, prevState) => {
-    //   const newToolId = state.activeToolId;
-    //   if (newToolId !== prevState.activeToolId) {
-    //     const context = this.getToolContext();
-    //     if (context) {
-    //       if (prevState.activeToolId && this.tools[prevState.activeToolId]) {
-    //         this.tools[prevState.activeToolId].onDeactivate(context);
-    //       }
-
-    //       this.currentToolId = newToolId;
-    //       this.canvas.style.cursor = "default";
-
-    //       if (newToolId && this.tools[newToolId]) {
-    //         const activeTool = this.tools[newToolId];
-    //         activeTool.onActivate(context);
-
-    //         // Injeta a última posição do mouse para evitar a cintilação do preview
-    //         if (this.lastMouseEvent) {
-    //           const rect = this.canvas.getBoundingClientRect();
-    //           const e = this.lastMouseEvent;
-    //           const mouseEvent =
-    //             e.target === this.canvas
-    //               ? e
-    //               : ({
-    //                   ...e,
-    //                   offsetX: e.clientX - rect.left,
-    //                   offsetY: e.clientY - rect.top,
-    //                 } as MouseEvent);
-
-    //           activeTool.onMouseMove(mouseEvent, context);
-    //         }
-    //       }
-    //     }
-    //   }
-    // });
   }
 
+  /**
+   * Handles keyboard release events to track modifier keys.
+   */
   private handleKeyUp = (e: KeyboardEvent) => {
     this.isCtrlPressed = e.ctrlKey || e.metaKey;
   };
 
+  /**
+   * Clears the current selection and commits any floating layers.
+   */
   private async clearSelection() {
     if (!this.project) return;
     if (this.project.selection.hasSelection) {
@@ -264,6 +276,9 @@ export class ForgeEngine {
     this.updateSelectionEdges();
   }
 
+  /**
+   * Handles keyboard press events for shortcuts and tool interactions.
+   */
   private handleKeyDown = (e: KeyboardEvent) => {
     this.isCtrlPressed = e.ctrlKey || e.metaKey;
 
@@ -289,6 +304,9 @@ export class ForgeEngine {
     }
   };
 
+  /**
+   * Cuts the selected area from the active layer to the clipboard.
+   */
   public async cutToClipboard() {
     if (!this.project || !this.project.activeLayerId) return;
 
@@ -328,6 +346,9 @@ export class ForgeEngine {
     }
   }
 
+  /**
+   * Copies the selected area (or entire active layer) to the system clipboard.
+   */
   public async copyToClipboard() {
     if (!this.project || !this.project.activeLayerId) return;
 
@@ -431,6 +452,9 @@ export class ForgeEngine {
     }
   }
 
+  /**
+   * Pastes an image from the system clipboard into a new layer.
+   */
   public async pasteFromClipboard() {
     if (!this.project) return;
 
@@ -505,6 +529,9 @@ export class ForgeEngine {
     }
   }
 
+  /**
+   * Handles mouse release events.
+   */
   private handleMouseUp(e: MouseEvent) {
     if (this.isPanning) {
       this.isPanning = false;
@@ -519,11 +546,17 @@ export class ForgeEngine {
     }
   }
 
+  /**
+   * Retrieves the currently active tool instance.
+   */
   private getActiveTool(): BaseTool | null {
     const activeToolId = useToolStore.getState().activeToolId;
     return this.tools[activeToolId] || null;
   }
 
+  /**
+   * Creates the tool context object provided to tools during interaction.
+   */
   private getToolContext(): ToolContext | null {
     if (!this.project) return null;
     const toolStore = useToolStore.getState();
@@ -598,6 +631,10 @@ export class ForgeEngine {
     return context as any as ToolContext;
   }
 
+  /**
+   * Ensures that a layer has a cached canvas representation.
+   * @param layer The layer to cache.
+   */
   public async ensureLayerCanvas(layer: Layer): Promise<HTMLCanvasElement> {
     const cached = this.layerCanvasCache.get(layer.id);
     if (
@@ -625,6 +662,9 @@ export class ForgeEngine {
     return canvas;
   }
 
+  /**
+   * Helper to load an image from a source string.
+   */
   private loadImage(src: string): Promise<HTMLImageElement> {
     return new Promise((resolve) => {
       const img = new Image();
@@ -633,6 +673,9 @@ export class ForgeEngine {
     });
   }
 
+  /**
+   * Converts screen coordinates to project space coordinates.
+   */
   public screenToProject(x: number, y: number) {
     if (!this.project) return { x, y };
     return {
@@ -641,6 +684,9 @@ export class ForgeEngine {
     };
   }
 
+  /**
+   * Handles mouse wheel events for zooming and panning.
+   */
   private handleWheel(e: WheelEvent) {
     if (!this.project) return;
     this.stopViewportAnimation();
@@ -677,6 +723,9 @@ export class ForgeEngine {
     this.onViewportChange(newScale, newOriginX, newOriginY);
   }
 
+  /**
+   * Handles mouse down events.
+   */
   private handleMouseDown(e: MouseEvent) {
     if (!this.project) return;
     this.stopViewportAnimation();
@@ -697,6 +746,9 @@ export class ForgeEngine {
     }
   }
 
+  /**
+   * Handles mouse double click events.
+   */
   private handleDoubleClick(e: MouseEvent) {
     if (!this.project) return;
     const tool = this.getActiveTool();
@@ -706,6 +758,9 @@ export class ForgeEngine {
     }
   }
 
+  /**
+   * Stops any ongoing viewport animation.
+   */
   private stopViewportAnimation() {
     if (this.viewportAnimationId) {
       cancelAnimationFrame(this.viewportAnimationId);
@@ -713,6 +768,9 @@ export class ForgeEngine {
     }
   }
 
+  /**
+   * Handles mouse movement events.
+   */
   private handleMouseMove(e: MouseEvent) {
     // this.lastMouseEvent = e; // <--- Adicione isso
     if (!this.project) return;
@@ -755,6 +813,9 @@ export class ForgeEngine {
     }
   }
 
+  /**
+   * Starts the main rendering loop.
+   */
   private startRenderLoop() {
     const loop = () => {
       this.render();
@@ -763,6 +824,9 @@ export class ForgeEngine {
     this.animationFrameId = requestAnimationFrame(loop);
   }
 
+  /**
+   * Stops the main rendering loop and removes all event listeners.
+   */
   public stopRenderLoop() {
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
@@ -784,6 +848,9 @@ export class ForgeEngine {
     // }
   }
 
+  /**
+   * Generates or retrieves the checkerboard pattern used for the background.
+   */
   private getCheckerPattern(): CanvasPattern {
     if (!this.checkerPattern) {
       const size = 8;
@@ -802,6 +869,9 @@ export class ForgeEngine {
     return this.checkerPattern;
   }
 
+  /**
+   * Sets the current project and invalidates caches if necessary.
+   */
   public setProject(project: Project) {
     const prevProjectId = this.project?.id;
     const prevLayers = this.project?.layers;
@@ -858,6 +928,9 @@ export class ForgeEngine {
     }
   }
 
+  /**
+   * Recalculates the selection edges for rendering the marching ants effect.
+   */
   private updateSelectionEdges() {
     if (!this.project || !this.project.selection.hasSelection) {
       this.selectionEdges = null;
@@ -929,6 +1002,9 @@ export class ForgeEngine {
     };
   }
 
+  /**
+   * Renders the marching ants effect around the selection.
+   */
   private renderSelection() {
     if (
       !this.project ||
@@ -1001,6 +1077,9 @@ export class ForgeEngine {
     this.ctx.restore();
   }
 
+  /**
+   * Resizes the viewport to fit the project on screen.
+   */
   public fitToScreen() {
     if (!this.project || !this.canvas.parentElement) return;
     const cw = this.canvas.parentElement.clientWidth;
@@ -1021,6 +1100,9 @@ export class ForgeEngine {
     this.onViewportChange(scale, originX, originY);
   }
 
+  /**
+   * Animates the viewport to fit the project (or override dimensions) on screen.
+   */
   public animateFitToScreen(overrideWidth?: number, overrideHeight?: number) {
     if (!this.project || !this.canvas.parentElement) return;
     const cw = this.canvas.parentElement.clientWidth;
@@ -1039,6 +1121,9 @@ export class ForgeEngine {
     this.animateToViewport(scale, originX, originY);
   }
 
+  /**
+   * Animates the viewport to a specific zoom and pan position.
+   */
   private animateToViewport(targetZoom: number, targetPanX: number, targetPanY: number) {
     if (!this.project) return;
 
@@ -1103,6 +1188,9 @@ export class ForgeEngine {
     this.viewportAnimationId = requestAnimationFrame(animate);
   }
 
+  /**
+   * Checks if a layer intersects with the project dimensions.
+   */
   private intersects(layer: Layer, projectWidth: number, projectHeight: number): boolean {
     return !(
       layer.x >= projectWidth ||
@@ -1112,6 +1200,9 @@ export class ForgeEngine {
     );
   }
 
+  /**
+   * Main render function that clears the canvas and draws the project, tools, and UI.
+   */
   public render() {
     if (!this.project) return;
 
@@ -1234,6 +1325,9 @@ export class ForgeEngine {
     this.renderSelection();
   }
 
+  /**
+   * Renders a single layer to a given context.
+   */
   private renderLayer(ctx: CanvasRenderingContext2D, layer: Layer) {
     ctx.save();
     ctx.globalAlpha = layer.opacity / 100;
@@ -1276,6 +1370,9 @@ export class ForgeEngine {
     ctx.restore();
   }
 
+  /**
+   * Renders a pixel grid when the zoom level is high enough.
+   */
   private renderPixelGrid() {
     if (!this.project) return;
     this.ctx.save();
@@ -1302,11 +1399,17 @@ export class ForgeEngine {
     this.ctx.restore();
   }
 
+  /**
+   * Invalidates the cache for a specific layer.
+   */
   public invalidateLayerCache(layerId: string) {
     this.layerCanvasCache.delete(layerId);
     this.layerReadyCache.delete(layerId);
   }
 
+  /**
+   * Extracts the selection into a floating layer.
+   */
   private async floatSelection(layerId: string): Promise<boolean> {
     if (!this.project || !this.project.selection.hasSelection || !this.project.selection.bounds)
       return false;
@@ -1377,6 +1480,9 @@ export class ForgeEngine {
     return true;
   }
 
+  /**
+   * Commits the floating selection back to its source layer.
+   */
   private async commitFloatingLayer() {
     if (!this.project || !this.project.selection.floatingLayer || !this.project.activeLayerId)
       return;
@@ -1436,6 +1542,9 @@ export class ForgeEngine {
     this.project.selection.floatingLayer = null;
   }
 
+  /**
+   * Selects all pixels in the project.
+   */
   public selectAll() {
     if (!this.project) return;
 
@@ -1467,6 +1576,9 @@ export class ForgeEngine {
     this.updateSelectionEdges();
   }
 
+  /**
+   * Duplicates the active layer or the selection within it.
+   */
   public async duplicateLayer() {
     if (!this.project || !this.project.activeLayerId) return;
 
@@ -1548,6 +1660,9 @@ export class ForgeEngine {
     });
   }
 
+  /**
+   * Exports the project to a PNG data URL.
+   */
   public async exportToPNG(): Promise<string> {
     if (!this.project) return "";
 

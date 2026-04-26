@@ -1,3 +1,6 @@
+/**
+ * Purpose: Tool options component for the Transform tool, displaying and allowing manual input for position, size, scale, and rotation.
+ */
 import React from "react";
 import { Check, X } from "lucide-react";
 import { useToolStore } from "@/renderer/store/toolStore";

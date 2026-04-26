@@ -1,3 +1,6 @@
+/**
+ * Purpose: Tool for creating and modifying selections using rectangular or elliptical shapes, supporting various modes like replace, unite, subtract, and intersect.
+ */
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 import { createHistoryState, HistoryState } from "@/renderer/store/projectStore";
 

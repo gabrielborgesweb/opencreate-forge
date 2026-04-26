@@ -1,3 +1,6 @@
+/**
+ * Purpose: Comprehensive options panel for the Text tool, including font family, weight, size, alignment, color, and advanced typography settings.
+ */
 import React, { useEffect, useRef, useMemo } from "react";
 import { useToolStore } from "@/renderer/store/toolStore";
 import { useProjectStore } from "@/renderer/store/projectStore";

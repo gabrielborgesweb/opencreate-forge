@@ -1,3 +1,6 @@
+/**
+ * Purpose: Generic input component for tool settings, supporting numeric values, scrubbing, scrolling, and a slider popup.
+ */
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 

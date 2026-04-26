@@ -1,3 +1,6 @@
+/**
+ * Purpose: Reusable foundation for modal dialogs, providing consistent styling, animations, backdrop handling, and keyboard focus trapping.
+ */
 import React, { useEffect, useState, useRef } from "react";
 import { X, LucideIcon } from "lucide-react";
 

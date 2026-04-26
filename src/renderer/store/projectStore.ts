@@ -1,52 +1,101 @@
+/**
+ * Purpose: Core state management for projects, layers, selection, and history (undo/redo), including serialization and project initialization logic.
+ */
 import { create } from "zustand";
 
+/**
+ * Represents a formatted segment of text with specific styling.
+ */
 export interface TextSpan {
+  /** The text content of the span. */
   text: string;
+  /** CSS color value. */
   color?: string;
+  /** Font size in pixels. */
   fontSize?: number;
+  /** Font family name. */
   fontFamily?: string;
+  /** Font weight (e.g., 'bold', 400). */
   fontWeight?: string | number;
 }
 
+/**
+ * Represents a layer in the project. Layers can be raster images, text, or groups.
+ */
 export interface Layer {
+  /** Unique identifier for the layer. */
   id: string;
+  /** Display name of the layer. */
   name: string;
+  /** The type of layer content. */
   type: "raster" | "text" | "group";
+  /** Whether the layer is currently visible. */
   visible: boolean;
+  /** Whether the layer is locked for editing. */
   locked: boolean;
+  /** Layer opacity from 0 to 100. */
   opacity: number;
+  /** X coordinate in project space. */
   x: number;
+  /** Y coordinate in project space. */
   y: number;
+  /** Width of the layer in pixels. */
   width: number;
+  /** Height of the layer in pixels. */
   height: number;
-  data?: string; // dataURL (Base64)
-  // Text properties
+  /** Base64 encoded image data for raster layers. */
+  data?: string; 
+  /** Raw text content for text layers. */
   text?: string;
+  /** Styled text spans for rich text support. */
   textSpans?: TextSpan[];
+  /** Whether the text is point-based or area-based. */
   textType?: "point" | "area";
+  /** Default font size for the layer. */
   fontSize?: number;
+  /** Default font family for the layer. */
   fontFamily?: string;
+  /** Default font weight for the layer. */
   fontWeight?: string | number;
+  /** Default text color. */
   color?: string;
+  /** Horizontal alignment of text. */
   textAlign?: "left" | "center" | "right" | "justify";
-  lineHeight?: number; // leading
-  tracking?: number; // letter spacing
+  /** Line height factor. */
+  lineHeight?: number;
+  /** Letter spacing in pixels. */
+  tracking?: number;
+  /** Whether the text overflows its bounds. */
   textOverflow?: boolean;
+  /** Rendering quality for text. */
   textRendering?: "nearest" | "bilinear";
+  /** Canvas composite operation for blending. */
   blendMode: GlobalCompositeOperation;
+  /** Rotation in degrees. */
   rotation?: number;
-  // History for text
+  /** Internal undo stack for text editing. */
   textUndoStack?: { text: string; textSpans?: TextSpan[] }[];
+  /** Internal redo stack for text editing. */
   textRedoStack?: { text: string; textSpans?: TextSpan[] }[];
 }
 
+/**
+ * Represents the current selection state in the project.
+ */
 export interface Selection {
+  /** Whether a selection is currently active. */
   hasSelection: boolean;
+  /** The rectangular bounds of the selection in project space. */
   bounds: { x: number; y: number; width: number; height: number } | null;
-  mask?: string; // dataURL of the mask
+  /** DataURL of the selection mask. */
+  mask?: string;
+  /** A temporary layer used for floating selections during transformation. */
   floatingLayer?: Layer | null;
 }
 
+/**
+ * A snapshot of the project state for history management.
+ */
 export interface HistoryState {
   width: number;
   height: number;
@@ -55,65 +104,113 @@ export interface HistoryState {
   selection: Selection;
 }
 
+/**
+ * An entry in the history stack.
+ */
 export interface HistoryEntry {
+  /** Description of the action for the UI. */
   description: string;
+  /** The project state at that point in time. */
   state: HistoryState;
 }
 
+/**
+ * Represents a complete project document.
+ */
 export interface Project {
+  /** Unique project identifier. */
   id: string;
+  /** Project name. */
   name: string;
+  /** Canvas width in pixels. */
   width: number;
+  /** Canvas height in pixels. */
   height: number;
+  /** List of layers in the project. */
   layers: Layer[];
+  /** ID of the currently selected layer. */
   activeLayerId: string | null;
+  /** Current selection state. */
   selection: Selection;
-  // Viewport isolada por projeto
+  /** Current viewport zoom level. */
   zoom: number;
+  /** Viewport pan X offset. */
   panX: number;
+  /** Viewport pan Y offset. */
   panY: number;
-  isDirty: boolean; // Para saber se houve mudanças não salvas
-  filePath?: string; // Caminho no sistema de arquivos se já foi salvo
-  // Metadata
+  /** Whether the project has unsaved changes. */
+  isDirty: boolean;
+  /** File system path if the project has been saved. */
+  filePath?: string;
+  /** Version of the document format. */
   version?: string;
+  /** Creation timestamp. */
   createdAt?: string;
+  /** Last update timestamp. */
   updatedAt?: string;
-  // History
+  /** Stack of states for undo. */
   undoStack: HistoryEntry[];
+  /** Stack of states for redo. */
   redoStack: HistoryEntry[];
 }
 
+/**
+ * Zustand store state for managing multiple projects and their lifecycle.
+ */
 interface ProjectState {
+  /** List of currently open projects. */
   projects: Project[];
+  /** ID of the project currently being edited. */
   activeProjectId: string | null;
+  /** The application version. */
   appVersion: string;
 
+  /** Initializes the store, fetching the app version from Electron. */
   initialize: () => Promise<void>;
+  /** Adds a new project to the store. */
   addProject: (project: Project) => void;
+  /** Removes a project from the store. */
   removeProject: (id: string) => void;
+  /** Sets the active project. */
   setActiveProject: (id: string | null) => void;
+  /** Updates project-level properties. */
   updateProject: (id: string, updates: Partial<Project>) => void;
+  /** Adds a new layer to a specific project. */
   addLayer: (projectId: string, layer: Partial<Layer>, skipHistory?: boolean) => void;
+  /** Removes a layer from a specific project. */
   removeLayer: (projectId: string, layerId: string, skipHistory?: boolean) => void;
+  /** Adds a manual entry to the project's history stack. */
   addHistoryEntry: (projectId: string, entry: HistoryEntry) => void;
+  /** Moves a layer from one index to another in the stack. */
   moveLayer: (projectId: string, fromIndex: number, toIndex: number) => void;
+  /** Duplicates an existing layer. */
   duplicateLayer: (projectId: string, layerId: string) => void;
+  /** Updates properties of a specific layer. */
   updateLayer: (
     projectId: string,
     layerId: string,
     updates: Partial<Layer>,
     skipDirty?: boolean,
   ) => void;
+  /** Renames a layer. */
   renameLayer: (projectId: string, layerId: string, name: string) => void;
+  /** Toggles layer visibility. */
   toggleLayerVisibility: (projectId: string, layerId: string) => void;
+  /** Toggles layer lock status. */
   toggleLayerLock: (projectId: string, layerId: string) => void;
+  /** Sets the active layer for a project. */
   setActiveLayer: (projectId: string, layerId: string | null) => void;
+  /** Reverts the last text change in a text layer. */
   undoText: (projectId: string, layerId: string) => void;
+  /** Re-applies the last reverted text change in a text layer. */
   redoText: (projectId: string, layerId: string) => void;
+  /** Jumps to a specific point in the project's history stack. */
   jumpToHistory: (projectId: string, index: number) => void;
-  // History actions
+  /** Pushes the current project state to the undo stack. */
   pushHistory: (projectId: string, description: string) => void;
+  /** Reverts to the previous project state. */
   undo: (projectId: string) => void;
+  /** Advances to the next project state in the redo stack. */
   redo: (projectId: string) => void;
 }
 

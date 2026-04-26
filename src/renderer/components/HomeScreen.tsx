@@ -1,3 +1,6 @@
+/**
+ * Purpose: Initial dashboard component shown when no projects are open, offering options to create new projects or open existing ones.
+ */
 import React, { useState, useEffect, useCallback } from "react";
 // import { Plus, FolderOpen } from "lucide-react";
 import { useProjectStore } from "@store/projectStore";

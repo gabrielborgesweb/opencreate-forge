@@ -1,3 +1,6 @@
+/**
+ * Purpose: Sidebar panel that lists the undo/redo history for the active project, allowing users to jump to specific points in the project's timeline.
+ */
 import React, { useEffect } from "react";
 import { useProjectStore } from "@store/projectStore";
 import { RotateCcw, RotateCw } from "lucide-react";

@@ -1,3 +1,6 @@
+/**
+ * Purpose: Tool for cropping the project canvas, providing interactive handles, rule-of-thirds overlays, and optional pixel deletion.
+ */
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 import { Layer } from "@/renderer/store/projectStore";
 

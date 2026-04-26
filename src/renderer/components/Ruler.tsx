@@ -1,3 +1,6 @@
+/**
+ * Purpose: Visual aid component that displays project-aligned rulers with major/minor ticks and a mouse position indicator.
+ */
 import React, { useEffect, useRef, useState } from "react";
 import { useProjectStore } from "@store/projectStore";
 

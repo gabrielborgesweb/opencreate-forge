@@ -1,3 +1,6 @@
+/**
+ * Purpose: Tool options component for the Brush tool, featuring size and hardness controls for soft-edged painting.
+ */
 import React from "react";
 import { useToolStore } from "@/renderer/store/toolStore";
 import ToolSettingInput from "@/renderer/components/ui/ToolSettingInput";

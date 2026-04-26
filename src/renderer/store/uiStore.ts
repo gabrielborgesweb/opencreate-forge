@@ -1,3 +1,6 @@
+/**
+ * Purpose: Global state for UI components, managing active tabs, project history, toast notifications, and sidebar configuration.
+ */
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 

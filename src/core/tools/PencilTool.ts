@@ -1,3 +1,6 @@
+/**
+ * Purpose: Pixel-perfect drawing tool with support for different sizes and shapes, optimized with offscreen buffering and bounding box calculations.
+ */
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 import { createHistoryState, HistoryState } from "@/renderer/store/projectStore";
 

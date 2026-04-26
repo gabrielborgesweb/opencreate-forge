@@ -1,3 +1,6 @@
+/**
+ * Purpose: Notification component that displays temporary messages with progress bars and different severity levels (info, warning, error).
+ */
 import React, { useEffect, useState, useRef } from "react";
 import { useUIStore } from "../../store/uiStore";
 import { TriangleAlert, Info, AlertCircle } from "lucide-react";

@@ -1,3 +1,6 @@
+/**
+ * Purpose: Sidebar component that displays the stack of layers for the active project, providing controls for adding, deleting, and reordering layers.
+ */
 import React from "react";
 import { useProjectStore } from "@store/projectStore";
 import LayerItem from "./LayerItem";

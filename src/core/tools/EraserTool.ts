@@ -1,3 +1,6 @@
+/**
+ * Purpose: Tool for removing content from raster layers, supporting both brush and pencil modes for soft or hard erasure.
+ */
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 import { createHistoryState, HistoryState } from "@/renderer/store/projectStore";
 

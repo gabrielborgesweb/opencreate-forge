@@ -1,3 +1,6 @@
+/**
+ * Purpose: Tool for scaling, rotating, and moving layers or selections with interactive handles and anchor points.
+ */
 import { BaseTool, ToolContext, ToolId } from "./BaseTool";
 import { Layer } from "@/renderer/store/projectStore";
 

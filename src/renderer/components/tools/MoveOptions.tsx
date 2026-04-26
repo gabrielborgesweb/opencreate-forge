@@ -1,3 +1,6 @@
+/**
+ * Purpose: Tool options component for the Move tool, allowing users to toggle auto-selection functionality.
+ */
 import React from "react";
 import { useToolStore } from "@/renderer/store/toolStore";
 

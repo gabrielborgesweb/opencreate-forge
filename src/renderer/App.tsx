@@ -1,3 +1,6 @@
+/**
+ * Purpose: Root React component that defines the application layout, manages global keyboard shortcuts, and orchestrates the main UI components.
+ */
 import React from "react";
 import { useUIStore } from "@store/uiStore";
 import { useProjectStore } from "@store/projectStore";

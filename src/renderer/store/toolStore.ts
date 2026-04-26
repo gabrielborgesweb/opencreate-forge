@@ -1,3 +1,6 @@
+/**
+ * Purpose: Zustand store for managing active tools, tool settings, colors, and interaction state, with persistence support.
+ */
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 

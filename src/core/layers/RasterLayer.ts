@@ -1,6 +1,22 @@
+/**
+ * Purpose: Logic for rendering raster layers, including image caching and lazy loading of data URLs into canvases.
+ */
 import { Layer } from "@/renderer/store/projectStore";
 
+/**
+ * Provides static methods for rendering raster (image-based) layers.
+ * Manages canvas caching and lazy loading of image data.
+ */
 export class RasterLayer {
+  /**
+   * Renders a raster layer to the given context.
+   * @param ctx The destination rendering context.
+   * @param layer The layer data to render.
+   * @param layerCanvasCache Map of cached canvases per layer ID.
+   * @param layerReadyCache Map of readiness flags per layer ID.
+   * @param imageCache Map of loaded HTMLImageElements per data URL.
+   * @param onReady Callback triggered when the image finishes loading and is ready for rendering in the next frame.
+   */
   public static render(
     ctx: CanvasRenderingContext2D,
     layer: Layer,

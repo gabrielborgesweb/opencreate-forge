@@ -1,3 +1,6 @@
+/**
+ * Purpose: Store for managing system and Google fonts, including loading, weight mapping, and ensuring fonts are available for rendering.
+ */
 import { create } from "zustand";
 
 export interface FontInfo {

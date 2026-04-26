@@ -80,11 +80,18 @@ jobs:
           REPO="${{ github.repository }}"
           BASE_URL="https://github.com/$REPO/releases/download/$TAG"
           
-          # Adjusting filenames based on electron-builder default naming convention:
-          # ${productName}-${version}-${arch}.${ext} (spaces are preserved or replaced depending on target)
-          # Based on dry run: "OpenCreate Forge-0.1.0-arm64.dmg"
+          # electron-builder sanitization rules:
+          # Windows: Spaces to dots
+          # macOS: Spaces are kept (usually)
+          # Linux: Spaces to hyphens
           
           PRODUCT_NAME="OpenCreate Forge"
+          WIN_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /./g')
+          MAC_NAME="$PRODUCT_NAME"
+          LINUX_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /-/g')
+          
+          # URL encode for the table links (replacing space with %20 for macOS)
+          MAC_URL_NAME=$(echo "$MAC_NAME" | sed 's/ /%20/g')
           
           cat <<EOF > body.md
           ## Downloads
@@ -101,21 +108,21 @@ jobs:
           <tr>
           <td><strong>Windows</strong></td>
           <td>x64</td>
-          <td><a href="$BASE_URL/$PRODUCT_NAME.Setup.$VERSION.exe">Installer (EXE)</a></td>
+          <td><a href="$BASE_URL/$WIN_NAME.Setup.$VERSION.exe">Installer (EXE)</a></td>
           </tr>
           <tr>
           <td rowspan="2"><strong>macOS</strong></td>
           <td>Intel (x64)</td>
-          <td><a href="$BASE_URL/$PRODUCT_NAME-$VERSION.dmg">Universal/Intel (DMG)</a></td>
+          <td><a href="$BASE_URL/$MAC_URL_NAME-$VERSION.dmg">Universal/Intel (DMG)</a></td>
           </tr>
           <tr>
           <td>Apple Silicon (arm64)</td>
-          <td><a href="$BASE_URL/$PRODUCT_NAME-$VERSION-arm64.dmg">Download (DMG)</a></td>
+          <td><a href="$BASE_URL/$MAC_URL_NAME-$VERSION-arm64.dmg">Download (DMG)</a></td>
           </tr>
           <tr>
           <td><strong>Linux</strong></td>
           <td>x64</td>
-          <td><a href="$BASE_URL/$PRODUCT_NAME-$VERSION.AppImage">AppImage</a></td>
+          <td><a href="$BASE_URL/$LINUX_NAME-$VERSION.AppImage">AppImage</a></td>
           </tr>
           </tbody>
           </table>

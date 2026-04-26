@@ -1,27 +1,98 @@
 {
   "name": "opencreate-forge",
+  "author": "Gabriel Borges",
+  "description": "Image Editor powered by React & Electron",
   "productName": "OpenCreate Forge",
-  "version": "0.0.1",
-  "main": "main.js",
+  "type": "module",
+  "version": "0.1.0",
+  "main": "dist-electron/main.js",
   "scripts": {
-    "start": "electron .",
-    "build-mac": "electron-builder --mac",
-    "build-win": "electron-builder --win",
-    "build-linux": "electron-builder --linux",
-    "build-all": "electron-builder --mac --win --linux"
+    "dev": "vite",
+    "build": "tsc && vite build && electron-builder",
+    "preview": "vite preview",
+    "lint": "eslint . --color",
+    "tsc": "tsc --noEmit --pretty",
+    "check": "npm run tsc && npm run lint",
+    "check:cp": "node scripts/check.js",
+    "test:all": "vitest run",
+    "test:project": "vitest run test/renderer/store",
+    "test:tools": "vitest run test/core/tools",
+    "test:layers": "vitest run test/core/layers",
+    "test:watch": "vitest",
+    "prettier": "prettier --write . --ignore-path .prettierignore"
   },
   "dependencies": {
-    "wasm-vips": "^0.0.14"
+    "lucide-react": "^1.8.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "wasm-vips": "^0.0.14",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
-    "electron": "^38.2.2",
-    "electron-builder": "^26.0.12"
+    "@eslint/js": "^9.39.4",
+    "@tailwindcss/vite": "^4.2.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/eslint__js": "^8.42.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/ui": "^4.1.5",
+    "electron": "^41.2.0",
+    "electron-builder": "^26.8.1",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "jsdom": "^29.0.2",
+    "prettier": "^3.8.3",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.2",
+    "vite": "^8.0.8",
+    "vite-plugin-electron": "^0.29.1",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^4.1.5",
+    "vitest-canvas-mock": "^1.1.4"
   },
   "build": {
-    "appId": "com.opencreate.forge",
+    "appId": "app.opencreate.forge",
+    "productName": "OpenCreate Forge",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json",
+      "!**/*.map",
+      "!src",
+      "!node_modules/.cache"
+    ],
+    "extraMetadata": {
+      "main": "dist-electron/main.js"
+    },
     "mac": {
       "category": "public.app-category.graphics-design",
-      "icon": "favicon-darwin-liquid.icns"
+      "icon": "shared/favicon/favicon-darwin-liquid.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
+    },
+    "win": {
+      "icon": "shared/favicon/favicon-windows.ico",
+      "target": "nsis"
+    },
+    "linux": {
+      "icon": "shared/favicon/favicon-linux.png",
+      "target": "AppImage"
+    },
+    "dmg": {
+      "sign": false
     }
   }
 }

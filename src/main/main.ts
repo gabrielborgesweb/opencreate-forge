@@ -28,11 +28,34 @@ export const RENDERER_DIST = path.join(APP_ROOT, "dist");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(APP_ROOT, "public") : RENDERER_DIST;
 
 let win: BrowserWindow | null;
+let splash: BrowserWindow | null;
 
 app.commandLine.appendSwitch("ignore-gpu-blacklist"); // Garante uso da GPU em mais máquinas
 app.commandLine.appendSwitch("enable-gpu-rasterization"); // Melhora o render de formas vetoriais e desenhos
 app.commandLine.appendSwitch("enable-zero-copy"); // Melhora a velocidade de escrita de texturas (bom para Canvas)
 app.commandLine.appendSwitch("enable-features", "SharedArrayBuffer"); // Crucial para WASM multithread
+
+function createSplashWindow() {
+  splash = new BrowserWindow({
+    width: 400,
+    height: 400,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    center: true,
+    resizable: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  const splashPath = VITE_DEV_SERVER_URL
+    ? path.join(process.env.VITE_PUBLIC!, "splash.html")
+    : path.join(RENDERER_DIST, "splash.html");
+
+  splash.loadFile(splashPath);
+}
 
 function createMenu(hasProject = false) {
   const isDev = !!VITE_DEV_SERVER_URL;
@@ -221,14 +244,34 @@ function createWindow() {
     center: true,
     darkTheme: true,
     icon: iconPath,
+    show: false, // Start hidden, show when ready
     webPreferences: {
       preload: path.join(__dirname, "preload.mjs"),
       contextIsolation: true,
       nodeIntegration: false,
       additionalArguments: [
-        "--disable-pinch", // Próprio sistema de zoom
+        "--disable-pinch", // Own zoom handling
+        "--force-color-profile=srgb", // Cores mais consistentes entre plataformas
       ],
     },
+  });
+
+  // const startTime = Date.now();
+
+  // Show splash screen until main window is ready
+  win.once("ready-to-show", () => {
+    // const elapsedTime = Date.now() - startTime;
+    // const minimumDelay = 2000;
+    // const remainingTime = Math.max(0, minimumDelay - elapsedTime);
+
+    setTimeout(() => {
+      if (splash) {
+        splash.close();
+        splash = null;
+      }
+      win?.show();
+      win?.maximize();
+    }, 1000);
   });
 
   // Test active push message to Renderer-process.
@@ -243,7 +286,6 @@ function createWindow() {
     win.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
 
-  win.maximize();
   createMenu();
   // win.setAutoHideMenuBar(true);
 }
@@ -398,5 +440,6 @@ app.whenReady().then(() => {
     }
   });
 
+  createSplashWindow();
   createWindow();
 });

@@ -44,7 +44,7 @@ export interface Layer {
   /** Height of the layer in pixels. */
   height: number;
   /** Base64 encoded image data for raster layers. */
-  data?: string; 
+  data?: string;
   /** Raw text content for text layers. */
   text?: string;
   /** Styled text spans for rich text support. */

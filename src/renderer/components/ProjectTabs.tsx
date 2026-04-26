@@ -28,18 +28,18 @@ const ProjectTabs: React.FC = () => {
         const result = await window.electronAPI.confirmClose(project.name);
         if (result === 2) return; // Cancel
         if (result === 0) {
-          // Salvar antes de fechar
+          // Save before closing
           setActiveTab(id);
           setActiveProject(id);
 
-          // Criar uma Promise que aguarda o evento de finalização do salvamento
+          // Create a Promise that waits for the save completion event
           const savePromise = new Promise<boolean>((resolve) => {
             const listener = (e: any) => {
               window.removeEventListener("forge:save-project-finished", listener);
               resolve(e.detail.success);
             };
             window.addEventListener("forge:save-project-finished", listener);
-            // Time-out de segurança caso o salvamento falhe bizarramente
+            // Safety timeout in case saving fails unexpectedly
             setTimeout(() => {
               window.removeEventListener("forge:save-project-finished", listener);
               resolve(false);
@@ -50,8 +50,8 @@ const ProjectTabs: React.FC = () => {
 
           const saved = await savePromise;
           if (!saved) {
-            // Se o salvamento falhou ou foi cancelado, talvez não devêssemos fechar
-            // Para manter a segurança, vamos apenas parar por aqui
+            // If saving failed or was cancelled, we probably shouldn't close
+            // To maintain safety, let's just stop here
             return;
           }
         }

@@ -1,28 +1,28 @@
 import { exec } from "child_process";
 import { platform } from "os";
 
-// Repassamos as flags --pretty (para o tsc) e --color (para o eslint)
+// We pass the --pretty (for tsc) and --color (for eslint) flags
 const command = "npm run tsc && npm run lint";
 
-// Forçamos o ambiente a aceitar cores, enganando as ferramentas para acharem que estão num terminal real
+// Force the environment to accept colors, deceiving tools into thinking they are in a real terminal
 const env = { ...process.env, FORCE_COLOR: "1" };
 
-console.log("⏳ Rodando verificações detalhadas (tsc e eslint)...");
+console.log("⏳ Running detailed checks (tsc and eslint)...");
 
 exec(command, { env }, (error, stdout, stderr) => {
   const rawOutput = stdout + (stderr ? "\n" + stderr : "");
 
-  // 1. Mostra o log no terminal EXATAMENTE como original, preservando cores e recuos de código
+  // 1. Shows the log in the terminal EXACTLY as original, preserving colors and code indentation
   console.log(rawOutput);
 
   if (error) {
-    // 2. Remove os códigos de cor ANSI para não sujar a sua área de transferência
-    // Isso garante que você cole apenas o texto puro e legível no chat ou no GitHub
+    // 2. Removes ANSI color codes to avoid cluttering your clipboard
+    // This ensures that you only paste clean and readable text in chat or on GitHub
     const cleanOutput = rawOutput.replace(/\x1B\[\d+(;\d+)*[mK]/g, "");
 
-    // 3. Comando de clipboard robusto.
-    // O fallback para wl-copy garante que a cópia funcione perfeitamente caso você
-    // esteja rodando uma interface moderna (como KDE Plasma sob Wayland).
+    // 3. Robust clipboard command.
+    // The fallback to wl-copy ensures that the copy works perfectly if you
+    // are running a modern interface (like KDE Plasma under Wayland).
     const copyCmd =
       platform() === "darwin"
         ? "pbcopy"
@@ -34,11 +34,9 @@ exec(command, { env }, (error, stdout, stderr) => {
     clipProcess.stdin.write(cleanOutput);
     clipProcess.stdin.end();
 
-    console.log(
-      "\n❌ Erros encontrados! O output detalhado foi copiado limpo para a área de transferência.",
-    );
+    console.log("\n❌ Errors found! The detailed output has been copied cleanly to the clipboard.");
     process.exit(1);
   } else {
-    console.log("\n✅ Tudo certo! Nenhum erro encontrado.");
+    console.log("\n✅ All good! No errors found.");
   }
 });

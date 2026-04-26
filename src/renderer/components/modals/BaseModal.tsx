@@ -29,31 +29,31 @@ const BaseModal: React.FC<BaseModalProps> = ({
   const [isVisible, setIsVisible] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // --- Sincronização de Estado durante o Render ---
+  // --- State Synchronization during Render ---
 
-  // 1. Se abriu via prop, garante que o componente seja montado no DOM
+  // 1. If opened via prop, ensure the component is mounted in the DOM
   if (isOpen && !isRendered) {
     setIsRendered(true);
   }
 
-  // 2. Se fechou via prop, dispara a animação de saída (fadeOut/slideDown)
-  // Mantemos isRendered como true para que o elemento continue existindo durante a transição
+  // 2. If closed via prop, trigger the exit animation (fadeOut/slideDown)
+  // We keep isRendered as true so the element continues to exist during transition
   if (!isOpen && isVisible) {
     setIsVisible(false);
   }
 
   useEffect(() => {
     if (isOpen) {
-      // Dispara a animação de entrada logo após a montagem
+      // Trigger the entry animation right after mounting
       const timer = setTimeout(() => setIsVisible(true), 10);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
-  // Esta função é a chave para o FadeOut: ela remove o modal do DOM
-  // SOMENTE após as transições de CSS terminarem.
+  // This function is the key to FadeOut: it removes the modal from the DOM
+  // ONLY after the CSS transitions have finished.
   const handleTransitionEnd = (e: React.TransitionEvent) => {
-    // Garantimos que a transição que terminou foi no container principal (ex: opacity)
+    // We ensure the transition that ended was on the main container (e.g., opacity)
     if (e.target === e.currentTarget && !isOpen && !isVisible) {
       setIsRendered(false);
     }

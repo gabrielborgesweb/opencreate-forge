@@ -18,7 +18,7 @@ const RightSidebar: React.FC = () => {
 
   const [isResizing, setIsResizing] = useState(false);
 
-  // Adicione uma referência para controlar a animação
+  // Add a reference to control the animation
   const rafRef = useRef<number | null>(null);
 
   const startResizing = useCallback((e: React.MouseEvent) => {
@@ -34,7 +34,7 @@ const RightSidebar: React.FC = () => {
     }
   }, []);
 
-  // Otimização: Throttling de alta performance com requestAnimationFrame
+  // Optimization: High-performance throttling with requestAnimationFrame
   const resize = useCallback(
     (e: MouseEvent) => {
       if (isResizing) {

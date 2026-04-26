@@ -813,7 +813,7 @@ export class TextTool extends BaseTool {
     if (!this.editingLayerId) return;
     const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
 
-    // Se o texto está vazio e não havia nada originalmente, removemos silenciosamente
+    // If text is empty and there was nothing originally, remove silently
     if (layer && !layer.text && this.originalText === "") {
       useProjectStore.getState().removeLayer(context.project.id, this.editingLayerId, true);
     } else if (this.previousState && layer) {
@@ -845,7 +845,7 @@ export class TextTool extends BaseTool {
           .updateLayer(context.project.id, layer.id, { name: newName }, true);
       }
 
-      // Empurra o histórico APENAS se houver alguma modificação de fato (texto, posição, cor, etc)
+      // Push history ONLY if there is an actual modification (text, position, color, etc)
       // Note: We check against the project state AFTER potentially updating the name
       const currentLayer = context.project.layers.find((l) => l.id === this.editingLayerId);
       if (!prevLayer || JSON.stringify(currentLayer) !== JSON.stringify(prevLayer)) {
@@ -857,7 +857,7 @@ export class TextTool extends BaseTool {
     }
 
     this.isEditing = false;
-    this.previousState = null; // Limpa o estado após o commit
+    this.previousState = null; // Clear state after commit
     this.editingLayerId = null;
     if (this.hiddenInput) {
       this.hiddenInput.value = "";
@@ -871,11 +871,11 @@ export class TextTool extends BaseTool {
     if (!this.editingLayerId) return;
     const layer = context.project.layers.find((l) => l.id === this.editingLayerId);
 
-    // Se criou camada e cancelou sem digitar, remove silenciosamente.
+    // If layer was created and cancelled without typing, remove silently.
     if (this.originalText === "" && (!layer || !layer.text)) {
       useProjectStore.getState().removeLayer(context.project.id, this.editingLayerId, true);
     } else if (this.previousState) {
-      // Se estava editando uma camada existente, restaura as propriedades exatas que ela tinha antes
+      // If an existing layer was being edited, restore the exact properties it had before
       const prevLayer = this.previousState.layers.find((l: Layer) => l.id === this.editingLayerId);
       if (prevLayer) {
         useProjectStore.getState().updateLayer(context.project.id, this.editingLayerId, prevLayer);
@@ -883,7 +883,7 @@ export class TextTool extends BaseTool {
     }
 
     this.isEditing = false;
-    this.previousState = null; // Limpa o estado após o cancelamento
+    this.previousState = null; // Clear state after cancellation
     this.editingLayerId = null;
     if (this.hiddenInput) {
       this.hiddenInput.value = "";

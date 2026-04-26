@@ -23,7 +23,7 @@ export class BrushTool extends BaseTool {
 
   private brushCanvas: HTMLCanvasElement | null = null;
 
-  // Para otimização de bounding box
+  // For bounding box optimization
   private minX = Infinity;
   private minY = Infinity;
   private maxX = -Infinity;
@@ -51,26 +51,26 @@ export class BrushTool extends BaseTool {
     const center = canvasSize / 2;
     const gradient = ctx.createRadialGradient(center, center, 0, center, center, radius);
 
-    // 1. Centro e início do falloff (totalmente opaco)
+    // 1. Center and start of falloff (fully opaque)
     const opaque = this.hexToRgba(color, 1);
     gradient.addColorStop(0, opaque);
 
     const hardnessStop = Math.max(0, Math.min(0.99, hardness));
     gradient.addColorStop(hardnessStop, opaque);
 
-    // 2. Transição Suave (Smoothstep) entre hardness e a borda (1)
-    // Usamos 10 passos para aproximar a curva; é leve para o processamento
+    // 2. Smooth Transition (Smoothstep) between hardness and the edge (1)
+    // We use 10 steps to approximate the curve; it is light for processing
     const steps = 10;
     for (let i = 1; i <= steps; i++) {
-      const t = i / steps; // Vai de 0 a 1
+      const t = i / steps; // Goes from 0 to 1
 
-      // Fórmula Smoothstep: interpolação não-linear
+      // Smoothstep Formula: non-linear interpolation
       const tSmooth = t * t * (3 - 2 * t);
 
-      // Invertemos para o Alpha (começa em 1 no hardness e vai para 0 na borda)
+      // Invert for Alpha (starts at 1 at hardness and goes to 0 at the edge)
       const alpha = 1 - tSmooth;
 
-      // Mapeamos a posição do stop entre o hardness e o final (1.0)
+      // Map stop position between hardness and the end (1.0)
       const stopPosition = hardnessStop + t * (1 - hardnessStop);
 
       gradient.addColorStop(Math.min(0.999, stopPosition), this.hexToRgba(color, alpha));
@@ -123,7 +123,7 @@ export class BrushTool extends BaseTool {
     this.mouseX = x;
     this.mouseY = y;
 
-    // Verifica se o mouse está sobre o canvas para mostrar/ocultar o preview
+    // Check if the mouse is over the canvas to show/hide the preview
     const rect = context.canvas.getBoundingClientRect();
     this.isMouseOver =
       e.clientX >= rect.left &&
@@ -154,11 +154,11 @@ export class BrushTool extends BaseTool {
   onMouseUp(e: MouseEvent, context: ToolContext): void {
     if (!this.isDrawing) return;
 
-    // Se ainda estiver carregando a imagem base (ex: camada gigante ou internet lenta se fosse o caso),
-    // vamos esperar um pouco ou forçar a finalização.
-    // Mas na maioria das vezes com o cache já vai estar pronto.
+    // If still loading the base image (e.g., giant layer or slow internet if that were the case),
+    // we will wait a bit or force completion.
+    // But most of the time it will already be ready with the cache.
     if (this.isLoadingBaseImage) {
-      // Pequeno delay para dar tempo do onload disparar se estiver quase pronto
+      // Small delay to give time for onload to fire if it's almost ready
       setTimeout(() => this.onMouseUp(e, context), 10);
       return;
     }
@@ -168,8 +168,8 @@ export class BrushTool extends BaseTool {
     if (this.offscreenCanvas && this.layerId && this.offscreenCtx) {
       const layer = context.project.layers.find((l) => l.id === this.layerId)!;
 
-      // Otimização: Em vez de varrer o canvas todo (que agora tem STROKE_PADDING),
-      // varremos apenas a união da área original da camada com a área do novo traço.
+      // Optimization: Instead of scanning the entire canvas (which now has STROKE_PADDING),
+      // we only scan the union of the original layer area and the new stroke area.
       const strokeLocalMinX = Math.floor(this.minX - this.strokeOriginX);
       const strokeLocalMinY = Math.floor(this.minY - this.strokeOriginY);
       const strokeLocalMaxX = Math.ceil(this.maxX - this.strokeOriginX);
@@ -296,28 +296,28 @@ export class BrushTool extends BaseTool {
     // })!;
     this.offscreenCtx = this.offscreenCanvas.getContext("2d")!;
 
-    // Tentar pegar do cache primeiro (sincronamente) para rapidez
+    // Try to get from cache first (synchronously) for speed
     const cachedResult = context.getLayerCanvas(layer.id);
     if (cachedResult) {
-      // Limpa para evitar sobreposição caso o motor tente desenhar a camada base de novo
+      // Clear to avoid overlap in case the engine tries to draw the base layer again
       this.offscreenCtx.clearRect(0, 0, width, height);
       this.offscreenCtx.drawImage(cachedResult.canvas, this.STROKE_PADDING, this.STROKE_PADDING);
 
-      // Se o cache já estava pronto, não precisamos carregar do data URL
+      // If the cache was already ready, we don't need to load from the data URL
       if (cachedResult.ready) {
         return;
       }
     }
 
-    // Se o cache não estava pronto ou não existia, carregar da data URL original
+    // If the cache was not ready or did not exist, load from the original data URL
     if (layer.data) {
       this.isLoadingBaseImage = true;
       const img = new Image();
       img.onload = () => {
         if (this.offscreenCtx) {
           this.offscreenCtx.save();
-          // Como vamos carregar a imagem real, limpamos o que quer que tenha vindo do cache incompleto
-          // para evitar o efeito de "duplicação" de opacidade
+          // Since we are going to load the real image, we clear whatever came from the incomplete cache
+          // to avoid the opacity "doubling" effect
           this.offscreenCtx.globalCompositeOperation = "destination-over";
           this.offscreenCtx.drawImage(img, this.STROKE_PADDING, this.STROKE_PADDING);
           this.offscreenCtx.restore();
@@ -453,7 +453,7 @@ export class BrushTool extends BaseTool {
       ctx.restore();
     }
 
-    // Brush Preview - Só desenha se o mouse estiver sobre o canvas
+    // Brush Preview - Only draws if the mouse is over the canvas
     if (this.isMouseOver) {
       ctx.save();
       ctx.setTransform(
@@ -468,21 +468,21 @@ export class BrushTool extends BaseTool {
       const effectiveSize = settings.size * (1 + (1 - settings.hardness) * 0.5);
       const radius = effectiveSize / 2;
 
-      // Outline externa (branca)
+      // Outer outline (white)
       ctx.beginPath();
       ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
       ctx.lineWidth = 1 / context.project.zoom;
       ctx.stroke();
 
-      // Outline interna (preta para contraste)
+      // Inner outline (black for contrast)
       ctx.beginPath();
       ctx.arc(this.mouseX, this.mouseY, radius - 0.5 / context.project.zoom, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
       ctx.lineWidth = 0.5 / context.project.zoom;
       ctx.stroke();
 
-      // Ponto central
+      // Center point
       // ctx.beginPath();
       // ctx.arc(
       //   this.mouseX,

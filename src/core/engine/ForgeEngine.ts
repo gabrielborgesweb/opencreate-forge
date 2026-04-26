@@ -212,7 +212,7 @@ export class ForgeEngine {
     const basePanX = this.targetViewport ? this.targetViewport.panX : this.project.panX;
     const basePanY = this.targetViewport ? this.targetViewport.panY : this.project.panY;
 
-    // Zoom centralizado na viewport
+    // Viewport-centered zoom
     const viewportWidth = this.canvas.width;
     const viewportHeight = this.canvas.height;
     const centerX = viewportWidth / 2;
@@ -462,7 +462,7 @@ export class ForgeEngine {
     if (this.project.selection.hasSelection) {
       // If we have a selection, let's just clear it to paste normally
       // Usually editors paste INSIDE if there's a selection, but here the request is:
-      // "colar e a seleção estiver vazia, tirar a seleção e colar normalmente"
+      // "paste and if there is a selection, remove the selection and paste normally"
       // If the selection has NO pixels it's redundant to keep it.
       // Most users actually want to paste as new layer and ignore selection if it's just a rectangle.
       useProjectStore.getState().updateProject(this.project.id, {
@@ -772,7 +772,6 @@ export class ForgeEngine {
    * Handles mouse movement events.
    */
   private handleMouseMove(e: MouseEvent) {
-    // this.lastMouseEvent = e; // <--- Adicione isso
     if (!this.project) return;
 
     const rect = this.canvas.getBoundingClientRect();
@@ -923,7 +922,7 @@ export class ForgeEngine {
         this.selectionEdges = null;
       }
     } else if (project.selection.hasSelection && !this.selectionEdges) {
-      // Caso a máscara não tenha mudado (já sincronizada pelo Tool), mas as bordas ainda não existam
+      // In case the mask hasn't changed (already synchronized by the Tool), but the edges don't exist yet
       this.updateSelectionEdges();
     }
   }
@@ -1040,13 +1039,13 @@ export class ForgeEngine {
       this.ctx.setLineDash([4 / zoom, 4 / zoom]);
       this.ctx.lineDashOffset = -this.marchingAntsOffset / zoom;
 
-      // Desenha linha branca
+      // Draw white line
       this.ctx.strokeStyle = "white";
       this.ctx.moveTo(bx + seg.x, by + seg.y);
       this.ctx.lineTo(bx + seg.x + seg.length, by + seg.y);
       this.ctx.stroke();
 
-      // Desenha linha preta intercalada (contraste)
+      // Draw interlaced black line (contrast)
       this.ctx.beginPath();
       this.ctx.strokeStyle = "black";
       this.ctx.lineDashOffset = -(this.marchingAntsOffset + 4) / zoom;
@@ -1206,7 +1205,7 @@ export class ForgeEngine {
   public render() {
     if (!this.project) return;
 
-    // Detectar mudança de ferramenta
+    // Detect tool change
     const activeToolId = useToolStore.getState().activeToolId;
     if (activeToolId !== this.currentToolId) {
       const context = this.getToolContext();
@@ -1218,7 +1217,7 @@ export class ForgeEngine {
         if (this.currentToolId && this.tools[this.currentToolId]) {
           this.tools[this.currentToolId].onActivate(context);
         }
-        // Reset cursor default ao trocar
+        // Reset default cursor when switching
         this.canvas.style.cursor = "default";
       }
     }
@@ -1585,13 +1584,13 @@ export class ForgeEngine {
     const activeLayer = this.project.layers.find((l) => l.id === this.project?.activeLayerId);
     if (!activeLayer) return;
 
-    // Se NÃO houver seleção, duplica a camada inteira via Store
+    // If there is NO selection, duplicate the entire layer via Store
     if (!this.project.selection.hasSelection || !this.project.selection.bounds) {
       useProjectStore.getState().duplicateLayer(this.project.id, activeLayer.id);
       return;
     }
 
-    // Se HOUVER seleção, faz o "Layer via Copy" (Photoshop style)
+    // If there IS a selection, perform "Layer via Copy" (Photoshop style)
     if (activeLayer.type !== "raster" || !activeLayer.data) {
       useUIStore
         .getState()
@@ -1604,7 +1603,7 @@ export class ForgeEngine {
 
     const { bounds } = this.project.selection;
 
-    // 1. Extrair pixels da seleção
+    // 1. Extract pixels from the selection
     const tempCanvas = document.createElement("canvas");
     tempCanvas.width = bounds.width;
     tempCanvas.height = bounds.height;
@@ -1645,7 +1644,7 @@ export class ForgeEngine {
       optimizedBounds.height,
     );
 
-    // 2. Criar nova camada com os pixels extraídos
+    // 2. Create a new layer with the extracted pixels
     const finalX = bounds.x + optimizedBounds.x;
     const finalY = bounds.y + optimizedBounds.y;
 

@@ -5,8 +5,8 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
 interface UIState {
-  activeTab: "home" | string; // 'home' ou ID do projeto
-  tabHistory: string[]; // Pilha de IDs (o último é o atual)
+  activeTab: "home" | string; // 'home' or project ID
+  tabHistory: string[]; // Stack of IDs (the last one is current)
   toast: {
     message: string;
     type: "info" | "warning" | "error";

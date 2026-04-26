@@ -749,20 +749,20 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
       const historyLength = project.undoStack.length + project.redoStack.length;
       if (index < 0 || index >= historyLength) return state;
 
-      // Usamos arrays mutáveis internamente para o loop
+      // Use mutable arrays internally for the loop
       const currentUndoStack = [...project.undoStack];
       const currentRedoStack = [...project.redoStack];
 
-      // Capturamos o estado vivo atual UMA vez antes do loop
+      // Capture the current live state ONCE before the loop
       let currentHistoryState = createHistoryState(project);
 
-      // O índice atual do usuário é sempre baseado no tamanho do undoStack
+      // The user's current index is always based on the undoStack size
       const currentIndex = currentUndoStack.length - 1;
 
       if (index === currentIndex) return state;
 
       if (index < currentIndex) {
-        // Voltando no tempo (Simula chamadas de Undo)
+        // Going back in time (Simulates Undo calls)
         const steps = currentIndex - index;
         for (let i = 0; i < steps; i++) {
           const lastEntry = currentUndoStack.pop()!;
@@ -773,7 +773,7 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
           currentHistoryState = lastEntry.state;
         }
       } else {
-        // Avançando no tempo (Simula chamadas de Redo)
+        // Going forward in time (Simulates Redo calls)
         const steps = index - currentIndex;
         for (let i = 0; i < steps; i++) {
           const nextEntry = currentRedoStack.pop()!;

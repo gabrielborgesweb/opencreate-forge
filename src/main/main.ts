@@ -30,10 +30,10 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(APP_ROOT, "public") : 
 let win: BrowserWindow | null;
 let splash: BrowserWindow | null;
 
-app.commandLine.appendSwitch("ignore-gpu-blacklist"); // Garante uso da GPU em mais máquinas
-app.commandLine.appendSwitch("enable-gpu-rasterization"); // Melhora o render de formas vetoriais e desenhos
-app.commandLine.appendSwitch("enable-zero-copy"); // Melhora a velocidade de escrita de texturas (bom para Canvas)
-app.commandLine.appendSwitch("enable-features", "SharedArrayBuffer"); // Crucial para WASM multithread
+app.commandLine.appendSwitch("ignore-gpu-blacklist"); // Ensures GPU usage on more machines
+app.commandLine.appendSwitch("enable-gpu-rasterization"); // Improves rendering of vector shapes and drawings
+app.commandLine.appendSwitch("enable-zero-copy"); // Improves texture write speed (good for Canvas)
+app.commandLine.appendSwitch("enable-features", "SharedArrayBuffer"); // Crucial for WASM multithread
 
 function createSplashWindow() {
   splash = new BrowserWindow({
@@ -329,7 +329,7 @@ app.whenReady().then(() => {
     if (canceled || !filePath) return { success: false };
 
     const matches = dataURL.match(/^data:(.+);base64,(.+)$/);
-    if (!matches) return { success: false, error: "Formato de dataURL inválido" };
+    if (!matches) return { success: false, error: "Invalid dataURL format" };
 
     const buffer = Buffer.from(matches[2], "base64");
     try {
@@ -344,8 +344,8 @@ app.whenReady().then(() => {
 
   ipcMain.handle("dialog:saveProjectAs", async (_event, { jsonString, defaultName }) => {
     const { canceled, filePath } = await dialog.showSaveDialog({
-      title: "Salvar Projeto Como...",
-      defaultPath: defaultName || "projeto.ocfd",
+      title: "Save Project As...",
+      defaultPath: defaultName || "project.ocfd",
       filters: [{ name: "OpenCreate Forge Document", extensions: ["ocfd"] }],
     });
     if (canceled || !filePath) return { success: false, filePath: null };
@@ -369,7 +369,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("fs:saveProject", async (_event, { jsonString, filePath }) => {
-    if (!filePath) return { success: false, error: "Nenhum caminho de arquivo fornecido." };
+    if (!filePath) return { success: false, error: "No file path provided." };
     try {
       const projectData = JSON.parse(jsonString);
 
@@ -389,26 +389,26 @@ app.whenReady().then(() => {
   ipcMain.handle("dialog:confirmClose", async (_event, projectName) => {
     const { response } = await dialog.showMessageBox({
       type: "question",
-      buttons: ["Salvar", "Não Salvar", "Cancelar"],
+      buttons: ["Save", "Don't Save", "Cancel"],
       defaultId: 0,
       cancelId: 2,
-      message: `Deseja salvar as alterações em "${projectName}"?`,
-      detail: "Suas alterações serão perdidas se você não as salvar.",
+      message: `Do you want to save the changes to "${projectName}"?`,
+      detail: "Your changes will be lost if you don't save them.",
     });
     return response;
   });
 
   ipcMain.handle("dialog:openProject", async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
-      title: "Abrir Projeto ou Imagem",
+      title: "Open Project or Image",
       properties: ["openFile"],
       filters: [
         {
-          name: "Todos os Arquivos Suportados",
+          name: "All Supported Files",
           extensions: ["ocfd", "png", "jpg", "jpeg", "bmp", "webp"],
         },
         { name: "OpenCreate Forge Document", extensions: ["ocfd"] },
-        { name: "Imagens", extensions: ["png", "jpg", "jpeg", "bmp", "webp"] },
+        { name: "Images", extensions: ["png", "jpg", "jpeg", "bmp", "webp"] },
       ],
     });
     if (canceled || !filePaths[0]) return null;
@@ -421,7 +421,7 @@ app.whenReady().then(() => {
         const content = await fs.readFile(filePath, "utf8");
         return { success: true, filePath, type: "project", content };
       } else {
-        // É uma imagem
+        // It's an image
         const buffer = await fs.readFile(filePath);
         const mimeType =
           {

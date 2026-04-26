@@ -206,17 +206,17 @@ function App() {
 
       <NewProject isOpen={isNewProjectModalOpen} onClose={() => setIsNewProjectModalOpen(false)} />
 
-      {/* 1. Abas de Projeto */}
+      {/* 1. Project Tabs */}
       <ProjectTabs />
 
-      {/* 2. Cabeçalho Dinâmico (Opções da Ferramenta) */}
+      {/* 2. Dynamic Header (Tool Options) */}
       {activeTab !== "home" && (
         <header className="bg-[#222] border-b border-bg-tertiary flex items-center">
           <ToolOptions />
         </header>
       )}
 
-      {/* 3. Área Principal */}
+      {/* 3. Main Area */}
       <main className="flex-1 flex overflow-hidden">
         {activeTab === "home" ? (
           <HomeScreen />

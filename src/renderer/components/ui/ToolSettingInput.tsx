@@ -12,7 +12,7 @@ interface ToolSettingInputProps {
   max?: number;
   step?: number;
   unit?: string;
-  displayMultiplier?: number; // Ex: 100 para porcentagem (valor interno 1.0 -> 100 na UI)
+  displayMultiplier?: number; // E.g., 100 for percentage (internal value 1.0 -> 100 in UI)
 }
 
 const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
@@ -31,7 +31,7 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
   const startX = useRef(0);
   const startValue = useRef(0);
 
-  // Valor convertido para exibição (ex: 0.5 * 100 = 50)
+  // Value converted for display (e.g., 0.5 * 100 = 50)
   const displayValue = Number((value * displayMultiplier).toFixed(displayMultiplier === 1 ? 0 : 2));
 
   const clampAndSave = (newValue: number) => {
@@ -39,7 +39,7 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
     onChange(clamped);
   };
 
-  // Lógica de Scrubbing (arrastar no label)
+  // Scrubbing logic (dragging on label)
   const handleMouseDown = (e: React.MouseEvent) => {
     isDragging.current = true;
     startX.current = e.clientX;
@@ -72,7 +72,7 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
     window.addEventListener("mouseup", handleMouseUp);
   };
 
-  // Lógica de Scroll
+  // Scroll logic
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const direction = e.deltaY > 0 ? -1 : 1;
@@ -80,7 +80,7 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
     clampAndSave(value + delta);
   };
 
-  // Fechar o slider ao clicar fora
+  // Close slider when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -128,7 +128,7 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
       {isOpen && (
         <div
           className="absolute top-[calc(100%+8px)] left-[-20px] z-50 bg-[#1a1a1a] border border-[#333] p-3 rounded shadow-2xl min-w-[160px] animate-in fade-in slide-in-from-top-2 duration-200"
-          onWheel={(e) => e.stopPropagation()} // Permite que o wheel do container pai funcione ou capture aqui
+          onWheel={(e) => e.stopPropagation()} // Allows parent container wheel to work or captures here
         >
           <div className="flex flex-col gap-2">
             <div className="flex justify-between text-[0.65rem] text-[#666] uppercase font-bold px-0.5">
@@ -154,7 +154,7 @@ const ToolSettingInput: React.FC<ToolSettingInputProps> = ({
               className="w-full h-1.5 bg-[#333] rounded-lg appearance-none cursor-pointer accent-accent"
             />
           </div>
-          {/* Seta do triângulo para o popup */}
+          {/* Triangle arrow for the popup */}
           <div className="absolute top-[-5px] left-[40px] w-2 h-2 bg-[#1a1a1a] border-t border-l border-[#333] rotate-45" />
         </div>
       )}

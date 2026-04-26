@@ -23,7 +23,7 @@ export class EraserTool extends BaseTool {
 
   private brushCanvas: HTMLCanvasElement | null = null;
 
-  // Para otimização de bounding box
+  // For bounding box optimization
   private minX = Infinity;
   private minY = Infinity;
   private maxX = -Infinity;
@@ -45,8 +45,8 @@ export class EraserTool extends BaseTool {
     const center = canvasSize / 2;
     const gradient = ctx.createRadialGradient(center, center, 0, center, center, radius);
 
-    // Na borracha (Brush mode), desenhamos com PRETO sólido no canvas auxiliar
-    // e depois usamos destination-out no canvas principal.
+    // For the eraser (Brush mode), we draw with solid BLACK on the auxiliary canvas
+    // and then use destination-out on the main canvas.
     const opaque = "rgba(0,0,0,1)";
     gradient.addColorStop(0, opaque);
 
@@ -86,7 +86,7 @@ export class EraserTool extends BaseTool {
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
     const settings = context.settings.eraser;
 
-    // Se for modo lápis, snap to pixel
+    // If in pencil mode, snap to pixel
     const drawX = settings.mode === "pencil" ? Math.floor(x) : x;
     const drawY = settings.mode === "pencil" ? Math.floor(y) : y;
 
@@ -228,7 +228,7 @@ export class EraserTool extends BaseTool {
         }
         context.updateProject({ layers, isDirty: true });
       } else {
-        // Camada ficou totalmente vazia
+        // Layer became completely empty
         const layers = context.project.layers.map((l) => {
           if (l.id === this.layerId) {
             return {
@@ -625,7 +625,7 @@ export class EraserTool extends BaseTool {
       ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
       ctx.lineWidth = 1 / zoom;
 
-      // Se for modo lápis e formato quadrado
+      // If pencil mode and square shape
       if (settings.mode === "pencil" && settings.shape === "square") {
         ctx.strokeRect(
           this.mouseX - Math.floor(size / 2),
@@ -634,7 +634,7 @@ export class EraserTool extends BaseTool {
           size,
         );
       } else {
-        // Modo Brush ou Modo Pencil com círculo
+        // Brush mode or Pencil mode with circle
         ctx.beginPath();
         ctx.arc(this.mouseX, this.mouseY, size / 2, 0, Math.PI * 2);
         ctx.stroke();

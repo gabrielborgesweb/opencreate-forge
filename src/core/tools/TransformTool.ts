@@ -468,7 +468,7 @@ export class TransformTool extends BaseTool {
     const t = this.currentTransform;
     const scale = context.project.zoom;
 
-    // Desenhar preview da camada transformada
+    // Draw preview of the transformed layer
     ctx.save();
     ctx.translate(t.x, t.y);
     ctx.rotate((t.rotation * Math.PI) / 180);
@@ -481,13 +481,13 @@ export class TransformTool extends BaseTool {
     }
     ctx.restore();
 
-    // Desenhar handles e bordas
+    // Draw handles and borders
     const handles = this.getTransformHandles(context, false);
     ctx.save();
     ctx.strokeStyle = "#0078ff";
     ctx.lineWidth = 1 / scale;
 
-    // Desenhar linhas conectando os cantos
+    // Draw lines connecting the corners
     const cornerNames = ["top-left", "top-right", "bottom-right", "bottom-left"];
     const corners = cornerNames
       .map((name) => handles.find((h) => h.name === name))
@@ -503,7 +503,7 @@ export class TransformTool extends BaseTool {
       ctx.stroke();
     }
 
-    // Desenhar linha de rotação
+    // Draw rotation line
     const rotateHandle = handles.find((h) => h.name === "rotate");
     const topMiddle = handles.find((h) => h.name === "top-middle");
     if (rotateHandle && topMiddle) {
@@ -513,7 +513,7 @@ export class TransformTool extends BaseTool {
       ctx.stroke();
     }
 
-    // Desenhar os handles
+    // Draw the handles
     const handleSize = this.TRANSFORM_HANDLE_SIZE / scale;
     handles.forEach((h) => {
       ctx.fillStyle = "white";

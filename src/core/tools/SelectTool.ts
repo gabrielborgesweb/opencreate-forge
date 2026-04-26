@@ -26,12 +26,12 @@ export class SelectTool extends BaseTool {
 
     const { x, y } = context.screenToProject(e.offsetX, e.offsetY);
 
-    // O modo já deve estar correto no store graças aos listeners no App.tsx
-    // mas capturamos aqui para manter o mesmo modo até o final do clique
+    // The mode should already be correct in the store thanks to listeners in App.tsx
+    // but we capture it here to keep the same mode until the end of the click
     const { mode } = context.settings.select;
     (this as any).effectiveMode = mode;
 
-    // Verificar se clicou dentro da seleção existente para mover
+    // Check if clicked inside existing selection to move it
     if (context.project.selection.hasSelection && context.project.selection.bounds) {
       const { bounds } = context.project.selection;
       const canMove = mode === "replace" || mode === "unite";
@@ -151,7 +151,7 @@ export class SelectTool extends BaseTool {
       const height = Math.abs(currentY - startY);
 
       if (width < 1 || height < 1) {
-        // Clique simples fora de seleção limpa se mode for replace
+        // Simple click outside selection clears it if mode is replace
         if (context.settings.select.mode === "replace") {
           this.clearSelection(context);
         }
@@ -219,7 +219,7 @@ export class SelectTool extends BaseTool {
     const { selection } = context.project;
 
     if (!selection.hasSelection || mode === "replace") {
-      // Nova seleção
+      // New selection
       selCanvas.width = rect.width;
       selCanvas.height = rect.height;
       selCtx.fillStyle = "white";
@@ -251,7 +251,7 @@ export class SelectTool extends BaseTool {
         },
       });
     } else {
-      // Modificar seleção existente
+      // Modify existing selection
       const oldBounds = selection.bounds!;
       const newBounds = {
         x: Math.min(oldBounds.x, rect.x),
@@ -267,12 +267,12 @@ export class SelectTool extends BaseTool {
       tempCanvas.height = finalHeight;
       const tempCtx = tempCanvas.getContext("2d")!;
 
-      // Desenha a seleção antiga no novo canvas com offset
+      // Draw old selection on new canvas with offset
       const offsetX = oldBounds.x - newBounds.x;
       const offsetY = oldBounds.y - newBounds.y;
       tempCtx.drawImage(selCanvas, offsetX, offsetY);
 
-      // Configura o composite operation para o modo selecionado
+      // Set composite operation for selected mode
       switch (mode) {
         case "unite":
           tempCtx.globalCompositeOperation = "source-over";
@@ -285,7 +285,7 @@ export class SelectTool extends BaseTool {
           break;
       }
 
-      // Desenha o novo retângulo ou elipse
+      // Draw new rectangle or ellipse
       const { shape } = context.settings.select;
       tempCtx.fillStyle = "white";
       const rx = rect.x - newBounds.x;
@@ -301,10 +301,10 @@ export class SelectTool extends BaseTool {
         tempCtx.fillRect(rx, ry, rw, rh);
       }
 
-      // Volta ao normal
+      // Back to normal
       tempCtx.globalCompositeOperation = "source-over";
 
-      // Verifica se ainda tem pixels na seleção
+      // Check if there are still pixels in selection
       const imageData = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
       const data = imageData.data;
       let hasSelection = false;
@@ -359,7 +359,7 @@ export class SelectTool extends BaseTool {
       const currentX = this.currentX;
       const currentY = this.currentY;
 
-      // Para o preview, vamos apenas desenhar o retângulo do mouse
+      // For preview, just draw the mouse rectangle
       const x = Math.min(startX, currentX);
       const y = Math.min(startY, currentY);
       const w = Math.abs(currentX - startX);

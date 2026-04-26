@@ -21,7 +21,7 @@ export class PencilTool extends BaseTool {
   private mouseY = 0;
   private isMouseOver = false;
 
-  // Para otimização de bounding box
+  // For bounding box optimization
   private minX = Infinity;
   private minY = Infinity;
   private maxX = -Infinity;
@@ -521,7 +521,7 @@ export class PencilTool extends BaseTool {
       const y = this.mouseY;
       const zoom = context.project.zoom;
 
-      // 1. Outline Externa (Branca)
+      // 1. External Outline (White)
       ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
       ctx.lineWidth = 1 / zoom;
 
@@ -533,7 +533,7 @@ export class PencilTool extends BaseTool {
         ctx.stroke();
       }
 
-      // 2. Outline Interna (Preta para contraste)
+      // 2. Internal Outline (Black for contrast)
       ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
       ctx.lineWidth = 0.5 / zoom;
       const offset = 0.5 / zoom;
@@ -551,7 +551,7 @@ export class PencilTool extends BaseTool {
         ctx.stroke();
       }
 
-      // 3. Ponto central
+      // 3. Center point
       // ctx.beginPath();
       // ctx.arc(x, y, 1 / zoom, 0, Math.PI * 2);
       // ctx.fillStyle = "rgba(255, 255, 255, 0.8)";

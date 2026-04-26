@@ -2,8 +2,8 @@
  * Purpose: Utility functions for image manipulation and optimization, such as calculating bounding boxes for non-transparent pixels.
  */
 /**
- * Encontra a caixa delimitadora (bounding box) de pixels não transparentes
- * DENTRO de uma área de busca específica para otimização.
+ * Finds the bounding box of non-transparent pixels
+ * WITHIN a specific search area for optimization.
  */
 export function getOptimizedBoundingBox(
   canvas: HTMLCanvasElement,

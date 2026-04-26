@@ -21,10 +21,10 @@ const CanvasViewport: React.FC = () => {
 
   const RULER_SIZE = 25;
 
-  // 1. Inicializa o Engine apenas uma vez
+  // 1. Initializes the Engine only once
   useEffect(() => {
     if (canvasRef.current && !engineRef.current) {
-      // Garantir tamanho inicial correto antes de criar o engine
+      // Ensure correct initial size before creating the engine
       const parent = canvasRef.current.parentElement;
       if (parent) {
         canvasRef.current.width = parent.clientWidth;
@@ -34,7 +34,7 @@ const CanvasViewport: React.FC = () => {
       engineRef.current = new ForgeEngine(canvasRef.current, (zoom, x, y) => {
         const id = useProjectStore.getState().activeProjectId;
         if (id) {
-          // Atualiza a store APENAS quando o zoom/pan muda via interação
+          // Updates the store ONLY when zoom/pan changes via interaction
           useProjectStore.getState().updateProject(id, {
             zoom,
             panX: x,
@@ -52,29 +52,29 @@ const CanvasViewport: React.FC = () => {
     };
   }, []);
 
-  // 2. Sincroniza o projeto ativo com o engine
+  // 2. Synchronizes the active project with the engine
   useEffect(() => {
     if (engineRef.current && project) {
       engineRef.current.setProject(project);
     }
   }, [project]);
 
-  // 3. Centralização inicial (Fit to Screen) - APENAS NA PRIMEIRA VEZ por projeto
+  // 3. Initial centering (Fit to Screen) - ONLY THE FIRST TIME per project
   const centeredProjectsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (engineRef.current && project && !centeredProjectsRef.current.has(project.id)) {
-      // Se o projeto foi recém-criado (está no estado padrão 1:1 e 0:0) ou simplesmente ainda não foi centralizado nesta sessão
+      // If the project was newly created (at default 1:1 and 0:0 state) or simply hasn't been centered in this session yet
       if (project.zoom === 1 && project.panX === 0 && project.panY === 0) {
         engineRef.current.fitToScreen();
         centeredProjectsRef.current.add(project.id);
       } else {
-        // Se já tem valores (ex: projeto carregado), marcamos como já centralizado para não forçar
+        // If it already has values (e.g., loaded project), mark as already centered to avoid forcing it
         centeredProjectsRef.current.add(project.id);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.id]); // Apenas quando mudar o projeto, não quando mudar o zoom
+  }, [project?.id]); // Only when project changes, not when zoom changes
 
   // 4. Handle resize (via ResizeObserver for better precision during transitions)
   useEffect(() => {
@@ -88,12 +88,12 @@ const CanvasViewport: React.FC = () => {
         const newWidth = parent.clientWidth;
         const newHeight = parent.clientHeight;
 
-        // Só altera o tamanho (e consequentemente limpa o canvas) se realmente mudou
+        // Only change size (and consequently clear canvas) if it really changed
         if (canvasRef.current.width !== newWidth || canvasRef.current.height !== newHeight) {
           canvasRef.current.width = newWidth;
           canvasRef.current.height = newHeight;
 
-          // FORÇA a renderização síncrona imediata para evitar a tela preta/branca
+          // FORCE immediate synchronous render to avoid black/white screen
           engineRef.current.render();
         }
       }
@@ -138,16 +138,16 @@ const CanvasViewport: React.FC = () => {
           const dataUrl = event.target?.result as string;
           const img = new Image();
           img.onload = () => {
-            // Coordenadas do centro da tela (viewport)
+            // Viewport center coordinates
             const viewportWidth = canvasRef.current?.width || 0;
             const viewportHeight = canvasRef.current?.height || 0;
 
-            // Converte o centro da tela para coordenadas dentro do projeto
-            // levando em conta o zoom e o pan atual
+            // Convert screen center to project coordinates,
+            // taking into account current zoom and pan
             const projCenterX = (viewportWidth / 2 - project.panX) / project.zoom;
             const projCenterY = (viewportHeight / 2 - project.panY) / project.zoom;
 
-            // Posiciona a imagem centralizada nesse ponto do projeto
+            // Position image centered at this project point
             const x = Math.round(projCenterX - img.naturalWidth / 2);
             const y = Math.round(projCenterY - img.naturalHeight / 2);
 

@@ -43,8 +43,8 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     root: path.resolve(__dirname, "."),
-    setupFiles: [path.resolve(__dirname, "./src/renderer/test/setup.ts")],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    setupFiles: [path.resolve(__dirname, "./test/setup.ts")],
+    include: ["test/**/*.{test,spec}.{ts,tsx}"],
   },
   build: {
     outDir: path.resolve(__dirname, "dist"),

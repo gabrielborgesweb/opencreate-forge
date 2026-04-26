@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { RasterLayer } from "./RasterLayer";
+import { RasterLayer } from "@/core/layers/RasterLayer";
 import { Layer } from "@/renderer/store/projectStore";
 
 describe("RasterLayer", () => {

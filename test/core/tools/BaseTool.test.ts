@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BaseTool, ToolId } from "./BaseTool";
+import { BaseTool, ToolId } from "@/core/tools/BaseTool";
 
 class TestTool extends BaseTool {
   id = "test-tool" as ToolId;
@@ -13,7 +13,6 @@ describe("BaseTool", () => {
 
   it("should have default empty methods", () => {
     const tool = new TestTool();
-    // Apenas garante que chamar as funções não lança erro
     expect(() => tool.onMouseDown({} as MouseEvent, {} as any)).not.toThrow();
     expect(() => tool.onMouseMove({} as MouseEvent, {} as any)).not.toThrow();
     expect(() => tool.onMouseUp({} as MouseEvent, {} as any)).not.toThrow();

@@ -15,9 +15,9 @@
     "check": "npm run tsc && npm run lint",
     "check:cp": "node scripts/check.js",
     "test:all": "vitest run",
-    "test:project": "vitest run src/renderer/store src/renderer/utils",
-    "test:tools": "vitest run src/core/tools",
-    "test:layers": "vitest run src/core/layers",
+    "test:project": "vitest run test/renderer/store",
+    "test:tools": "vitest run test/core/tools",
+    "test:layers": "vitest run test/core/layers",
     "test:watch": "vitest",
     "prettier": "prettier --write . --ignore-path .prettierignore"
   },
@@ -52,7 +52,8 @@
     "vite": "^8.0.8",
     "vite-plugin-electron": "^0.29.1",
     "vite-plugin-electron-renderer": "^0.14.6",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "vitest-canvas-mock": "^1.1.4"
   },
   "build": {
     "appId": "app.opencreate.forge",

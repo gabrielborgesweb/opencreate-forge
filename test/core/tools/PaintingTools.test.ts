@@ -1,0 +1,49 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { BrushTool } from "@/core/tools/BrushTool";
+import { PencilTool } from "@/core/tools/PencilTool";
+import { EraserTool } from "@/core/tools/EraserTool";
+import { createMockToolContext } from "../../mocks";
+
+describe("Painting Tools", () => {
+  let context: any;
+
+  beforeEach(() => {
+    context = createMockToolContext();
+    HTMLCanvasElement.prototype.toDataURL = vi.fn(() => "data:image/png;base64,mock");
+    HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
+      drawImage: vi.fn(),
+      fillRect: vi.fn(),
+      beginPath: vi.fn(),
+      arc: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      clearRect: vi.fn(),
+      createRadialGradient: vi.fn(() => ({
+        addColorStop: vi.fn(),
+      })),
+      getImageData: vi.fn(() => ({
+        data: new Uint8ClampedArray([0, 0, 0, 255]),
+      })),
+      save: vi.fn(),
+      restore: vi.fn(),
+      setTransform: vi.fn(),
+    })) as any;
+  });
+
+  describe("BrushTool", () => {
+    it("should start drawing on mouse down", () => {
+      const tool = new BrushTool();
+      tool.onMouseDown({ button: 0, offsetX: 10, offsetY: 10 } as MouseEvent, context);
+      expect(tool.getEditingLayerId()).toBe("layer-1");
+    });
+  });
+
+  describe("PencilTool", () => {
+    it("should snap to pixels", () => {
+      const tool = new PencilTool();
+      context.screenToProject = vi.fn(() => ({ x: 10.7, y: 20.2 }));
+      tool.onMouseDown({ button: 0, offsetX: 10, offsetY: 10 } as MouseEvent, context);
+      expect(tool.getEditingLayerId()).toBe("layer-1");
+    });
+  });
+});

@@ -136,7 +136,7 @@ export class TextLayer {
       ctx.translate(-midX, -midY);
     }
 
-    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+    ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}"`;
     ctx.textAlign = textAlign === "justify" ? "left" : textAlign;
     ctx.textBaseline = "alphabetic";
 
@@ -369,7 +369,7 @@ export class TextLayer {
       const fontWeight = style.fontWeight || baseFontWeight;
       const color = style.color || baseColor;
 
-      ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+      ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}"`;
       ctx.fillStyle = color;
 
       ctx.fillText(char, currentX, y);
@@ -597,14 +597,14 @@ export class TextLayer {
     if (!layer || !layer.textSpans || layer.textSpans.length === 0) {
       if (tracking === 0) {
         ctx.save();
-        ctx.font = `${layer?.fontWeight || "normal"} ${layer?.fontSize || 24}px ${layer?.fontFamily || "Arial"}`;
+        ctx.font = `${layer?.fontWeight || "400"} ${layer?.fontSize || 24}px "${layer?.fontFamily || "Arial"}"`;
         const w = ctx.measureText(text).width;
         ctx.restore();
         return w;
       }
       let width = 0;
       ctx.save();
-      ctx.font = `${layer?.fontWeight || "normal"} ${layer?.fontSize || 24}px ${layer?.fontFamily || "Arial"}`;
+      ctx.font = `${layer?.fontWeight || "400"} ${layer?.fontSize || 24}px "${layer?.fontFamily || "Arial"}"`;
       for (let i = 0; i < text.length; i++) {
         width += ctx.measureText(text[i]).width + tracking;
       }
@@ -624,7 +624,7 @@ export class TextLayer {
       const fontWeight = style.fontWeight || baseFontWeight;
 
       ctx.save();
-      ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+      ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}"`;
       width += ctx.measureText(text[i]).width + tracking;
       ctx.restore();
     }

@@ -88,7 +88,7 @@ export const useToolStore = create<ToolState>()(
         text: {
           fontFamily: "Arial",
           fontSize: 24,
-          fontWeight: "normal",
+          fontWeight: "400",
           color: "#000000",
           textAlign: "left",
           lineHeight: 1.2,

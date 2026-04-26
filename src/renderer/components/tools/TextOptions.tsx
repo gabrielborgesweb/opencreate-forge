@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import { useToolStore } from "@/renderer/store/toolStore";
 import { useProjectStore } from "@/renderer/store/projectStore";
+import { useFontStore } from "@/renderer/store/fontStore";
 import ToolSettingInput from "@/renderer/components/ui/ToolSettingInput";
 import {
   AlignLeft,
@@ -49,8 +50,8 @@ const TextOverflowIcon = ({ size = 16 }: { size?: number }) => (
 );
 
 export const TextOptions: React.FC = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(document.createElement("canvas"));
-  const [availableWeights, setAvailableWeights] = React.useState<string[]>(["normal", "bold"]);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
   const toolSettings = useToolStore((state) => state.toolSettings);
   const updateToolSettings = useToolStore((state) => state.updateToolSettings);
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
@@ -58,70 +59,34 @@ export const TextOptions: React.FC = () => {
     state.projects.find((p) => p.id === activeProjectId),
   );
 
+  const {
+    systemFonts,
+    googleFonts,
+    loadSystemFonts,
+    loadGoogleFonts,
+    ensureFontLoaded,
+    getFontWeights,
+  } = useFontStore();
+
   const textSettings = toolSettings.text;
   const textAlign = textSettings.textAlign;
   const activeToolId = useToolStore((state) => state.activeToolId);
 
-  // 0. Detect available weights for the current font
+  // Initialize fonts
   useEffect(() => {
-    const family = textSettings.fontFamily;
-    const testWeights = ["100", "200", "300", "400", "500", "600", "700", "800", "900"];
-    const detected: string[] = [];
+    loadSystemFonts();
+    loadGoogleFonts();
+  }, [loadSystemFonts, loadGoogleFonts]);
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return;
+  // Ensure font is loaded when selected
+  useEffect(() => {
+    ensureFontLoaded(textSettings.fontFamily);
+  }, [textSettings.fontFamily, ensureFontLoaded]);
 
-    const text = "Hg";
-    const fontSize = "40px";
-
-    const getPixelSum = (weight: string) => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.font = `${weight} ${fontSize} "${family}"`;
-      ctx.fillText(text, 10, 30);
-      const data = ctx.getImageData(0, 0, 150, 50).data;
-      let sum = 0;
-      for (let i = 3; i < data.length; i += 4) {
-        if (data[i] > 0) sum += 1; // Count filled pixels
-      }
-      return sum;
-    };
-
-    canvas.width = 200;
-    canvas.height = 60;
-    ctx.textBaseline = "top";
-    ctx.fillStyle = "black";
-
-    const normalSum = getPixelSum("400");
-    const boldSum = getPixelSum("700");
-
-    testWeights.forEach((w) => {
-      const currentSum = getPixelSum(w);
-      if (w === "400") {
-        detected.push(w);
-        return;
-      }
-      if (w === "700") {
-        detected.push(w);
-        return;
-      }
-
-      // If it differs from both normal and bold, it's likely a unique weight
-      const diffFromNormal = Math.abs(currentSum - normalSum);
-      const diffFromBold = Math.abs(currentSum - boldSum);
-
-      if (diffFromNormal > 2 || diffFromBold > 2) {
-        detected.push(w);
-      }
-    });
-
-    if (detected.length <= 2) {
-      setTimeout(() => setAvailableWeights(["normal", "bold"]), 0);
-    } else {
-      const sorted = detected.sort((a, b) => parseInt(a) - parseInt(b));
-      setTimeout(() => setAvailableWeights(sorted), 0);
-    }
-  }, [textSettings.fontFamily]);
+  const availableWeights = useMemo(
+    () => getFontWeights(textSettings.fontFamily),
+    [getFontWeights, textSettings.fontFamily],
+  );
 
   // Fallback if current weight is missing in new font
   useEffect(() => {
@@ -129,20 +94,26 @@ export const TextOptions: React.FC = () => {
       availableWeights.length > 0 &&
       !availableWeights.includes(String(textSettings.fontWeight))
     ) {
-      updateToolSettings("text", { fontWeight: "400" });
+      const current = parseInt(String(textSettings.fontWeight)) || 400;
+      const closest = availableWeights.reduce((prev, curr) => {
+        return Math.abs(parseInt(curr) - current) < Math.abs(parseInt(prev) - current)
+          ? curr
+          : prev;
+      });
+      updateToolSettings("text", { fontWeight: closest });
     }
-  }, [availableWeights, textSettings.fontWeight, updateToolSettings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableWeights, updateToolSettings]);
 
-  // 1. Sync ToolOptions UI with selected layer properties
+  // Sync ToolOptions UI with selected layer properties
   useEffect(() => {
     if (activeProject && activeProject.activeLayerId) {
       const layer = activeProject.layers.find((l) => l.id === activeProject.activeLayerId);
       if (layer && layer.type === "text" && !textSettings.isEditing) {
-        // Only update if values are actually different to avoid cycles
         const currentLayerProps = {
           fontSize: layer.fontSize || 24,
           fontFamily: layer.fontFamily || "Arial",
-          fontWeight: layer.fontWeight || "normal",
+          fontWeight: layer.fontWeight || "400",
           color: layer.color || "#000000",
           textAlign: layer.textAlign || "left",
           tracking: layer.tracking || 0,
@@ -160,15 +131,13 @@ export const TextOptions: React.FC = () => {
         }
       }
     }
-    // We only want to sync when the active layer ID changes or when we stop editing
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProject?.activeLayerId, textSettings.isEditing]);
+  }, [activeProject?.activeLayerId, textSettings.isEditing, updateToolSettings]);
 
-  // 2. Live updates from ToolOptions to the layer
+  // Live updates from ToolOptions to the layer
   useEffect(() => {
     if (activeProject && activeProject.activeLayerId) {
       const layer = activeProject.layers.find((l) => l.id === activeProject.activeLayerId);
-      // Update if editing OR if the layer is selected while the text tool is active
       if (layer && layer.type === "text" && (textSettings.isEditing || activeToolId === "text")) {
         const baseUpdates: any = {
           fontSize: textSettings.fontSize,
@@ -182,17 +151,18 @@ export const TextOptions: React.FC = () => {
           textRendering: textSettings.textRendering,
         };
 
-        // For point text, we must recalculate width/height to avoid clipping
         let dimensionUpdates: any = {};
 
-        // Baseline Pivot scaling: oldY + oldFontSize = newY + newFontSize
-        // So newY = oldY + oldFontSize - newFontSize
         if (layer.fontSize !== textSettings.fontSize) {
           dimensionUpdates.y = Math.round(layer.y + (layer.fontSize || 24) - textSettings.fontSize);
         }
 
         if (layer.textType === "point") {
-          const ctx = canvasRef.current.getContext("2d")!;
+          // Use temporary canvas for measurement
+          if (!canvasRef.current) {
+            (canvasRef as any).current = document.createElement("canvas");
+          }
+          const ctx = canvasRef.current!.getContext("2d")!;
           const metrics = TextLayer.calculateMetrics(ctx, layer, {
             ...baseUpdates,
             ...dimensionUpdates,
@@ -206,8 +176,6 @@ export const TextOptions: React.FC = () => {
         }
 
         const updates = { ...baseUpdates, ...dimensionUpdates };
-
-        // Only update if there's a real change to avoid infinite loops or unnecessary renders
         const hasChange = Object.keys(updates).some(
           (key) => (updates as any)[key] !== (layer as any)[key],
         );
@@ -219,8 +187,7 @@ export const TextOptions: React.FC = () => {
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [textSettings, activeProject?.activeLayerId, activeToolId]);
+  }, [textSettings, activeProject, activeToolId]);
 
   const handleApply = () => {
     window.dispatchEvent(new CustomEvent("forge:text-apply"));
@@ -234,6 +201,15 @@ export const TextOptions: React.FC = () => {
     updateToolSettings("text", { textAlign: align });
   };
 
+  const sortedSystemFonts = useMemo(
+    () => [...systemFonts].sort((a, b) => a.family.localeCompare(b.family)),
+    [systemFonts],
+  );
+  const sortedGoogleFonts = useMemo(
+    () => [...googleFonts].sort((a, b) => a.family.localeCompare(b.family)),
+    [googleFonts],
+  );
+
   return (
     <div className="flex items-center gap-4 w-full">
       {/* Font Family & Weight */}
@@ -242,20 +218,28 @@ export const TextOptions: React.FC = () => {
         <select
           value={textSettings.fontFamily}
           onChange={(e) => updateToolSettings("text", { fontFamily: e.target.value })}
-          className="bg-zinc-800 border-none text-[0.75rem] text-white px-2 py-1 rounded outline-none focus:ring-1 focus:ring-accent min-w-[100px]"
+          className="bg-zinc-800 border-none text-[0.75rem] text-white px-2 py-1 rounded outline-none focus:ring-1 focus:ring-accent min-w-[120px] max-w-[200px]"
         >
-          <option value="Arial">Arial</option>
-          <option value="Times New Roman">Times New Roman</option>
-          <option value="Courier New">Courier New</option>
-          <option value="Verdana">Verdana</option>
-          <option value="Georgia">Georgia</option>
-          <option value="system-ui">System UI</option>
+          <optgroup label="System Fonts">
+            {sortedSystemFonts.map((f) => (
+              <option key={f.family} value={f.family}>
+                {f.family}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Google Fonts">
+            {sortedGoogleFonts.map((f) => (
+              <option key={f.family} value={f.family}>
+                {f.family}
+              </option>
+            ))}
+          </optgroup>
         </select>
 
         <select
           value={textSettings.fontWeight}
           onChange={(e) => updateToolSettings("text", { fontWeight: e.target.value })}
-          className="bg-zinc-800 border-none text-[0.75rem] text-white px-2 py-1 rounded outline-none focus:ring-1 focus:ring-accent w-24"
+          className="bg-zinc-800 border-none text-[0.75rem] text-white px-2 py-1 rounded outline-none focus:ring-1 focus:ring-accent w-28"
         >
           {availableWeights.map((w) => (
             <option key={w} value={w}>

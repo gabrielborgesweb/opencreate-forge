@@ -4,8 +4,9 @@ TODO: OpenCreate Forge
 [-] Marcar como pendente
 
 - [ ] Guias (depois de Régua)
-- [ ] Carregar todas as fontes do sistema
-  - [ ] Integrar com Google Fonts
+- [x] Carregar todas as fontes do sistema
+  - [x] Integrar com Google Fonts
+  - [x] Corrigir e verificar se todos os weights estão sendo renderizados corretamente
 - [x] Salvamento local
   - [x] Ferramenta atual
   - [x] Foreground atual

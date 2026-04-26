@@ -85,11 +85,18 @@
     },
     "win": {
       "icon": "shared/favicon/favicon-windows.ico",
-      "target": "nsis"
+      "target": [
+        "nsis",
+        "portable"
+      ]
     },
     "linux": {
       "icon": "shared/favicon/favicon-linux.png",
-      "target": "AppImage"
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ]
     },
     "dmg": {
       "sign": false

@@ -79,56 +79,69 @@ jobs:
           TAG="${{ steps.get_version.outputs.tag_name }}"
           REPO="${{ github.repository }}"
           BASE_URL="https://github.com/$REPO/releases/download/$TAG"
-          
+
           # electron-builder sanitization rules:
           # Windows: Spaces to dots
           # macOS: Spaces are kept (usually)
           # Linux: Spaces to hyphens
-          
+
           PRODUCT_NAME="OpenCreate Forge"
           WIN_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /./g')
           MAC_NAME="$PRODUCT_NAME"
           LINUX_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /-/g')
-          
+
           # URL encode for the table links (replacing space with %20 for macOS)
           MAC_URL_NAME=$(echo "$MAC_NAME" | sed 's/ /%20/g')
-          
+
           cat <<EOF > body.md
           ## Downloads
-          
+
           <table>
           <thead>
           <tr>
           <th>Platform</th>
           <th>Architecture</th>
-          <th>Download</th>
+          <th>Format</th>
           </tr>
           </thead>
           <tbody>
           <tr>
-          <td><strong>Windows</strong></td>
-          <td>x64</td>
+          <td rowspan="2"><strong>Windows</strong></td>
+          <td rowspan="2">x64</td>
           <td><a href="$BASE_URL/$WIN_NAME.Setup.$VERSION.exe">Installer (EXE)</a></td>
           </tr>
           <tr>
-          <td rowspan="2"><strong>macOS</strong></td>
-          <td>Intel (x64)</td>
+          <td><a href="$BASE_URL/$WIN_NAME.$VERSION.exe">Portable (EXE)</a></td>
+          </tr>
+          <tr>
+          <td rowspan="4"><strong>macOS</strong></td>
+          <td rowspan="2">Intel (x64)</td>
           <td><a href="$BASE_URL/$MAC_URL_NAME-$VERSION.dmg">Universal/Intel (DMG)</a></td>
           </tr>
           <tr>
-          <td>Apple Silicon (arm64)</td>
+          <td><a href="$BASE_URL/$MAC_URL_NAME-$VERSION-mac.zip">Portable (ZIP/APP)</a></td>
+          </tr>
+          <tr>
+          <td rowspan="2">Apple Silicon (arm64)</td>
           <td><a href="$BASE_URL/$MAC_URL_NAME-$VERSION-arm64.dmg">Download (DMG)</a></td>
           </tr>
           <tr>
-          <td><strong>Linux</strong></td>
-          <td>x64</td>
+          <td><a href="$BASE_URL/$MAC_URL_NAME-$VERSION-arm64-mac.zip">Portable (ZIP/APP)</a></td>
+          </tr>
+          <tr>
+          <td rowspan="3"><strong>Linux</strong></td>
+          <td rowspan="3">x64</td>
           <td><a href="$BASE_URL/$LINUX_NAME-$VERSION.AppImage">AppImage</a></td>
+          </tr>
+          <tr>
+          <td><a href="$BASE_URL/${LINUX_NAME}_${VERSION}_amd64.deb">Debian (DEB)</a></td>
+          </tr>
+          <tr>
+          <td><a href="$BASE_URL/$LINUX_NAME-$VERSION.x86_64.rpm">RedHat (RPM)</a></td>
           </tr>
           </tbody>
           </table>
-          
-          ---
-          *For more details on changes in this release, please check the commit history.*
+
           EOF
 
       - name: Create Release
@@ -136,7 +149,7 @@ jobs:
         with:
           body_path: body.md
           files: artifacts/*
-          draft: false
+          draft: true
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
